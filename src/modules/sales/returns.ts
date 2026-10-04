@@ -1,0 +1,283 @@
+import { Prisma } from "@prisma/client";
+
+import { prisma } from "@/lib/db/client";
+import { writeAudit } from "@/modules/auth/audit";
+import { PostingError, postBalancedJournal } from "@/modules/accounting/post";
+import { outstandingReceivable } from "@/modules/customers/customers";
+import { allocateNumber, documentYear } from "@/modules/documents/numbers";
+import { hashPayload, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
+import { decimalString, parseQuantity } from "@/modules/inventory/money";
+import { applyMovement, StockRuleError } from "@/modules/inventory/stock";
+import { returnLineAmount } from "@/modules/returns/amount";
+
+type Failure = { ok: false; status: 404 | 409 | 422; code: "NOT_FOUND" | "CONFLICT" | "BUSINESS_RULE"; message: string };
+
+type Actor = {
+  organizationId: string;
+  branchId: string;
+  userId: string;
+  idempotencyKey: string;
+  ip: string;
+  userAgent: string | null;
+};
+
+function money(value: Prisma.Decimal) {
+  return value.toDecimalPlaces(2);
+}
+
+function zero() {
+  return new Prisma.Decimal(0);
+}
+
+function occurredDate(value: string) {
+  return new Date(`${value}T00:00:00.000Z`);
+}
+
+function failure(error: unknown): Failure | null {
+  if (error instanceof StockRuleError || error instanceof PostingError) {
+    const status = error instanceof StockRuleError ? error.status : 422;
+    return {
+      ok: false,
+      status,
+      code: status === 404 ? "NOT_FOUND" : status === 409 ? "CONFLICT" : "BUSINESS_RULE",
+      message: error.message,
+    };
+  }
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+    return { ok: false, status: 409, code: "CONFLICT", message: "That document number was already used. Try again." };
+  }
+  return null;
+}
+
+export async function postSaleReturn(
+  input: Actor & { saleId: string; occurredOn: string; lines: Array<{ saleItemId: string; quantity: string }> },
+) {
+  const requestHash = hashPayload({ saleId: input.saleId, occurredOn: input.occurredOn, lines: input.lines });
+  try {
+    const data = await prisma.$transaction(async (tx) => {
+      const existing = await readIdempotency(tx, { organizationId: input.organizationId, key: input.idempotencyKey, requestHash });
+      if (existing === "mismatch") {
+        throw new StockRuleError("This idempotency key was already used for a different request.", 409);
+      }
+      if (existing) {
+        return { id: existing.entityId, replayed: true, number: null as string | null, total: null as string | null };
+      }
+      const sale = await tx.sale.findFirst({
+        where: { id: input.saleId, organizationId: input.organizationId },
+        select: { id: true, branchId: true, warehouseId: true, customerId: true, status: true },
+      });
+      if (!sale || sale.branchId !== input.branchId) {
+        throw new StockRuleError("That record was not found.", 404);
+      }
+      if (sale.status !== "POSTED" || !sale.warehouseId) {
+        throw new StockRuleError("Only a posted sale can be returned.");
+      }
+      if (new Set(input.lines.map((line) => line.saleItemId)).size !== input.lines.length) {
+        throw new StockRuleError("Each sale line can appear once on a return.");
+      }
+      const priced = [];
+      for (const line of input.lines) {
+        const quantity = parseQuantity(line.quantity);
+        if (!quantity) {
+          throw new StockRuleError("Enter a quantity greater than zero.");
+        }
+        const locked = await tx.$queryRaw<Array<{ id: string; productId: string; variantId: string | null; quantity: Prisma.Decimal; unitPrice: Prisma.Decimal; lineTotal: Prisma.Decimal }>>`
+          SELECT id, productId, variantId, quantity, unitPrice, lineTotal FROM sale_items
+          WHERE id = ${line.saleItemId} AND saleId = ${sale.id} AND organizationId = ${input.organizationId}
+          FOR UPDATE
+        `;
+        const item = locked[0];
+        if (!item) {
+          throw new StockRuleError("That record was not found.", 404);
+        }
+        const prior = await tx.saleReturnItem.findMany({
+          where: { saleItemId: item.id, saleReturn: { status: "POSTED" } },
+          orderBy: [{ saleReturn: { createdAt: "asc" } }, { id: "asc" }],
+          select: { quantity: true },
+        });
+        const amount = returnLineAmount({
+          sourceQuantity: new Prisma.Decimal(item.quantity),
+          unitAmount: new Prisma.Decimal(item.unitPrice),
+          sourceTotal: new Prisma.Decimal(item.lineTotal),
+          priorQuantities: prior.map((row) => new Prisma.Decimal(row.quantity)),
+          quantity,
+        });
+        const unitCost = await saleUnitCost(tx, input.organizationId, sale.id, item.productId, item.variantId);
+        const cost = returnLineAmount({
+          sourceQuantity: new Prisma.Decimal(item.quantity),
+          unitAmount: unitCost,
+          sourceTotal: money(new Prisma.Decimal(item.quantity).mul(unitCost)),
+          priorQuantities: prior.map((row) => new Prisma.Decimal(row.quantity)),
+          quantity,
+        });
+        priced.push({ saleItemId: item.id, productId: item.productId, variantId: item.variantId, quantity, amount, unitCost, cost });
+      }
+      const total = money(priced.reduce((sum, line) => sum.plus(line.amount), zero()));
+      const cost = money(priced.reduce((sum, line) => sum.plus(line.cost), zero()));
+      const split = await receivableSplit(tx, input.organizationId, sale.customerId, total);
+      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "RET", year: documentYear(input.occurredOn) });
+      const saleReturn = await tx.saleReturn.create({
+        data: {
+          organizationId: input.organizationId,
+          branchId: input.branchId,
+          saleId: sale.id,
+          number,
+          status: "POSTED",
+          occurredOn: occurredDate(input.occurredOn),
+          total,
+          items: { create: priced.map((line) => ({ organizationId: input.organizationId, saleItemId: line.saleItemId, quantity: line.quantity })) },
+        },
+        select: { id: true, number: true },
+      });
+      for (const line of priced) {
+        await applyMovement(tx, {
+          organizationId: input.organizationId,
+          productId: line.productId,
+          variantId: line.variantId,
+          branchId: input.branchId,
+          warehouseId: sale.warehouseId,
+          quantity: line.quantity,
+          direction: "IN",
+          movementType: "CUSTOMER_RETURN",
+          referenceType: "sale_return",
+          referenceId: saleReturn.id,
+          userId: input.userId,
+          unitCost: line.unitCost,
+        });
+      }
+      const journalLines = [
+        ...(total.gt(0) ? [{ accountCode: "4100", debit: total, credit: zero() }] : []),
+        ...(split.applied.gt(0) ? [{ accountCode: "1300", debit: zero(), credit: split.applied }] : []),
+        ...(split.refund.gt(0) ? [{ accountCode: "1100", debit: zero(), credit: split.refund }] : []),
+        ...(cost.gt(0)
+          ? [
+              { accountCode: "1400", debit: cost, credit: zero() },
+              { accountCode: "5100", debit: zero(), credit: cost },
+            ]
+          : []),
+      ];
+      if (journalLines.length > 0) {
+        const journalId = await postBalancedJournal(tx, {
+          organizationId: input.organizationId,
+          branchId: input.branchId,
+          occurredOn: occurredDate(input.occurredOn),
+          description: `Sale return ${number}`,
+          createdById: input.userId,
+          lines: journalLines,
+        });
+        await tx.saleReturn.update({ where: { id: saleReturn.id }, data: { journalId } });
+      }
+      if (sale.customerId && split.applied.gt(0)) {
+        await tx.customerLedger.create({
+          data: {
+            organizationId: input.organizationId,
+            branchId: input.branchId,
+            customerId: sale.customerId,
+            occurredOn: occurredDate(input.occurredOn),
+            entryType: "RETURN",
+            credit: split.applied,
+            referenceType: "sale_return",
+            referenceId: saleReturn.id,
+          },
+        });
+      }
+      await saveIdempotency(tx, {
+        organizationId: input.organizationId,
+        userId: input.userId,
+        key: input.idempotencyKey,
+        requestHash,
+        entityType: "sale_return",
+        entityId: saleReturn.id,
+      });
+      return { id: saleReturn.id, number: saleReturn.number, replayed: false, total: decimalString(total, 2) };
+    });
+    if (!data.replayed) {
+      await writeAudit({
+        organizationId: input.organizationId,
+        branchId: input.branchId,
+        userId: input.userId,
+        action: "return",
+        module: "sales",
+        entityType: "sale_return",
+        entityId: data.id,
+        after: { number: data.number },
+        ip: input.ip,
+        userAgent: input.userAgent,
+      });
+    }
+    return { ok: true as const, ...data };
+  } catch (error) {
+    const mapped = failure(error);
+    if (mapped) {
+      return mapped;
+    }
+    throw error;
+  }
+}
+
+async function saleUnitCost(tx: Prisma.TransactionClient, organizationId: string, saleId: string, productId: string, variantId: string | null) {
+  const rows = await tx.stockLedger.findMany({
+    where: { organizationId, referenceType: "sale", referenceId: saleId, productId, variantId, direction: "OUT", movementType: "SALE" },
+    select: { unitCost: true },
+  });
+  const first = rows[0]?.unitCost;
+  if (first === null || first === undefined || rows.some((row) => row.unitCost === null || !new Prisma.Decimal(row.unitCost ?? 0).eq(first))) {
+    throw new StockRuleError("This return has no single unit cost on the original sale.");
+  }
+  return new Prisma.Decimal(first);
+}
+
+async function receivableSplit(tx: Prisma.TransactionClient, organizationId: string, customerId: string | null, total: Prisma.Decimal) {
+  if (!customerId || total.eq(0)) {
+    return { applied: zero(), refund: total };
+  }
+  await tx.$queryRaw`SELECT id FROM customers WHERE id = ${customerId} AND organizationId = ${organizationId} FOR UPDATE`;
+  const outstanding = await outstandingReceivable(organizationId, customerId, tx);
+  const applied = money(Prisma.Decimal.min(total, outstanding.gt(0) ? outstanding : zero()));
+  return { applied, refund: money(total.minus(applied)) };
+}
+
+export async function listSaleReturns(organizationId: string, branchId: string) {
+  const rows = await prisma.saleReturn.findMany({
+    where: { organizationId, branchId },
+    orderBy: { occurredOn: "desc" },
+    take: 50,
+    select: { id: true, number: true, status: true, total: true, occurredOn: true, sale: { select: { invoice: { select: { number: true } } } } },
+  });
+  return rows.map((row) => ({
+    id: row.id,
+    number: row.number,
+    status: row.status,
+    total: decimalString(row.total, 2),
+    occurredOn: row.occurredOn.toISOString().slice(0, 10),
+    source: row.sale.invoice?.number ?? "Sale",
+  }));
+}
+
+export async function listReturnableSaleLines(organizationId: string, branchId: string) {
+  const rows = await prisma.saleItem.findMany({
+    where: { organizationId, sale: { branchId, status: "POSTED" } },
+    orderBy: { sale: { occurredOn: "desc" } },
+    take: 100,
+    select: {
+      id: true,
+      saleId: true,
+      quantity: true,
+      product: { select: { sku: true, name: true } },
+      sale: { select: { invoice: { select: { number: true } } } },
+      returnItems: { where: { saleReturn: { status: "POSTED" } }, select: { quantity: true } },
+    },
+  });
+  return rows.flatMap((row) => {
+    const returned = row.returnItems.reduce((sum, item) => sum.plus(item.quantity), zero());
+    const eligible = new Prisma.Decimal(row.quantity).minus(returned);
+    if (eligible.lte(0)) {
+      return [];
+    }
+    return [{
+      saleId: row.saleId,
+      itemId: row.id,
+      label: `${row.sale.invoice?.number ?? "Sale"} · ${row.product.sku} · ${row.product.name} · eligible ${decimalString(eligible, 4)}`,
+    }];
+  });
+}
