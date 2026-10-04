@@ -1,0 +1,52 @@
+{
+  "name": "meridian",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=20.9"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "start:cpanel": "node server.js",
+    "lint": "eslint .",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "node --experimental-strip-types --import ./src/test/register.mjs --test src/lib/format/date.test.ts src/lib/format/money.test.ts src/lib/screens/registry.test.ts src/lib/db/schema.test.ts src/modules/auth/auth.test.ts src/modules/inventory/inventory.test.ts src/modules/purchasing/purchase.test.ts src/modules/sales/sale.test.ts src/modules/returns/return.test.ts src/modules/accounting/accounting.test.ts src/modules/customers/customer.test.ts src/modules/commerce/commerce.test.ts src/modules/shifts/shift.test.ts src/modules/sms/sms.test.ts src/modules/reports/report.test.ts src/modules/imports/import.test.ts src/modules/auth/security.test.ts src/modules/performance/performance.test.ts src/modules/qa/qa.test.ts"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^5.9.1",
+    "@prisma/client": "^6.19.3",
+    "@radix-ui/react-dialog": "^1.1.23",
+    "@radix-ui/react-dropdown-menu": "^2.1.24",
+    "@radix-ui/react-popover": "^1.1.23",
+    "@radix-ui/react-tabs": "^1.1.21",
+    "@radix-ui/react-tooltip": "^1.2.16",
+    "bcryptjs": "^3.0.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.49.0",
+    "next": "16.3.8",
+    "nodemailer": "^10.0.13",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-hook-form": "^7.89.0",
+    "tailwind-merge": "^3.7.0",
+    "zod": "^3.25.76"
+  },
+  "prisma": {
+    "seed": "node --experimental-strip-types --import ./src/test/register.mjs prisma/seed.ts"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.8",
+    "prisma": "^6.19.3",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

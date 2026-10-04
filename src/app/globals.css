@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f4f6f8;
+  --surface: #ffffff;
+  --surface-muted: #f7f8fa;
+  --border: #e3e7ee;
+  --text: #152033;
+  --muted: #4a5568;
+  --primary: #123a63;
+  --primary-hover: #0d2c4c;
+  --primary-foreground: #ffffff;
+  --secondary: #e7eef6;
+  --secondary-foreground: #123a63;
+  --success: #067647;
+  --success-subtle: #e8f6ef;
+  --warning: #9a4d08;
+  --warning-subtle: #fef4e6;
+  --error: #b42318;
+  --error-subtle: #fdeceb;
+  --info: #175cd3;
+  --info-subtle: #e8f0fe;
+  --sidebar: #0f2744;
+  --sidebar-foreground: #f4f7fb;
+  --sidebar-muted: #c5d2e2;
+  --sidebar-active: #1b426e;
+  --sidebar-border: #1e3a5c;
+  --ring: #1d4e89;
+  --radius: 0.375rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-success: var(--success);
+  --color-success-subtle: var(--success-subtle);
+  --color-warning: var(--warning);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-error: var(--error);
+  --color-error-subtle: var(--error-subtle);
+  --color-info: var(--info);
+  --color-info-subtle: var(--info-subtle);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-active: var(--sidebar-active);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-ring: var(--ring);
+  --font-sans: var(--font-ibm);
+  --radius-md: var(--radius);
+}
+
+body {
+  background: var(--background);
+  color: var(--text);
+  font-family: var(--font-ibm), "Segoe UI", sans-serif;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .print-sheet,
+  .print-sheet * {
+    visibility: visible;
+  }
+
+  .print-sheet {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    border: 0;
+  }
+
+  .print-sheet.thermal {
+    width: 80mm;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

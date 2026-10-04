@@ -1,0 +1,431 @@
+import { Prisma } from "@prisma/client";
+
+import { prisma } from "@/lib/db/client";
+import { writeAudit } from "@/modules/auth/audit";
+import { PostingError, postBalancedJournal } from "@/modules/accounting/post";
+import { allocateNumber, documentYear } from "@/modules/documents/numbers";
+import { hashPayload, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
+import { decimalString, parseMoney, parseQuantity } from "@/modules/inventory/money";
+import { applyMovement, resolveWarehouse, StockRuleError } from "@/modules/inventory/stock";
+import { outstandingPayable } from "@/modules/purchasing/suppliers";
+
+type Failure = { ok: false; status: 404 | 409 | 422; code: "NOT_FOUND" | "CONFLICT" | "BUSINESS_RULE"; message: string };
+
+export type PurchaseLine = { productId: string; variantId?: string; quantity: string; unitCost: string };
+
+type Actor = {
+  organizationId: string;
+  branchId: string;
+  userId: string;
+  warehouseId?: string;
+  idempotencyKey: string;
+  ip: string;
+  userAgent: string | null;
+};
+
+function money(value: Prisma.Decimal) {
+  return value.toDecimalPlaces(2);
+}
+
+function failure(error: unknown): Failure | null {
+  if (error instanceof StockRuleError || error instanceof PostingError) {
+    const status = error instanceof StockRuleError ? error.status : 422;
+    return {
+      ok: false,
+      status,
+      code: status === 404 ? "NOT_FOUND" : status === 409 ? "CONFLICT" : "BUSINESS_RULE",
+      message: error.message,
+    };
+  }
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+    return { ok: false, status: 409, code: "CONFLICT", message: "That document number was already used. Try again." };
+  }
+  return null;
+}
+
+function occurredDate(value: string) {
+  return new Date(`${value}T00:00:00.000Z`);
+}
+
+export async function postPurchase(
+  input: Actor & {
+    supplierId: string;
+    occurredOn: string;
+    lines: PurchaseLine[];
+    paymentAmount?: string;
+    paymentMethod?: "CASH" | "BANK";
+  },
+) {
+  const requestHash = hashPayload({
+    supplierId: input.supplierId,
+    occurredOn: input.occurredOn,
+    warehouseId: input.warehouseId ?? null,
+    lines: input.lines,
+    paymentAmount: input.paymentAmount ?? "0.00",
+    paymentMethod: input.paymentMethod ?? null,
+  });
+  try {
+    const data = await prisma.$transaction(async (tx) => {
+      const existing = await readIdempotency(tx, {
+        organizationId: input.organizationId,
+        key: input.idempotencyKey,
+        requestHash,
+      });
+      if (existing === "mismatch") {
+        throw new StockRuleError("This idempotency key was already used for a different request.", 409);
+      }
+      if (existing) {
+        return { id: existing.entityId, replayed: true, number: null as string | null };
+      }
+      const supplier = await tx.supplier.findFirst({
+        where: { id: input.supplierId, organizationId: input.organizationId },
+        select: { id: true, status: true, creditLimit: true },
+      });
+      if (!supplier) {
+        throw new StockRuleError("That record was not found.", 404);
+      }
+      if (supplier.status !== "ACTIVE") {
+        throw new StockRuleError("That supplier is not active.");
+      }
+      const warehouse = await resolveWarehouse(input.organizationId, input.branchId, input.warehouseId);
+      if (!warehouse) {
+        throw new StockRuleError("Choose an active warehouse on the current branch.");
+      }
+      const payment = parseMoney(input.paymentAmount ?? "0.00");
+      if (!payment) {
+        throw new StockRuleError("Enter a payment amount with up to two decimals.");
+      }
+      if (payment.gt(0) && !input.paymentMethod) {
+        throw new StockRuleError("Choose cash or bank for the payment.");
+      }
+      const priced = input.lines.map((line) => {
+        const quantity = parseQuantity(line.quantity);
+        const unitCost = parseMoney(line.unitCost);
+        if (!quantity || !unitCost) {
+          throw new StockRuleError("Enter a quantity greater than zero and a unit cost with up to two decimals.");
+        }
+        return { ...line, quantity, unitCost, lineTotal: money(quantity.mul(unitCost)) };
+      });
+      const subtotal = money(priced.reduce((sum, line) => sum.plus(line.lineTotal), new Prisma.Decimal(0)));
+      if (payment.gt(subtotal)) {
+        throw new StockRuleError("The payment is greater than the purchase total.");
+      }
+      const number = await allocateNumber(tx, {
+        organizationId: input.organizationId,
+        documentType: "PUR",
+        year: documentYear(input.occurredOn),
+      });
+      const purchase = await tx.purchase.create({
+        data: {
+          organizationId: input.organizationId,
+          branchId: input.branchId,
+          warehouseId: warehouse.id,
+          supplierId: supplier.id,
+          number,
+          status: "POSTED",
+          subtotal,
+          discountTotal: new Prisma.Decimal(0),
+          vatTotal: new Prisma.Decimal(0),
+          chargesTotal: new Prisma.Decimal(0),
+          total: subtotal,
+          occurredOn: occurredDate(input.occurredOn),
+          createdById: input.userId,
+          items: {
+            create: priced.map((line) => ({
+              organizationId: input.organizationId,
+              productId: line.productId,
+              variantId: line.variantId ?? null,
+              quantity: line.quantity,
+              unitCost: line.unitCost,
+              lineTotal: line.lineTotal,
+            })),
+          },
+        },
+        select: { id: true, number: true },
+      });
+      for (const line of priced) {
+        await applyMovement(tx, {
+          organizationId: input.organizationId,
+          productId: line.productId,
+          variantId: line.variantId,
+          branchId: input.branchId,
+          warehouseId: warehouse.id,
+          quantity: line.quantity,
+          direction: "IN",
+          movementType: "PURCHASE",
+          referenceType: "purchase",
+          referenceId: purchase.id,
+          userId: input.userId,
+          unitCost: line.unitCost,
+        });
+      }
+      const purchaseJournalId = await postBalancedJournal(tx, {
+        organizationId: input.organizationId,
+        branchId: input.branchId,
+        occurredOn: occurredDate(input.occurredOn),
+        description: `Purchase ${number}`,
+        createdById: input.userId,
+        lines: [
+          { accountCode: "1400", debit: subtotal, credit: new Prisma.Decimal(0) },
+          { accountCode: "2100", debit: new Prisma.Decimal(0), credit: subtotal },
+        ],
+      });
+      await tx.purchase.update({ where: { id: purchase.id }, data: { journalId: purchaseJournalId } });
+      await tx.supplierLedger.create({
+        data: {
+          organizationId: input.organizationId,
+          branchId: input.branchId,
+          supplierId: supplier.id,
+          occurredOn: occurredDate(input.occurredOn),
+          entryType: "PURCHASE",
+          credit: subtotal,
+          referenceType: "purchase",
+          referenceId: purchase.id,
+        },
+      });
+      if (payment.gt(0) && input.paymentMethod) {
+        await settleSupplier(tx, {
+          ...input,
+          supplierId: supplier.id,
+          occurredOn: input.occurredOn,
+          amount: payment,
+          method: input.paymentMethod,
+          purchaseId: purchase.id,
+        });
+      }
+      if (supplier.creditLimit) {
+        const balance = await outstandingPayable(input.organizationId, supplier.id, tx);
+        if (balance.gt(supplier.creditLimit)) {
+          throw new StockRuleError("The purchase exceeds the supplier credit limit.");
+        }
+      }
+      await saveIdempotency(tx, {
+        organizationId: input.organizationId,
+        userId: input.userId,
+        key: input.idempotencyKey,
+        requestHash,
+        entityType: "purchase",
+        entityId: purchase.id,
+      });
+      return { id: purchase.id, number: purchase.number, replayed: false, total: decimalString(subtotal, 2) };
+    });
+    if (!data.replayed) {
+      await writeAudit({
+        organizationId: input.organizationId,
+        branchId: input.branchId,
+        userId: input.userId,
+        action: "purchase",
+        module: "purchases",
+        entityType: "purchase",
+        entityId: data.id,
+        after: { number: data.number },
+        ip: input.ip,
+        userAgent: input.userAgent,
+      });
+    }
+    return { ok: true as const, ...data };
+  } catch (error) {
+    const mapped = failure(error);
+    if (mapped) {
+      return mapped;
+    }
+    throw error;
+  }
+}
+
+async function settleSupplier(
+  tx: Prisma.TransactionClient,
+  input: Actor & { supplierId: string; occurredOn: string; amount: Prisma.Decimal; method: "CASH" | "BANK"; purchaseId?: string },
+) {
+  const number = await allocateNumber(tx, {
+    organizationId: input.organizationId,
+    documentType: "PAY",
+    year: documentYear(input.occurredOn),
+  });
+  const journalId = await postBalancedJournal(tx, {
+    organizationId: input.organizationId,
+    branchId: input.branchId,
+    occurredOn: occurredDate(input.occurredOn),
+    description: `Supplier payment ${number}`,
+    createdById: input.userId,
+    lines: [
+      { accountCode: "2100", debit: input.amount, credit: new Prisma.Decimal(0) },
+      { accountCode: input.method === "CASH" ? "1100" : "1200", debit: new Prisma.Decimal(0), credit: input.amount },
+    ],
+  });
+  const payment = await tx.supplierPayment.create({
+    data: {
+      organizationId: input.organizationId,
+      branchId: input.branchId,
+      supplierId: input.supplierId,
+      number,
+      occurredOn: occurredDate(input.occurredOn),
+      method: input.method,
+      amount: input.amount,
+      journalId,
+    },
+    select: { id: true, number: true },
+  });
+  if (input.purchaseId) {
+    await tx.purchasePayment.create({
+      data: {
+        organizationId: input.organizationId,
+        purchaseId: input.purchaseId,
+        method: input.method,
+        amount: input.amount,
+      },
+    });
+  }
+  await tx.supplierLedger.create({
+    data: {
+      organizationId: input.organizationId,
+      branchId: input.branchId,
+      supplierId: input.supplierId,
+      occurredOn: occurredDate(input.occurredOn),
+      entryType: "PAYMENT",
+      debit: input.amount,
+      referenceType: "supplier_payment",
+      referenceId: payment.id,
+    },
+  });
+  return payment;
+}
+
+export async function postSupplierPayment(
+  input: Actor & { supplierId: string; occurredOn: string; amount: string; method: "CASH" | "BANK" },
+) {
+  const requestHash = hashPayload({
+    supplierId: input.supplierId,
+    occurredOn: input.occurredOn,
+    amount: input.amount,
+    method: input.method,
+  });
+  try {
+    const data = await prisma.$transaction(async (tx) => {
+      const existing = await readIdempotency(tx, {
+        organizationId: input.organizationId,
+        key: input.idempotencyKey,
+        requestHash,
+      });
+      if (existing === "mismatch") {
+        throw new StockRuleError("This idempotency key was already used for a different request.", 409);
+      }
+      if (existing) {
+        return { id: existing.entityId, replayed: true };
+      }
+      const supplier = await tx.supplier.findFirst({
+        where: { id: input.supplierId, organizationId: input.organizationId, status: "ACTIVE" },
+        select: { id: true },
+      });
+      if (!supplier) {
+        throw new StockRuleError("That record was not found.", 404);
+      }
+      const amount = parseMoney(input.amount);
+      if (!amount || amount.lte(0)) {
+        throw new StockRuleError("Enter a payment amount greater than zero.");
+      }
+      const balance = await outstandingPayable(input.organizationId, supplier.id, tx);
+      if (amount.gt(balance)) {
+        throw new StockRuleError("The payment is greater than the outstanding payable.");
+      }
+      const payment = await settleSupplier(tx, { ...input, supplierId: supplier.id, amount });
+      await saveIdempotency(tx, {
+        organizationId: input.organizationId,
+        userId: input.userId,
+        key: input.idempotencyKey,
+        requestHash,
+        entityType: "supplier_payment",
+        entityId: payment.id,
+      });
+      return { id: payment.id, number: payment.number, replayed: false };
+    });
+    if (!data.replayed) {
+      await writeAudit({
+        organizationId: input.organizationId,
+        branchId: input.branchId,
+        userId: input.userId,
+        action: "payment",
+        module: "suppliers",
+        entityType: "supplier_payment",
+        entityId: data.id,
+        after: { number: data.number ?? null },
+        ip: input.ip,
+        userAgent: input.userAgent,
+      });
+    }
+    return { ok: true as const, ...data };
+  } catch (error) {
+    const mapped = failure(error);
+    if (mapped) {
+      return mapped;
+    }
+    throw error;
+  }
+}
+
+export async function listPurchases(organizationId: string, branchId: string) {
+  const rows = await prisma.purchase.findMany({
+    where: { organizationId, branchId },
+    orderBy: { occurredOn: "desc" },
+    take: 100,
+    select: {
+      id: true,
+      number: true,
+      status: true,
+      total: true,
+      occurredOn: true,
+      supplier: { select: { name: true } },
+    },
+  });
+  return rows.map((row) => ({
+    id: row.id,
+    number: row.number,
+    status: row.status,
+    total: decimalString(row.total, 2),
+    occurredOn: row.occurredOn.toISOString().slice(0, 10),
+    supplierName: row.supplier.name,
+  }));
+}
+
+export async function getPurchase(organizationId: string, branchId: string, id: string) {
+  const row = await prisma.purchase.findFirst({
+    where: { id, organizationId, branchId },
+    include: {
+      supplier: { select: { id: true, name: true } },
+      items: { include: { product: { select: { sku: true, name: true } } } },
+      payments: true,
+      journal: { include: { lines: { select: { debit: true, credit: true } } } },
+    },
+  });
+  if (!row) {
+    return null;
+  }
+  const debit = row.journal?.lines.reduce((sum, line) => sum.plus(line.debit), new Prisma.Decimal(0)) ?? new Prisma.Decimal(0);
+  const credit = row.journal?.lines.reduce((sum, line) => sum.plus(line.credit), new Prisma.Decimal(0)) ?? new Prisma.Decimal(0);
+  return {
+    id: row.id,
+    number: row.number,
+    status: row.status,
+    occurredOn: row.occurredOn.toISOString().slice(0, 10),
+    supplier: row.supplier,
+    subtotal: decimalString(row.subtotal, 2),
+    discountTotal: decimalString(row.discountTotal, 2),
+    vatTotal: decimalString(row.vatTotal, 2),
+    chargesTotal: decimalString(row.chargesTotal, 2),
+    total: decimalString(row.total, 2),
+    journalBalanced: debit.eq(credit),
+    items: row.items.map((item) => ({
+      id: item.id,
+      sku: item.product.sku,
+      name: item.product.name,
+      quantity: decimalString(item.quantity, 4),
+      unitCost: decimalString(item.unitCost, 2),
+      lineTotal: decimalString(item.lineTotal, 2),
+    })),
+    payments: row.payments.map((payment) => ({
+      id: payment.id,
+      method: payment.method,
+      amount: decimalString(payment.amount, 2),
+    })),
+  };
+}
