@@ -24,7 +24,7 @@
 
 - [ ] `git status` পরিষ্কার; ফেজভিত্তিক কমিট ইতিহাস দেখানো
 - [ ] GitHub CI সবুজ (লিংক/স্ক্রিনশট)
-- [ ] staging সাইট খোলে, `/api/health` ok, আলাদা DB
+- [ ] লোকাল প্র্যাকটিস সাইট (`meridian_practice`, `build:cpanel`, production মোড, পোর্ট ৩১০০) খোলে: `/api/health` ok, `/login` খোলে, `x-powered-by` নেই; টেস্ট DB থেকে আলাদা DB
 - [ ] টেস্ট হারনেস দিয়ে একটি নমুনা টেস্ট পাস
 - [ ] সিড টেস্ট (C1, C2) পাস
 - [ ] typecheck, lint, test সব সবুজ
