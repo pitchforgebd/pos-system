@@ -51,11 +51,11 @@ async function lockCustomer(tx: Prisma.TransactionClient, organizationId: string
 }
 
 export async function postCustomerPayment(
-  input: Actor & { customerId: string; occurredOn: string; amount: string; method: "CASH" | "BANK" },
+  input: Actor & { customerId: string; businessDate: string; amount: string; method: "CASH" | "BANK" },
 ) {
   const requestHash = hashPayload({
     customerId: input.customerId,
-    occurredOn: input.occurredOn,
+    businessDate: input.businessDate,
     amount: input.amount,
     method: input.method,
   });
@@ -88,12 +88,12 @@ export async function postCustomerPayment(
       const number = await allocateNumber(tx, {
         organizationId: input.organizationId,
         documentType: "PAY",
-        year: documentYear(input.occurredOn),
+        year: documentYear(input.businessDate),
       });
       const journalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
-        occurredOn: occurredDate(input.occurredOn),
+        businessDate: occurredDate(input.businessDate),
         description: `Customer payment ${number}`,
         createdById: input.userId,
         lines: [
@@ -107,7 +107,7 @@ export async function postCustomerPayment(
           branchId: input.branchId,
           customerId: input.customerId,
           number,
-          occurredOn: occurredDate(input.occurredOn),
+          businessDate: occurredDate(input.businessDate),
           method: input.method,
           amount,
           journalId,
@@ -119,7 +119,7 @@ export async function postCustomerPayment(
           organizationId: input.organizationId,
           branchId: input.branchId,
           customerId: input.customerId,
-          occurredOn: occurredDate(input.occurredOn),
+          businessDate: occurredDate(input.businessDate),
           entryType: "PAYMENT",
           credit: amount,
           referenceType: "customer_payment",
@@ -163,12 +163,12 @@ export async function postCustomerPayment(
 export async function listCustomerPayments(organizationId: string, branchId: string) {
   const rows = await prisma.customerPayment.findMany({
     where: { organizationId, branchId },
-    orderBy: { occurredOn: "desc" },
+    orderBy: { businessDate: "desc" },
     take: 100,
     select: {
       id: true,
       number: true,
-      occurredOn: true,
+      businessDate: true,
       method: true,
       amount: true,
       customer: { select: { name: true } },
@@ -177,7 +177,7 @@ export async function listCustomerPayments(organizationId: string, branchId: str
   return rows.map((row) => ({
     id: row.id,
     number: row.number ?? row.id,
-    occurredOn: dateOnly(row.occurredOn),
+    businessDate: dateOnly(row.businessDate),
     customerName: row.customer.name,
     method: row.method,
     amount: decimalString(row.amount, 2),

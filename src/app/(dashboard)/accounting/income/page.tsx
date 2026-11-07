@@ -38,7 +38,7 @@ export default async function IncomePage() {
       <DataTable
         caption="Income documents"
         columns={[
-          { key: "date", header: "Date", cell: (row) => row.occurredOn },
+          { key: "date", header: "Date", cell: (row) => row.businessDate },
           { key: "category", header: "Category", cell: (row) => row.category },
           { key: "amount", header: "Amount", cell: (row) => row.amount },
           { key: "posted", header: "Journal", cell: (row) => row.posted },

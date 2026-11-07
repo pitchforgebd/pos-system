@@ -40,7 +40,7 @@ export default async function LoyaltyPage() {
       <DataTable
         caption="Loyalty ledger"
         columns={[
-          { key: "date", header: "Date", cell: (row) => row.occurredOn },
+          { key: "date", header: "Date", cell: (row) => row.businessDate },
           { key: "customer", header: "Customer", cell: (row) => row.customerName },
           { key: "type", header: "Type", cell: (row) => row.entryType },
           { key: "points", header: "Points", cell: (row) => row.points },

@@ -66,7 +66,7 @@ test("phase 15 imports each row on its own and does not post opening stock to a 
       warehouseId: warehouse.id,
       idempotencyKey: randomUUID(),
       fileName: "opening.csv",
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       csv: `sku,quantity,unitCost,rack\n${sku},2,3.00,Shelf\nMISSING,1,1.00,\n`,
     });
     assert.equal(opening.ok, true);

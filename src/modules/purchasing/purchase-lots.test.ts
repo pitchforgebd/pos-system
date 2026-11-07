@@ -73,7 +73,7 @@ test("a purchase of an expiry-tracked product creates its lots", async () => {
     const milk = await product("MILK", true);
     const salt = await product("SALT", false);
     const buy = (lines: Parameters<typeof postPurchase>[0]["lines"]) =>
-      postPurchase({ ...actor, idempotencyKey: randomUUID(), supplierId: supplier.supplier.id, occurredOn: "2026-10-01", lines });
+      postPurchase({ ...actor, idempotencyKey: randomUUID(), supplierId: supplier.supplier.id, businessDate: "2026-10-01", lines });
 
     // An expiry-tracked product needs a lot and an expiry date; nothing is posted without them.
     const bare = await buy([{ productId: milk.id, quantity: "4", unitCost: "5.00" }]);

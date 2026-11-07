@@ -9,7 +9,7 @@ import { redeemLoyalty } from "@/modules/reference/extras";
 const bodySchema = z.object({
   customerId: z.string().uuid(),
   points: z.string(),
-  occurredOn: isoDate,
+  businessDate: isoDate,
 });
 
 export async function POST(request: Request) {

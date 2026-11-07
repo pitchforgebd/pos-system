@@ -16,11 +16,11 @@ import {
 export async function reportCsv(kind: string, scope: ReportScope) {
   if (kind === "sales") {
     const report = await salesReport(scope);
-    return toCsv(["date", "invoice", "customer", "total"], report.rows.map((row) => [row.occurredOn, row.number, row.party, row.total]));
+    return toCsv(["date", "invoice", "customer", "total"], report.rows.map((row) => [row.businessDate, row.number, row.party, row.total]));
   }
   if (kind === "purchases") {
     const report = await purchaseReport(scope);
-    return toCsv(["date", "purchase", "supplier", "total"], report.rows.map((row) => [row.occurredOn, row.number, row.party, row.total]));
+    return toCsv(["date", "purchase", "supplier", "total"], report.rows.map((row) => [row.businessDate, row.number, row.party, row.total]));
   }
   if (kind === "inventory") {
     const report = await inventoryReport(scope);
@@ -36,7 +36,7 @@ export async function reportCsv(kind: string, scope: ReportScope) {
   }
   if (kind === "cash" || kind === "bank") {
     const report = kind === "cash" ? await cashReport(scope) : await bankReport(scope);
-    return toCsv(["date", "reference", "debit", "credit"], report.rows.map((row) => [row.occurredOn, row.reference, row.debit, row.credit]));
+    return toCsv(["date", "reference", "debit", "credit"], report.rows.map((row) => [row.businessDate, row.reference, row.debit, row.credit]));
   }
   if (kind === "profit-loss") {
     const report = await profitAndLoss(scope);
@@ -60,5 +60,5 @@ export async function reportCsv(kind: string, scope: ReportScope) {
     );
   }
   const report = await dayBook(scope);
-  return toCsv(["date", "reference", "account", "debit", "credit"], report.rows.map((row) => [row.occurredOn, row.reference, row.account, row.debit, row.credit]));
+  return toCsv(["date", "reference", "account", "debit", "credit"], report.rows.map((row) => [row.businessDate, row.reference, row.account, row.debit, row.credit]));
 }

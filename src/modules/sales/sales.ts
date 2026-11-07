@@ -60,7 +60,7 @@ function failure(error: unknown): Failure | null {
 
 export async function postSale(
   input: Actor & {
-    occurredOn: string;
+    businessDate: string;
     customerId?: string;
     ticketId?: string;
     chargesTotal?: string;
@@ -73,7 +73,7 @@ export async function postSale(
   },
 ) {
   const requestHash = hashPayload({
-    occurredOn: input.occurredOn,
+    businessDate: input.businessDate,
     customerId: input.customerId ?? null,
     ticketId: input.ticketId ?? null,
     warehouseId: input.warehouseId ?? null,
@@ -210,7 +210,7 @@ export async function postSale(
       const number = await allocateNumber(tx, {
         organizationId: input.organizationId,
         documentType: "INV",
-        year: documentYear(input.occurredOn),
+        year: documentYear(input.businessDate),
       });
       const sale = await tx.sale.create({
         data: {
@@ -224,7 +224,7 @@ export async function postSale(
           vatTotal,
           chargesTotal: charges,
           total: subtotal,
-          occurredOn: occurredDate(input.occurredOn),
+          businessDate: occurredDate(input.businessDate),
           createdById: input.userId,
           items: {
             create: priced.map((line) => ({
@@ -264,7 +264,7 @@ export async function postSale(
           referenceId: sale.id,
           userId: input.userId,
           unitCost: line.unitCost,
-          occurredOn: occurredDate(input.occurredOn),
+          businessDate: occurredDate(input.businessDate),
         });
       }
       const journalLines = [
@@ -286,7 +286,7 @@ export async function postSale(
         const journalId = await postBalancedJournal(tx, {
           organizationId: input.organizationId,
           branchId: input.branchId,
-          occurredOn: occurredDate(input.occurredOn),
+          businessDate: occurredDate(input.businessDate),
           description: `Sale ${number}`,
           createdById: input.userId,
           lines: journalLines,
@@ -305,7 +305,7 @@ export async function postSale(
             organizationId: input.organizationId,
             branchId: input.branchId,
             customerId: customer.id,
-            occurredOn: occurredDate(input.occurredOn),
+            businessDate: occurredDate(input.businessDate),
             entryType: "SALE",
             debit: ledgerDebit,
             referenceType: "sale",
@@ -343,7 +343,7 @@ export async function postSale(
                 customerId: customer.id,
                 entryType: "EARN",
                 points,
-                occurredOn: occurredDate(input.occurredOn),
+                businessDate: occurredDate(input.businessDate),
                 referenceType: "sale",
                 referenceId: sale.id,
               },
@@ -482,13 +482,13 @@ async function requireCustomer(tx: Prisma.TransactionClient, organizationId: str
 export async function listSales(organizationId: string, branchId: string) {
   const rows = await prisma.sale.findMany({
     where: { organizationId, branchId },
-    orderBy: { occurredOn: "desc" },
+    orderBy: { businessDate: "desc" },
     take: 100,
     select: {
       id: true,
       status: true,
       total: true,
-      occurredOn: true,
+      businessDate: true,
       customer: { select: { name: true } },
       invoice: { select: { number: true } },
     },
@@ -498,7 +498,7 @@ export async function listSales(organizationId: string, branchId: string) {
     number: row.invoice?.number ?? null,
     status: row.status,
     total: decimalString(row.total, 2),
-    occurredOn: dateOnly(row.occurredOn),
+    businessDate: dateOnly(row.businessDate),
     customerName: row.customer?.name ?? "Walk-in",
   }));
 }
@@ -523,7 +523,7 @@ export async function getSale(organizationId: string, branchId: string, id: stri
     id: row.id,
     number: row.invoice?.number ?? null,
     status: row.status,
-    occurredOn: dateOnly(row.occurredOn),
+    businessDate: dateOnly(row.businessDate),
     customerName: row.customer?.name ?? "Walk-in",
     subtotal: decimalString(row.subtotal, 2),
     discountTotal: decimalString(row.discountTotal, 2),

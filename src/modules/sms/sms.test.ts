@@ -104,7 +104,7 @@ test("phase 13 sms substitutes text, fails closed, and does not post a journal",
     }
     await prisma.smsMessage.update({ where: { id: sent.id }, data: { status: "FAILED" } });
 
-    const blocked = await requestRecharge({ ...actor, idempotencyKey: randomUUID(), quantity: "10", occurredOn: "2026-10-01" });
+    const blocked = await requestRecharge({ ...actor, idempotencyKey: randomUUID(), quantity: "10", businessDate: "2026-10-01" });
     assert.equal(blocked.ok, false);
     if (!blocked.ok) {
       assert.equal(blocked.message, "Set a per-SMS price before requesting a recharge.");
@@ -112,7 +112,7 @@ test("phase 13 sms substitutes text, fails closed, and does not post a journal",
 
     const priced = await saveSmsSettings({ ...actor, sender: "Shop", provider: "Label", unitPrice: "0.40" });
     assert.equal(priced.ok, true);
-    const recharge = await requestRecharge({ ...actor, idempotencyKey: randomUUID(), quantity: "10", occurredOn: "2026-10-01" });
+    const recharge = await requestRecharge({ ...actor, idempotencyKey: randomUUID(), quantity: "10", businessDate: "2026-10-01" });
     assert.equal(recharge.ok, true);
     if (recharge.ok) {
       assert.equal(recharge.amount, "4.00");

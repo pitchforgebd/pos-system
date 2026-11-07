@@ -95,7 +95,7 @@ test("phase 12 shift cash uses the confirmed expected formula", async () => {
     const sale = await postSale({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       lines: [{ productId: product.id, quantity: "1" }],
       paymentAmount: "12.00",
       paymentMethod: "CASH",
@@ -109,7 +109,7 @@ test("phase 12 shift cash uses the confirmed expected formula", async () => {
       ...actor,
       idempotencyKey: randomUUID(),
       saleId: sale.id,
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       lines: [{ saleItemId: item?.id ?? "", quantity: "1" }],
     });
     assert.equal(returned.ok, true);

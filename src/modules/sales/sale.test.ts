@@ -109,7 +109,7 @@ test("phase 07 sales post stock, invoice, and a balanced journal", async () => {
     const overpay = await postSale({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       lines: [{ productId: product.id, quantity: "1" }],
       paymentAmount: "100.00",
       paymentMethod: "CASH",
@@ -119,7 +119,7 @@ test("phase 07 sales post stock, invoice, and a balanced journal", async () => {
     const discount = await postSale({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       lines: [{ productId: product.id, quantity: "1", discountAmount: "1.00" }],
       paymentAmount: "12.00",
       paymentMethod: "CASH",
@@ -129,7 +129,7 @@ test("phase 07 sales post stock, invoice, and a balanced journal", async () => {
     const override = await postSale({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       lines: [{ productId: product.id, quantity: "1", unitPrice: "99.00" }],
       paymentAmount: "12.00",
       paymentMethod: "CASH",
@@ -139,7 +139,7 @@ test("phase 07 sales post stock, invoice, and a balanced journal", async () => {
     const overLimit = await postSale({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       customerId: customer.id,
       lines: [{ productId: product.id, quantity: "1" }],
       paymentAmount: "6.00",
@@ -151,7 +151,7 @@ test("phase 07 sales post stock, invoice, and a balanced journal", async () => {
     const sold = await postSale({
       ...actor,
       idempotencyKey: key,
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       ticketId: held.ok ? held.id : undefined,
       lines: [{ productId: product.id, quantity: "1" }],
       paymentAmount: "12.00",
@@ -165,7 +165,7 @@ test("phase 07 sales post stock, invoice, and a balanced journal", async () => {
     const replay = await postSale({
       ...actor,
       idempotencyKey: key,
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       ticketId: held.ok ? held.id : undefined,
       lines: [{ productId: product.id, quantity: "1" }],
       paymentAmount: "12.00",
@@ -179,7 +179,7 @@ test("phase 07 sales post stock, invoice, and a balanced journal", async () => {
     const credit = await postSale({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       customerId: customer.id,
       lines: [{ productId: product.id, quantity: "1" }],
       paymentAmount: "8.00",
@@ -212,7 +212,7 @@ test("phase 07 sales post stock, invoice, and a balanced journal", async () => {
     const mixed = await postSale({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       lines: [{ productId: product.id, quantity: "1" }],
       paymentAmount: "12.00",
       paymentMethod: "CASH",

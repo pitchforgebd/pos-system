@@ -48,9 +48,9 @@ function failure(error: unknown): Failure | null {
 }
 
 export async function postSaleReturn(
-  input: Actor & { saleId: string; occurredOn: string; lines: Array<{ saleItemId: string; quantity: string }> },
+  input: Actor & { saleId: string; businessDate: string; lines: Array<{ saleItemId: string; quantity: string }> },
 ) {
-  const requestHash = hashPayload({ saleId: input.saleId, occurredOn: input.occurredOn, lines: input.lines });
+  const requestHash = hashPayload({ saleId: input.saleId, businessDate: input.businessDate, lines: input.lines });
   try {
     const data = await idempotentTransaction(async (tx) => {
       const existing = await readIdempotency(tx, { organizationId: input.organizationId, key: input.idempotencyKey, requestHash });
@@ -127,7 +127,7 @@ export async function postSaleReturn(
       const salesTotal = money(total.minus(vatTotal));
       const cost = money(priced.reduce((sum, line) => sum.plus(line.cost), zero()));
       const split = await receivableSplit(tx, input.organizationId, sale.customerId, total);
-      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "RET", year: documentYear(input.occurredOn) });
+      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "RET", year: documentYear(input.businessDate) });
       const saleReturn = await tx.saleReturn.create({
         data: {
           organizationId: input.organizationId,
@@ -135,7 +135,7 @@ export async function postSaleReturn(
           saleId: sale.id,
           number,
           status: "POSTED",
-          occurredOn: occurredDate(input.occurredOn),
+          businessDate: occurredDate(input.businessDate),
           total,
           items: { create: priced.map((line) => ({ organizationId: input.organizationId, saleItemId: line.saleItemId, quantity: line.quantity })) },
         },
@@ -173,7 +173,7 @@ export async function postSaleReturn(
         const journalId = await postBalancedJournal(tx, {
           organizationId: input.organizationId,
           branchId: input.branchId,
-          occurredOn: occurredDate(input.occurredOn),
+          businessDate: occurredDate(input.businessDate),
           description: `Sale return ${number}`,
           createdById: input.userId,
           lines: journalLines,
@@ -186,7 +186,7 @@ export async function postSaleReturn(
             organizationId: input.organizationId,
             branchId: input.branchId,
             customerId: sale.customerId,
-            occurredOn: occurredDate(input.occurredOn),
+            businessDate: occurredDate(input.businessDate),
             entryType: "RETURN",
             credit: split.applied,
             referenceType: "sale_return",
@@ -253,16 +253,16 @@ async function receivableSplit(tx: Prisma.TransactionClient, organizationId: str
 export async function listSaleReturns(organizationId: string, branchId: string) {
   const rows = await prisma.saleReturn.findMany({
     where: { organizationId, branchId },
-    orderBy: { occurredOn: "desc" },
+    orderBy: { businessDate: "desc" },
     take: 50,
-    select: { id: true, number: true, status: true, total: true, occurredOn: true, sale: { select: { invoice: { select: { number: true } } } } },
+    select: { id: true, number: true, status: true, total: true, businessDate: true, sale: { select: { invoice: { select: { number: true } } } } },
   });
   return rows.map((row) => ({
     id: row.id,
     number: row.number,
     status: row.status,
     total: decimalString(row.total, 2),
-    occurredOn: dateOnly(row.occurredOn),
+    businessDate: dateOnly(row.businessDate),
     source: row.sale.invoice?.number ?? "Sale",
   }));
 }
@@ -270,7 +270,7 @@ export async function listSaleReturns(organizationId: string, branchId: string) 
 export async function listReturnableSaleLines(organizationId: string, branchId: string) {
   const rows = await prisma.saleItem.findMany({
     where: { organizationId, sale: { branchId, status: "POSTED" } },
-    orderBy: { sale: { occurredOn: "desc" } },
+    orderBy: { sale: { businessDate: "desc" } },
     take: 100,
     select: {
       id: true,

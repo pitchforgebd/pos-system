@@ -7,7 +7,7 @@ import { idempotencyKey, stockActor } from "@/modules/inventory/actor";
 import { postContra } from "@/modules/accounting/books";
 
 const bodySchema = z.object({
-  occurredOn: isoDate,
+  businessDate: isoDate,
   direction: z.enum(["CASH_TO_BANK", "BANK_TO_CASH"]),
   amount: z.string(),
 });

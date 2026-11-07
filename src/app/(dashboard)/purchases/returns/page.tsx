@@ -33,7 +33,7 @@ export default async function PurchaseReturnsPage() {
         caption="Purchase returns"
         columns={[
           { key: "number", header: "Return", cell: (row) => row.number },
-          { key: "date", header: "Date", cell: (row) => row.occurredOn },
+          { key: "date", header: "Date", cell: (row) => row.businessDate },
           { key: "source", header: "Purchase", cell: (row) => row.source },
           { key: "supplier", header: "Supplier", cell: (row) => row.supplierName },
           { key: "total", header: "Total", cell: (row) => row.total },

@@ -74,7 +74,7 @@ export default async function DueDateInvoicesPage({ searchParams }: { searchPara
       <DataTable
         caption="Open invoice dues"
         columns={[
-          { key: "date", header: "Invoice date", cell: (row) => row.occurredOn },
+          { key: "date", header: "Invoice date", cell: (row) => row.businessDate },
           { key: "number", header: "Invoice", cell: (row) => row.number },
           { key: "party", header: "Customer", cell: (row) => row.party },
           { key: "total", header: "Total", cell: (row) => row.total },

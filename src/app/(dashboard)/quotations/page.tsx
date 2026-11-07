@@ -54,7 +54,7 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
         caption="Quotations"
         columns={[
           { key: "number", header: "Quotation", cell: (row) => <Link href={`/quotations/${row.id}`}>{row.number}</Link> },
-          { key: "date", header: "Date", cell: (row) => row.occurredOn },
+          { key: "date", header: "Date", cell: (row) => row.businessDate },
           { key: "customer", header: "Customer", cell: (row) => row.customerName },
           { key: "lines", header: "Lines", cell: (row) => String(row.lineCount) },
           { key: "status", header: "Status", cell: (row) => row.status },

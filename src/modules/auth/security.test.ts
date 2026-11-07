@@ -75,7 +75,7 @@ test("phase 16 rejects cross-site, cross-branch, injection, and secret leakage",
       postBalancedJournal({} as never, {
         organizationId: "org",
         branchId: "branch",
-        occurredOn: new Date("2026-10-01T00:00:00.000Z"),
+        businessDate: new Date("2026-10-01T00:00:00.000Z"),
         description: "unbalanced",
         createdById: "user",
         lines: [
@@ -130,7 +130,7 @@ test("phase 16 rejects cross-site, cross-branch, injection, and secret leakage",
       branchId: branch.id,
       status: "POSTED",
       total: "2.00",
-      occurredOn: new Date("2026-10-01T00:00:00.000Z"),
+      businessDate: new Date("2026-10-01T00:00:00.000Z"),
     },
   });
 

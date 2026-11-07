@@ -43,7 +43,7 @@ export default async function SalesReturnsPage() {
         caption="Returned invoices"
         columns={[
           { key: "number", header: "Return", cell: (row) => row.number },
-          { key: "date", header: "Date", cell: (row) => row.occurredOn },
+          { key: "date", header: "Date", cell: (row) => row.businessDate },
           { key: "source", header: "Invoice", cell: (row) => row.source },
           { key: "total", header: "Total", cell: (row) => row.total },
           { key: "status", header: "Status", cell: (row) => row.status },
@@ -56,7 +56,7 @@ export default async function SalesReturnsPage() {
       <DataTable
         caption="Direct returns"
         columns={[
-          { key: "date", header: "Date", cell: (row) => row.occurredOn },
+          { key: "date", header: "Date", cell: (row) => row.businessDate },
           { key: "product", header: "Product", cell: (row) => row.productName },
           { key: "quantity", header: "Quantity", cell: (row) => row.quantity },
           { key: "refund", header: "Refund", cell: (row) => row.refundAmount },

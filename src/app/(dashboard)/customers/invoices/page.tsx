@@ -27,7 +27,7 @@ export default async function CustomerInvoicesPage() {
         caption="Invoices"
         columns={[
           { key: "number", header: "Invoice", cell: (row) => <Link href={`/sales/${row.saleId}`}>{row.number}</Link> },
-          { key: "date", header: "Date", cell: (row) => row.occurredOn },
+          { key: "date", header: "Date", cell: (row) => row.businessDate },
           { key: "customer", header: "Customer", cell: (row) => row.customerName },
           { key: "status", header: "Status", cell: (row) => row.status },
           { key: "total", header: "Total", cell: (row) => row.total },

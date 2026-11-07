@@ -6,7 +6,7 @@ import { requirePermission, requireSession } from "@/modules/access/guard";
 import { idempotencyKey, stockActor } from "@/modules/inventory/actor";
 import { reverseJournal } from "@/modules/accounting/books";
 
-const bodySchema = z.object({ occurredOn: isoDate });
+const bodySchema = z.object({ businessDate: isoDate });
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const rejected = rejectCrossSite(request);
@@ -28,7 +28,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     return jsonError("VALIDATION_ERROR", "A branch, an Idempotency-Key, and a date are required.", 400);
   }
   const { id } = await context.params;
-  const result = await reverseJournal({ ...actor, idempotencyKey: key, journalId: id, occurredOn: parsed.data.occurredOn });
+  const result = await reverseJournal({ ...actor, idempotencyKey: key, journalId: id, businessDate: parsed.data.businessDate });
   if (!result.ok) {
     return jsonError(result.code, result.message, result.status);
   }

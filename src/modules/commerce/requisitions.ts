@@ -37,13 +37,13 @@ function failure(error: unknown): Failure | null {
 export async function listRequisitions(organizationId: string, branchId: string) {
   const rows = await prisma.requisition.findMany({
     where: { organizationId, branchId },
-    orderBy: { occurredOn: "desc" },
+    orderBy: { businessDate: "desc" },
     take: 100,
     select: {
       id: true,
       number: true,
       status: true,
-      occurredOn: true,
+      businessDate: true,
       note: true,
       requestedBy: { select: { name: true } },
     },
@@ -52,7 +52,7 @@ export async function listRequisitions(organizationId: string, branchId: string)
     id: row.id,
     number: row.number,
     status: row.status,
-    occurredOn: dateString(row.occurredOn),
+    businessDate: dateString(row.businessDate),
     note: row.note,
     requesterName: row.requestedBy.name,
   }));
@@ -65,7 +65,7 @@ export async function getRequisition(organizationId: string, branchId: string, i
       id: true,
       number: true,
       status: true,
-      occurredOn: true,
+      businessDate: true,
       note: true,
       requestedBy: { select: { name: true } },
     },
@@ -77,18 +77,18 @@ export async function getRequisition(organizationId: string, branchId: string, i
     id: row.id,
     number: row.number,
     status: row.status,
-    occurredOn: dateString(row.occurredOn),
+    businessDate: dateString(row.businessDate),
     note: row.note,
     requesterName: row.requestedBy.name,
   };
 }
 
-export async function createRequisition(input: Actor & { occurredOn: string; note: string }) {
+export async function createRequisition(input: Actor & { businessDate: string; note: string }) {
   const note = input.note.trim();
   if (!note || note.length > 255) {
     return { ok: false as const, status: 422 as const, code: "BUSINESS_RULE" as const, message: "Enter a note of up to 255 characters." };
   }
-  const requestHash = hashPayload({ occurredOn: input.occurredOn, note });
+  const requestHash = hashPayload({ businessDate: input.businessDate, note });
   try {
     const data = await prisma.$transaction(async (tx) => {
       const existing = await readIdempotency(tx, {
@@ -109,14 +109,14 @@ export async function createRequisition(input: Actor & { occurredOn: string; not
       const number = await allocateNumber(tx, {
         organizationId: input.organizationId,
         documentType: "REQ",
-        year: documentYear(input.occurredOn),
+        year: documentYear(input.businessDate),
       });
       const requisition = await tx.requisition.create({
         data: {
           organizationId: input.organizationId,
           branchId: input.branchId,
           number,
-          occurredOn: occurredDate(input.occurredOn),
+          businessDate: occurredDate(input.businessDate),
           note,
           requestedById: input.userId,
         },

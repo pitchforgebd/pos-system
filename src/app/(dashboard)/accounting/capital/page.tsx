@@ -35,7 +35,7 @@ export default async function CapitalPage() {
       <DataTable
         caption="Capital documents"
         columns={[
-          { key: "date", header: "Date", cell: (row) => row.occurredOn },
+          { key: "date", header: "Date", cell: (row) => row.businessDate },
           { key: "type", header: "Type", cell: (row) => row.capitalType },
           { key: "owner", header: "Owner", cell: (row) => row.ownerName },
           { key: "amount", header: "Amount", cell: (row) => row.amount },

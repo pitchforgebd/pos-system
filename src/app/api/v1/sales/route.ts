@@ -18,7 +18,7 @@ const lineSchema = z.object({
 });
 
 const bodySchema = z.object({
-  occurredOn: isoDate,
+  businessDate: isoDate,
   customerId: z.string().uuid().optional(),
   ticketId: z.string().uuid().optional(),
   warehouseId: z.string().uuid().optional(),

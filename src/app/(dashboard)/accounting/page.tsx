@@ -41,7 +41,7 @@ export default async function AccountingPage({ searchParams }: { searchParams: P
         caption="Journals"
         columns={[
           { key: "number", header: "Journal", cell: (row) => <Link href={`/accounting/journals/${row.id}`}>{row.number ?? row.description ?? "Journal"}</Link> },
-          { key: "date", header: "Date", cell: (row) => row.occurredOn },
+          { key: "date", header: "Date", cell: (row) => row.businessDate },
           { key: "debit", header: "Debit", cell: (row) => row.debit },
           { key: "credit", header: "Credit", cell: (row) => row.credit },
           { key: "status", header: "Status", cell: (row) => row.status },

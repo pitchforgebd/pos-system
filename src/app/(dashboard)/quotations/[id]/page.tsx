@@ -23,14 +23,14 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
     <div className="space-y-6">
       <PageHeader
         title={quotation.number}
-        description={`${quotation.customerName} · ${quotation.occurredOn} · ${quotation.status}. A line converts into a due sale at the quoted unit price.`}
+        description={`${quotation.customerName} · ${quotation.businessDate} · ${quotation.status}. A line converts into a due sale at the quoted unit price.`}
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Quotations", href: "/quotations" }, { label: quotation.number }]}
         actions={<PrintButton label="Print quotation" />}
       />
       <PrintSheet title="Quotation" note={quotation.items.length ? "Quoted lines" : "No product line is stored."}>
         <p>{quotation.number}</p>
         <p>{quotation.customerName}</p>
-        <p>{quotation.occurredOn}</p>
+        <p>{quotation.businessDate}</p>
         <p>{quotation.status}</p>
         {quotation.note ? <p>{quotation.note}</p> : null}
       </PrintSheet>

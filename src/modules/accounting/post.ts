@@ -21,7 +21,7 @@ export async function postBalancedJournal(
   input: {
     organizationId: string;
     branchId: string;
-    occurredOn: Date;
+    businessDate: Date;
     description: string;
     createdById: string;
     lines: JournalLineInput[];
@@ -54,7 +54,7 @@ export async function postBalancedJournal(
     data: {
       organizationId: input.organizationId,
       branchId: input.branchId,
-      occurredOn: input.occurredOn,
+      businessDate: input.businessDate,
       status: "POSTED",
       description: input.description,
       postedAt: new Date(),

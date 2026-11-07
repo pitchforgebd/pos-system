@@ -40,7 +40,7 @@ export default async function CustomerAdvancesPage() {
       <DataTable
         caption="Advance report"
         columns={[
-          { key: "date", header: "Date", cell: (row) => row.occurredOn },
+          { key: "date", header: "Date", cell: (row) => row.businessDate },
           { key: "customer", header: "Customer", cell: (row) => row.customerName },
           { key: "method", header: "Method", cell: (row) => row.method },
           { key: "amount", header: "Amount", cell: (row) => row.amount },

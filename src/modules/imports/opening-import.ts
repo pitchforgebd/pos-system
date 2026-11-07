@@ -18,7 +18,7 @@ type Actor = {
   idempotencyKey: string;
   fileName: string;
   csv: string;
-  occurredOn: string;
+  businessDate: string;
   ip: string;
   userAgent: string | null;
 };
@@ -49,10 +49,10 @@ export async function confirmOpeningImport(input: Actor) {
   if (!preview.ok) {
     return preview;
   }
-  if (!isIsoDate(input.occurredOn)) {
+  if (!isIsoDate(input.businessDate)) {
     return { ok: false as const, status: 422 as const, message: "Enter the opening date as YYYY-MM-DD." };
   }
-  const requestHash = hashPayload({ kind: "opening", csv: input.csv, occurredOn: input.occurredOn, warehouseId: input.warehouseId ?? null });
+  const requestHash = hashPayload({ kind: "opening", csv: input.csv, businessDate: input.businessDate, warehouseId: input.warehouseId ?? null });
   let fresh = false;
   const started = await idempotentTransaction(async (tx) => {
     const existing = await readIdempotency(tx, { organizationId: input.organizationId, key: input.idempotencyKey, requestHash });
@@ -145,7 +145,7 @@ export async function confirmOpeningImport(input: Actor) {
       userId: input.userId,
       warehouseId: input.warehouseId,
       idempotencyKey: hashPayload({ importId: started }),
-      occurredOn: input.occurredOn,
+      businessDate: input.businessDate,
       lines,
       ip: input.ip,
       userAgent: input.userAgent,

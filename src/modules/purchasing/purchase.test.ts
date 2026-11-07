@@ -88,7 +88,7 @@ test("phase 06 purchases and supplier balances", async () => {
       ...actor,
       idempotencyKey: randomUUID(),
       supplierId: supplier.supplier.id,
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       lines: [{ productId: product.id, quantity: "2", unitCost: "10.00" }],
     });
     assert.equal(over.ok, false);
@@ -99,7 +99,7 @@ test("phase 06 purchases and supplier balances", async () => {
       ...actor,
       idempotencyKey: key,
       supplierId: supplier.supplier.id,
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       paymentAmount: "4.00",
       paymentMethod: "CASH",
       lines: [{ productId: product.id, quantity: "1", unitCost: "10.00" }],
@@ -113,7 +113,7 @@ test("phase 06 purchases and supplier balances", async () => {
       ...actor,
       idempotencyKey: key,
       supplierId: supplier.supplier.id,
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       paymentAmount: "4.00",
       paymentMethod: "CASH",
       lines: [{ productId: product.id, quantity: "1", unitCost: "10.00" }],
@@ -135,7 +135,7 @@ test("phase 06 purchases and supplier balances", async () => {
       ...actor,
       idempotencyKey: randomUUID(),
       supplierId: supplier.supplier.id,
-      occurredOn: "2026-10-02",
+      businessDate: "2026-10-02",
       amount: "7.00",
       method: "BANK",
     });
@@ -144,7 +144,7 @@ test("phase 06 purchases and supplier balances", async () => {
       ...actor,
       idempotencyKey: randomUUID(),
       supplierId: supplier.supplier.id,
-      occurredOn: "2026-10-02",
+      businessDate: "2026-10-02",
       amount: "6.00",
       method: "BANK",
     });

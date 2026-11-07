@@ -39,7 +39,7 @@ function postedJournal(scope: ReportScope) {
   return {
     status: "POSTED" as const,
     branchId: scope.branchId,
-    occurredOn: reportWindow(scope) ?? undefined,
+    businessDate: reportWindow(scope) ?? undefined,
   };
 }
 
@@ -48,18 +48,18 @@ export async function salesReport(scope: ReportScope) {
     organizationId: scope.organizationId,
     branchId: scope.branchId,
     status: "POSTED" as const,
-    occurredOn: reportWindow(scope) ?? undefined,
+    businessDate: reportWindow(scope) ?? undefined,
   };
   const [sum, rows] = await Promise.all([
     prisma.sale.aggregate({ where, _sum: { total: true }, _count: true }),
     prisma.sale.findMany({
       where,
-      orderBy: [{ occurredOn: "desc" }, { createdAt: "desc" }],
+      orderBy: [{ businessDate: "desc" }, { createdAt: "desc" }],
       take: listLimit,
       select: {
         id: true,
         total: true,
-        occurredOn: true,
+        businessDate: true,
         customer: { select: { name: true } },
         invoice: { select: { number: true } },
       },
@@ -70,7 +70,7 @@ export async function salesReport(scope: ReportScope) {
     count: sum._count,
     rows: rows.map((row) => ({
       id: row.id,
-      occurredOn: dateOnly(row.occurredOn),
+      businessDate: dateOnly(row.businessDate),
       number: row.invoice?.number ?? "Sale",
       party: row.customer?.name ?? "Walk-in",
       total: money(row.total),
@@ -83,15 +83,15 @@ export async function purchaseReport(scope: ReportScope) {
     organizationId: scope.organizationId,
     branchId: scope.branchId,
     status: "POSTED" as const,
-    occurredOn: reportWindow(scope) ?? undefined,
+    businessDate: reportWindow(scope) ?? undefined,
   };
   const [sum, rows] = await Promise.all([
     prisma.purchase.aggregate({ where, _sum: { total: true }, _count: true }),
     prisma.purchase.findMany({
       where,
-      orderBy: [{ occurredOn: "desc" }, { createdAt: "desc" }],
+      orderBy: [{ businessDate: "desc" }, { createdAt: "desc" }],
       take: listLimit,
-      select: { id: true, number: true, total: true, occurredOn: true, supplier: { select: { name: true } } },
+      select: { id: true, number: true, total: true, businessDate: true, supplier: { select: { name: true } } },
     }),
   ]);
   return {
@@ -99,7 +99,7 @@ export async function purchaseReport(scope: ReportScope) {
     count: sum._count,
     rows: rows.map((row) => ({
       id: row.id,
-      occurredOn: dateOnly(row.occurredOn),
+      businessDate: dateOnly(row.businessDate),
       number: row.number ?? "Purchase",
       party: row.supplier.name,
       total: money(row.total),
@@ -194,7 +194,7 @@ async function accountMovement(scope: ReportScope, code: string) {
     select: { id: true, code: true, name: true },
   });
   if (!account) {
-    return { code, debit: "0.00", credit: "0.00", count: 0, rows: [] as { id: string; occurredOn: string; reference: string; debit: string; credit: string }[] };
+    return { code, debit: "0.00", credit: "0.00", count: 0, rows: [] as { id: string; businessDate: string; reference: string; debit: string; credit: string }[] };
   }
   const where = {
     organizationId: scope.organizationId,
@@ -205,9 +205,9 @@ async function accountMovement(scope: ReportScope, code: string) {
     prisma.journalLine.aggregate({ where, _sum: { debit: true, credit: true }, _count: true }),
     prisma.journalLine.findMany({
       where,
-      orderBy: [{ journal: { occurredOn: "desc" } }, { createdAt: "desc" }],
+      orderBy: [{ journal: { businessDate: "desc" } }, { createdAt: "desc" }],
       take: listLimit,
-      select: { id: true, debit: true, credit: true, journal: { select: { number: true, description: true, occurredOn: true } } },
+      select: { id: true, debit: true, credit: true, journal: { select: { number: true, description: true, businessDate: true } } },
     }),
   ]);
   return {
@@ -217,7 +217,7 @@ async function accountMovement(scope: ReportScope, code: string) {
     count: sum._count,
     rows: rows.map((row) => ({
       id: row.id,
-      occurredOn: dateOnly(row.journal.occurredOn),
+      businessDate: dateOnly(row.journal.businessDate),
       reference: row.journal.number ?? row.journal.description ?? "Journal",
       debit: money(row.debit),
       credit: money(row.credit),
@@ -271,14 +271,14 @@ export async function dayBook(scope: ReportScope) {
     prisma.journalLine.aggregate({ where, _sum: { debit: true, credit: true }, _count: true }),
     prisma.journalLine.findMany({
       where,
-      orderBy: [{ journal: { occurredOn: "desc" } }, { createdAt: "desc" }],
+      orderBy: [{ journal: { businessDate: "desc" } }, { createdAt: "desc" }],
       take: listLimit,
       select: {
         id: true,
         debit: true,
         credit: true,
         account: { select: { code: true, name: true } },
-        journal: { select: { number: true, description: true, occurredOn: true } },
+        journal: { select: { number: true, description: true, businessDate: true } },
       },
     }),
   ]);
@@ -291,7 +291,7 @@ export async function dayBook(scope: ReportScope) {
     count: sum._count,
     rows: rows.map((row) => ({
       id: row.id,
-      occurredOn: dateOnly(row.journal.occurredOn),
+      businessDate: dateOnly(row.journal.businessDate),
       reference: row.journal.number ?? row.journal.description ?? "Journal",
       account: `${row.account.code} ${row.account.name}`,
       debit: money(row.debit),
@@ -351,7 +351,7 @@ export async function salesByProduct(scope: ReportScope) {
         organizationId: scope.organizationId,
         branchId: scope.branchId,
         status: "POSTED",
-        occurredOn: reportWindow(scope) ?? undefined,
+        businessDate: reportWindow(scope) ?? undefined,
       },
     },
     _sum: { quantity: true, lineTotal: true },
@@ -368,7 +368,7 @@ export async function salesByProduct(scope: ReportScope) {
         organizationId: scope.organizationId,
         branchId: scope.branchId,
         status: "POSTED",
-        occurredOn: reportWindow(scope) ?? undefined,
+        businessDate: reportWindow(scope) ?? undefined,
       },
     },
     select: { quantity: true, saleItem: { select: { productId: true, unitPrice: true, lineTotal: true, quantity: true } } },
@@ -410,7 +410,7 @@ export async function paymentMethodReport(scope: ReportScope) {
         organizationId: scope.organizationId,
         branchId: scope.branchId,
         status: "POSTED",
-        occurredOn: reportWindow(scope) ?? undefined,
+        businessDate: reportWindow(scope) ?? undefined,
       },
     },
     _sum: { amount: true },
@@ -432,14 +432,14 @@ export async function dueSaleReport(scope: ReportScope) {
       organizationId: scope.organizationId,
       branchId: scope.branchId,
       status: "POSTED",
-      occurredOn: reportWindow(scope) ?? undefined,
+      businessDate: reportWindow(scope) ?? undefined,
     },
-    orderBy: [{ occurredOn: "desc" }, { createdAt: "desc" }],
+    orderBy: [{ businessDate: "desc" }, { createdAt: "desc" }],
     take: listLimit,
     select: {
       id: true,
       total: true,
-      occurredOn: true,
+      businessDate: true,
       customer: { select: { name: true } },
       invoice: { select: { number: true } },
       payments: { select: { method: true, amount: true } },
@@ -455,7 +455,7 @@ export async function dueSaleReport(scope: ReportScope) {
     }
     return [{
       id: row.id,
-      occurredOn: dateOnly(row.occurredOn),
+      businessDate: dateOnly(row.businessDate),
       number: row.invoice?.number ?? "Sale",
       party: row.customer?.name ?? "Walk-in",
       total: money(dec(row.total)),

@@ -67,7 +67,7 @@ test("phase 05 stock and products", async () => {
     const opened = await postOpeningStock({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       lines: [{ productId: created.product.id, quantity: "2.0000", unitCost: "10.00" }],
     });
     assert.equal(opened.ok, true);
@@ -128,7 +128,7 @@ test("phase 05 stock and products", async () => {
     const last = await postOpeningStock({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       lines: [{ productId: created.product.id, quantity: "1" }],
     });
     assert.equal(last.ok, true);

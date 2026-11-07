@@ -42,7 +42,7 @@ export default async function OpeningStockPage() {
         caption="Opening stock invoices"
         columns={[
           { key: "number", header: "Number", cell: (row) => row.number },
-          { key: "date", header: "Date", cell: (row) => row.occurredOn },
+          { key: "date", header: "Date", cell: (row) => row.businessDate },
           { key: "place", header: "Place", cell: (row) => row.warehouseName },
         ]}
         rows={invoices}

@@ -42,8 +42,8 @@ test("phase 17 lists dues in one pass and the new indexes cover the explained fi
   const clear = await prisma.customer.create({ data: { organizationId: org.id, name: "Bea" } });
   await prisma.customerLedger.createMany({
     data: [
-      { organizationId: org.id, customerId: owed.id, occurredOn: new Date("2026-10-01T00:00:00.000Z"), entryType: "OPENING", debit: "8.00", credit: "0.00" },
-      { organizationId: org.id, customerId: owed.id, occurredOn: new Date("2026-10-01T00:00:00.000Z"), entryType: "PAYMENT", debit: "0.00", credit: "3.00" },
+      { organizationId: org.id, customerId: owed.id, businessDate: new Date("2026-10-01T00:00:00.000Z"), entryType: "OPENING", debit: "8.00", credit: "0.00" },
+      { organizationId: org.id, customerId: owed.id, businessDate: new Date("2026-10-01T00:00:00.000Z"), entryType: "PAYMENT", debit: "0.00", credit: "3.00" },
     ],
   });
 
@@ -72,9 +72,9 @@ test("phase 17 lists dues in one pass and the new indexes cover the explained fi
     );
     assert.equal(ledger.possible.includes("stock_ledgers_organizationId_branchId_createdAt_idx"), true);
     const journals = await plans(
-      "SELECT id FROM journals WHERE organizationId = '00000000-0000-0000-0000-000000000000' AND branchId = '00000000-0000-0000-0000-000000000000' AND status = 'POSTED' AND occurredOn >= '2026-01-01'",
+      "SELECT id FROM journals WHERE organizationId = '00000000-0000-0000-0000-000000000000' AND branchId = '00000000-0000-0000-0000-000000000000' AND status = 'POSTED' AND businessDate >= '2026-01-01'",
     );
-    assert.equal(journals.possible.includes("journals_organizationId_branchId_status_occurredOn_idx"), true);
+    assert.equal(journals.possible.includes("journals_organizationId_branchId_status_businessDate_idx"), true);
   } finally {
     await prisma.customerLedger.deleteMany({ where: { organizationId: org.id } });
     await prisma.customer.deleteMany({ where: { organizationId: org.id } });

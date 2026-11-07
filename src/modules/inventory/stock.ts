@@ -31,7 +31,7 @@ type MovementInput = {
   /** If given, the lots an OUT movement used up are added here (a transfer moves them on). */
   lotsOut?: ConsumedLot[];
   /** The business date of the movement, used to tell whether a lot is in date. Defaults to today (UTC). */
-  occurredOn?: Date;
+  businessDate?: Date;
 };
 
 function startOfTodayUtc() {
@@ -50,7 +50,7 @@ async function consumeExpiryLots(tx: Prisma.TransactionClient, input: MovementIn
   // A sale may only use lots that are still in date (the expiry day itself is the last day).
   // Stock that is in no lot at all (older records) stays sellable.
   const inDateOnly = input.movementType === "SALE";
-  const asOf = input.occurredOn ?? startOfTodayUtc();
+  const asOf = input.businessDate ?? startOfTodayUtc();
   if (inDateOnly) {
     const [expired] = await tx.$queryRaw<Array<{ quantity: Prisma.Decimal | null }>>`
       SELECT SUM(quantity) AS quantity FROM expiry_batches

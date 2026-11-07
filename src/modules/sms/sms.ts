@@ -362,7 +362,7 @@ export async function requestRecharge(input: {
   actorId: string;
   idempotencyKey: string;
   quantity: string;
-  occurredOn: string;
+  businessDate: string;
   ip: string;
   userAgent: string | null;
 }) {
@@ -376,7 +376,7 @@ export async function requestRecharge(input: {
     return { ok: false as const, status: 422 as const, code: "BUSINESS_RULE" as const, message: "Set a per-SMS price before requesting a recharge." };
   }
   const amount = money(quantity.times(price));
-  const requestHash = hashPayload({ quantity: decimalString(quantity, 4), occurredOn: input.occurredOn });
+  const requestHash = hashPayload({ quantity: decimalString(quantity, 4), businessDate: input.businessDate });
   try {
     const created = await prisma.$transaction(async (tx) => {
       const existing = await readIdempotency(tx, { organizationId: input.organizationId, key: input.idempotencyKey, requestHash });
@@ -393,7 +393,7 @@ export async function requestRecharge(input: {
           quantity,
           amount,
           status: "REQUESTED",
-          requestedOn: new Date(`${input.occurredOn}T00:00:00.000Z`),
+          requestedOn: new Date(`${input.businessDate}T00:00:00.000Z`),
         },
         select: { id: true, amount: true },
       });

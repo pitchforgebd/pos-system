@@ -152,7 +152,7 @@ export async function seedDemoContent() {
       userId: user.id,
       warehouseId: warehouse.id,
       idempotencyKey: "demo-opening-stock",
-      occurredOn: new Date().toISOString().slice(0, 10),
+      businessDate: new Date().toISOString().slice(0, 10),
       lines: catalog.map((item) => ({
         productId: productIds.get(item.sku) ?? "",
         quantity: item.qty,
@@ -243,7 +243,7 @@ export async function seedDemoContent() {
     userId: user.id,
     warehouseId: warehouse.id,
     idempotencyKey: "demo-sale-cash",
-    occurredOn: day,
+    businessDate: day,
     lines: [
       { productId: rice, quantity: "2" },
       { productId: oil, quantity: "1" },
@@ -261,7 +261,7 @@ export async function seedDemoContent() {
     userId: user.id,
     warehouseId: warehouse.id,
     idempotencyKey: "demo-sale-due",
-    occurredOn: day,
+    businessDate: day,
     customerId: dealerId,
     lines: [{ productId: sugar, quantity: "3" }],
     paymentAmount: "0.00",

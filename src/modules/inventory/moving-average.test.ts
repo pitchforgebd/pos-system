@@ -77,7 +77,7 @@ test("the cost of goods sold follows the moving average of the stock on hand", a
     const sold = await postSale({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-05",
+      businessDate: "2026-10-05",
       lines: [{ productId, quantity }],
       paymentAmount: payment,
       paymentMethod: "CASH",
@@ -96,7 +96,7 @@ test("the cost of goods sold follows the moving average of the stock on hand", a
     (kind === "open" ? postOpeningStock : postOwnStock)({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       lines: [{ productId, quantity, unitCost }],
     });
 

@@ -22,7 +22,7 @@ export default async function RequisitionDetailPage({ params }: { params: Promis
     <div className="space-y-6">
       <PageHeader
         title={requisition.number}
-        description={`${requisition.requesterName} · ${requisition.occurredOn} · ${requisition.status}. Fulfillment does not move stock.`}
+        description={`${requisition.requesterName} · ${requisition.businessDate} · ${requisition.status}. Fulfillment does not move stock.`}
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Requisitions", href: "/requisitions" }, { label: requisition.number }]}
       />
       <p className="text-sm">{requisition.note}</p>

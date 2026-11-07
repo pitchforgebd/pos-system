@@ -34,7 +34,7 @@ export function QuotationForm({ customers, products }: { customers: Option[]; pr
           "/api/v1/quotations",
           {
             customerId: form.get("customerId"),
-            occurredOn: form.get("occurredOn"),
+            businessDate: form.get("businessDate"),
             note: String(form.get("note") || "") || null,
             ...(productId
               ? { lines: [{ productId, quantity: form.get("quantity"), unitPrice: form.get("unitPrice") }] }
@@ -60,7 +60,7 @@ export function QuotationForm({ customers, products }: { customers: Option[]; pr
           </option>
         ))}
       </select>
-      <Input name="occurredOn" type="date" required aria-label="Date" />
+      <Input name="businessDate" type="date" required aria-label="Date" />
       <select name="productId" aria-label="Product" className="h-10 rounded-md border border-border bg-surface px-3 text-sm">
         <option value="">Product line, optional</option>
         {products.map((product) => (
@@ -92,7 +92,7 @@ export function RequisitionForm() {
         const form = new FormData(event.currentTarget);
         setPending(true);
         setMessage("");
-        void postJson("/api/v1/requisitions", { occurredOn: form.get("occurredOn"), note: form.get("note") }, true)
+        void postJson("/api/v1/requisitions", { businessDate: form.get("businessDate"), note: form.get("note") }, true)
           .then((result) => {
             if (!result.ok) {
               setMessage(result.message || "The requisition was not saved.");
@@ -103,7 +103,7 @@ export function RequisitionForm() {
           .finally(() => setPending(false));
       }}
     >
-      <Input name="occurredOn" type="date" required aria-label="Date" />
+      <Input name="businessDate" type="date" required aria-label="Date" />
       <Input name="note" required placeholder="Note" aria-label="Note" />
       <p className="text-sm text-muted">The request uses the signed-in branch. Approval does not move stock.</p>
       {message ? <p className="text-sm text-error">{message}</p> : null}

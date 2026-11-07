@@ -45,13 +45,13 @@ export async function listCrmSegments(organizationId: string) {
 export async function listCrmActivities(organizationId: string) {
   const rows = await prisma.crmActivity.findMany({
     where: { organizationId },
-    orderBy: { occurredOn: "desc" },
+    orderBy: { businessDate: "desc" },
     take: 100,
-    select: { id: true, occurredOn: true, note: true, contact: { select: { name: true } } },
+    select: { id: true, businessDate: true, note: true, contact: { select: { name: true } } },
   });
   return rows.map((row) => ({
     id: row.id,
-    occurredOn: dateOnly(row.occurredOn),
+    businessDate: dateOnly(row.businessDate),
     note: row.note,
     contactName: row.contact.name,
   }));
@@ -118,7 +118,7 @@ export async function createCrmActivity(input: {
   organizationId: string;
   actorId: string;
   contactId: string;
-  occurredOn: string;
+  businessDate: string;
   note: string;
   ip: string;
   userAgent: string | null;
@@ -138,7 +138,7 @@ export async function createCrmActivity(input: {
     data: {
       organizationId: input.organizationId,
       contactId: contact.id,
-      occurredOn: new Date(`${input.occurredOn}T00:00:00.000Z`),
+      businessDate: new Date(`${input.businessDate}T00:00:00.000Z`),
       note,
     },
     select: { id: true },

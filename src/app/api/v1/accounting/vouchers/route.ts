@@ -7,7 +7,7 @@ import { requirePermission, requireSession } from "@/modules/access/guard";
 import { idempotencyKey, stockActor } from "@/modules/inventory/actor";
 
 const bodySchema = z.object({
-  occurredOn: isoDate,
+  businessDate: isoDate,
   voucherType: z.enum(["PAYMENT", "RECEIPT"]),
   accountCode: z.string().trim().min(1).max(16),
   amount: z.string(),

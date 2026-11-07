@@ -17,7 +17,7 @@ const lineSchema = z.object({
 });
 
 const bodySchema = z.object({
-  occurredOn: isoDate,
+  businessDate: isoDate,
   warehouseId: z.string().uuid().optional(),
   lines: z.array(lineSchema).min(1).max(100),
 });

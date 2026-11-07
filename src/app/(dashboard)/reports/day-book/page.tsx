@@ -31,7 +31,7 @@ export default async function DayBookPage({ searchParams }: { searchParams: Prom
       <DataTable
         caption="Posted lines"
         columns={[
-          { key: "date", header: "Date", cell: (row) => row.occurredOn },
+          { key: "date", header: "Date", cell: (row) => row.businessDate },
           { key: "reference", header: "Reference", cell: (row) => row.reference },
           { key: "account", header: "Account", cell: (row) => row.account },
           { key: "debit", header: "Debit", cell: (row) => row.debit },

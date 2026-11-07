@@ -52,7 +52,7 @@ export default async function StatementsPage({ searchParams }: { searchParams: P
         <DataTable
           caption="Statement lines"
           columns={[
-            { key: "date", header: "Date", cell: (row) => row.occurredOn },
+            { key: "date", header: "Date", cell: (row) => row.businessDate },
             { key: "reference", header: "Reference", cell: (row) => row.reference },
             { key: "debit", header: "Debit", cell: (row) => row.debit },
             { key: "credit", header: "Credit", cell: (row) => row.credit },

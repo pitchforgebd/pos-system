@@ -150,7 +150,7 @@ test("cleanup does not deadlock with postings that are running at the same time"
   const stableAccount = await prisma.account.findFirstOrThrow({ where: { organizationId: stable.org.id } });
   const post = (organizationId: string, accountId: string) =>
     prisma.$transaction(async (tx) => {
-      const journal = await tx.journal.create({ data: { organizationId, occurredOn: new Date("2026-10-01T00:00:00.000Z") } });
+      const journal = await tx.journal.create({ data: { organizationId, businessDate: new Date("2026-10-01T00:00:00.000Z") } });
       await tx.journalLine.createMany({
         data: [
           { organizationId, journalId: journal.id, accountId, debit: "1.00" },

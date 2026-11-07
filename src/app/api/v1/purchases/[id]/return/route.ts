@@ -7,7 +7,7 @@ import { idempotencyKey, stockActor } from "@/modules/inventory/actor";
 import { postPurchaseReturn } from "@/modules/purchasing/returns";
 
 const bodySchema = z.object({
-  occurredOn: isoDate,
+  businessDate: isoDate,
   refundMethod: z.enum(["CASH", "BANK"]).optional(),
   lines: z.array(z.object({ purchaseItemId: z.string().uuid(), quantity: z.string() })).min(1).max(100),
 });

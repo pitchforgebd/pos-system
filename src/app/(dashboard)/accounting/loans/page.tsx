@@ -36,7 +36,7 @@ export default async function LoansPage() {
       <DataTable
         caption="Loan movements"
         columns={[
-          { key: "date", header: "Date", cell: (row) => row.occurredOn },
+          { key: "date", header: "Date", cell: (row) => row.businessDate },
           { key: "number", header: "Voucher", cell: (row) => row.number },
           { key: "description", header: "Description", cell: (row) => row.description },
           { key: "debit", header: "Paid", cell: (row) => row.debit },

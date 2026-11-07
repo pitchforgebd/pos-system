@@ -45,7 +45,7 @@ test("phase 09 journals balance and reversals do not edit the original", async (
     const unbalanced = await postJournal({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       description: "Unbalanced",
       lines: [
         { accountCode: "1100", debit: "10.00", credit: "0.00" },
@@ -59,7 +59,7 @@ test("phase 09 journals balance and reversals do not edit the original", async (
     const posted = await postJournal({
       ...actor,
       idempotencyKey: key,
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       description: "Move cash",
       lines: [
         { accountCode: "1100", debit: "10.00", credit: "0.00" },
@@ -73,7 +73,7 @@ test("phase 09 journals balance and reversals do not edit the original", async (
     const replay = await postJournal({
       ...actor,
       idempotencyKey: key,
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       description: "Move cash",
       lines: [
         { accountCode: "1100", debit: "10.00", credit: "0.00" },
@@ -87,14 +87,14 @@ test("phase 09 journals balance and reversals do not edit the original", async (
       ...actor,
       idempotencyKey: randomUUID(),
       journalId: posted.ok ? posted.id : "",
-      occurredOn: "2026-10-02",
+      businessDate: "2026-10-02",
     });
     assert.equal(reversal.ok, true);
     const again = await reverseJournal({
       ...actor,
       idempotencyKey: randomUUID(),
       journalId: posted.ok ? posted.id : "",
-      occurredOn: "2026-10-02",
+      businessDate: "2026-10-02",
     });
     assert.equal(again.ok, false);
     const still = posted.ok ? await getJournal(org.id, branch.id, posted.id) : null;
@@ -103,7 +103,7 @@ test("phase 09 journals balance and reversals do not edit the original", async (
     const wrongAccount = await postExpense({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       accountCode: "1100",
       amount: "15.00",
       method: "CASH",
@@ -112,7 +112,7 @@ test("phase 09 journals balance and reversals do not edit the original", async (
     const rent = await postExpense({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       accountCode: "6100",
       amount: "15.00",
       method: "CASH",
@@ -124,7 +124,7 @@ test("phase 09 journals balance and reversals do not edit the original", async (
     const contra = await postContra({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       direction: "CASH_TO_BANK",
       amount: "5.00",
     });
@@ -137,7 +137,7 @@ test("phase 09 journals balance and reversals do not edit the original", async (
     const income = await postIncome({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       accountCode: "4200",
       amount: "8.00",
       method: "CASH",
@@ -147,7 +147,7 @@ test("phase 09 journals balance and reversals do not edit the original", async (
     const capital = await postCapital({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       capitalType: "ADDED",
       ownerName: "Owner",
       amount: "25.00",
@@ -157,7 +157,7 @@ test("phase 09 journals balance and reversals do not edit the original", async (
     const loan = await postLoan({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       direction: "RECEIVED",
       lender: "City Bank",
       amount: "40.00",
@@ -167,7 +167,7 @@ test("phase 09 journals balance and reversals do not edit the original", async (
     const payment = await postCashVoucher({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       voucherType: "PAYMENT",
       accountCode: "6100",
       amount: "3.00",
@@ -177,7 +177,7 @@ test("phase 09 journals balance and reversals do not edit the original", async (
     const salesReceipt = await postCashVoucher({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       voucherType: "RECEIPT",
       accountCode: "4100",
       amount: "3.00",

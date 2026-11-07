@@ -11,7 +11,7 @@ const bodySchema = z.object({
   quantity: z.string(),
   refundAmount: z.string(),
   method: z.enum(["CASH", "BANK"]),
-  occurredOn: isoDate,
+  businessDate: isoDate,
 });
 
 export async function POST(request: Request) {

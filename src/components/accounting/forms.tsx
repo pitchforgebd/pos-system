@@ -32,7 +32,7 @@ export function JournalForm({ accounts }: { accounts: AccountOption[] }) {
         setPending(true);
         setMessage("");
         void postJson("/api/v1/accounting/journals", {
-          occurredOn: form.get("occurredOn"),
+          businessDate: form.get("businessDate"),
           description: form.get("description"),
           lines: [
             { accountCode: form.get("debitAccount"), debit: form.get("amount"), credit: "0.00" },
@@ -50,7 +50,7 @@ export function JournalForm({ accounts }: { accounts: AccountOption[] }) {
           .finally(() => setPending(false));
       }}
     >
-      <Input name="occurredOn" type="date" required aria-label="Date" />
+      <Input name="businessDate" type="date" required aria-label="Date" />
       <Input name="description" placeholder="Description" aria-label="Description" />
       <Input name="amount" required placeholder="Amount" aria-label="Amount" />
       <label className="grid gap-1 text-sm">
@@ -89,7 +89,7 @@ export function ExpenseForm({ accounts }: { accounts: AccountOption[] }) {
         setPending(true);
         setMessage("");
         void postJson("/api/v1/accounting/expenses", {
-          occurredOn: form.get("occurredOn"),
+          businessDate: form.get("businessDate"),
           accountCode: form.get("accountCode"),
           amount: form.get("amount"),
           method: form.get("method"),
@@ -106,7 +106,7 @@ export function ExpenseForm({ accounts }: { accounts: AccountOption[] }) {
           .finally(() => setPending(false));
       }}
     >
-      <Input name="occurredOn" type="date" required aria-label="Date" />
+      <Input name="businessDate" type="date" required aria-label="Date" />
       <label className="grid gap-1 text-sm">
         Expense account
         <select name="accountCode" required className="h-10 rounded-md border border-border bg-surface px-2">
@@ -143,7 +143,7 @@ export function ContraForm() {
         setPending(true);
         setMessage("");
         void postJson("/api/v1/accounting/contras", {
-          occurredOn: form.get("occurredOn"),
+          businessDate: form.get("businessDate"),
           direction: form.get("direction"),
           amount: form.get("amount"),
         }, true)
@@ -158,7 +158,7 @@ export function ContraForm() {
           .finally(() => setPending(false));
       }}
     >
-      <Input name="occurredOn" type="date" required aria-label="Date" />
+      <Input name="businessDate" type="date" required aria-label="Date" />
       <Input name="amount" required placeholder="Amount" aria-label="Amount" />
       <label className="grid gap-1 text-sm">
         Direction
@@ -229,7 +229,7 @@ export function ReverseForm({ journalId }: { journalId: string }) {
         const form = new FormData(event.currentTarget);
         setPending(true);
         setMessage("");
-        void postJson(`/api/v1/accounting/journals/${journalId}/reverse`, { occurredOn: form.get("occurredOn") }, true)
+        void postJson(`/api/v1/accounting/journals/${journalId}/reverse`, { businessDate: form.get("businessDate") }, true)
           .then(async (response) => {
             const payload = (await response.json()) as { data?: { id?: string }; error?: { message?: string } };
             if (!response.ok || !payload.data?.id) {
@@ -241,7 +241,7 @@ export function ReverseForm({ journalId }: { journalId: string }) {
           .finally(() => setPending(false));
       }}
     >
-      <Input name="occurredOn" type="date" required aria-label="Reversal date" />
+      <Input name="businessDate" type="date" required aria-label="Reversal date" />
       {message ? <p className="text-sm text-error">{message}</p> : null}
       <Button type="submit" variant="secondary" loading={pending}>Reverse journal</Button>
     </form>
@@ -311,7 +311,7 @@ export function IncomeForm({ accounts, moneyAccounts }: { accounts: AccountOptio
         event.preventDefault();
         const form = new FormData(event.currentTarget);
         reloadForm("/api/v1/accounting/incomes", {
-          occurredOn: form.get("occurredOn"),
+          businessDate: form.get("businessDate"),
           accountCode: form.get("accountCode"),
           amount: form.get("amount"),
           method: form.get("method"),
@@ -321,7 +321,7 @@ export function IncomeForm({ accounts, moneyAccounts }: { accounts: AccountOptio
         }, "The income was not posted.", setMessage, setPending);
       }}
     >
-      <Input name="occurredOn" type="date" required aria-label="Date" />
+      <Input name="businessDate" type="date" required aria-label="Date" />
       <AccountSelect name="accountCode" label="Income account" accounts={accounts} />
       <Input name="amount" required placeholder="Amount" aria-label="Amount" />
       <MethodSelect moneyAccounts={moneyAccounts} />
@@ -344,7 +344,7 @@ export function CapitalForm({ moneyAccounts }: { moneyAccounts: AccountOption[] 
         event.preventDefault();
         const form = new FormData(event.currentTarget);
         reloadForm("/api/v1/accounting/capitals", {
-          occurredOn: form.get("occurredOn"),
+          businessDate: form.get("businessDate"),
           capitalType: form.get("capitalType"),
           ownerName: form.get("ownerName"),
           amount: form.get("amount"),
@@ -353,7 +353,7 @@ export function CapitalForm({ moneyAccounts }: { moneyAccounts: AccountOption[] 
         }, "The capital entry was not posted.", setMessage, setPending);
       }}
     >
-      <Input name="occurredOn" type="date" required aria-label="Date" />
+      <Input name="businessDate" type="date" required aria-label="Date" />
       <Input name="ownerName" required placeholder="Owner name" aria-label="Owner name" />
       <Input name="amount" required placeholder="Amount" aria-label="Amount" />
       <label className="grid gap-1 text-sm">
@@ -381,7 +381,7 @@ export function LoanForm({ moneyAccounts }: { moneyAccounts: AccountOption[] }) 
         event.preventDefault();
         const form = new FormData(event.currentTarget);
         reloadForm("/api/v1/accounting/loans", {
-          occurredOn: form.get("occurredOn"),
+          businessDate: form.get("businessDate"),
           direction: form.get("direction"),
           lender: form.get("lender"),
           amount: form.get("amount"),
@@ -390,7 +390,7 @@ export function LoanForm({ moneyAccounts }: { moneyAccounts: AccountOption[] }) 
         }, "The loan was not posted.", setMessage, setPending);
       }}
     >
-      <Input name="occurredOn" type="date" required aria-label="Date" />
+      <Input name="businessDate" type="date" required aria-label="Date" />
       <Input name="lender" required placeholder="Lender" aria-label="Lender" />
       <Input name="amount" required placeholder="Amount" aria-label="Amount" />
       <label className="grid gap-1 text-sm">
@@ -418,7 +418,7 @@ export function CashVoucherForm({ accounts, moneyAccounts }: { accounts: Account
         event.preventDefault();
         const form = new FormData(event.currentTarget);
         reloadForm("/api/v1/accounting/vouchers", {
-          occurredOn: form.get("occurredOn"),
+          businessDate: form.get("businessDate"),
           voucherType: form.get("voucherType"),
           accountCode: form.get("accountCode"),
           amount: form.get("amount"),
@@ -427,7 +427,7 @@ export function CashVoucherForm({ accounts, moneyAccounts }: { accounts: Account
         }, "The voucher was not posted.", setMessage, setPending);
       }}
     >
-      <Input name="occurredOn" type="date" required aria-label="Date" />
+      <Input name="businessDate" type="date" required aria-label="Date" />
       <label className="grid gap-1 text-sm">
         Voucher
         <select name="voucherType" className="h-10 rounded-md border border-border bg-surface px-2" defaultValue="PAYMENT">

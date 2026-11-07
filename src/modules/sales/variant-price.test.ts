@@ -70,7 +70,7 @@ test("a variant sells at its own price and falls back to the product price", asy
     const opened = await postOpeningStock({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       lines: [
         { productId: product.id, variantId: priced.id, quantity: "5", unitCost: "5.00" },
         { productId: product.id, variantId: unpriced.id, quantity: "5", unitCost: "5.00" },
@@ -81,7 +81,7 @@ test("a variant sells at its own price and falls back to the product price", asy
     const sold = await postSale({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-02",
+      businessDate: "2026-10-02",
       lines: [
         { productId: product.id, variantId: priced.id, quantity: "2" },
         { productId: product.id, variantId: unpriced.id, quantity: "1" },
@@ -99,7 +99,7 @@ test("a variant sells at its own price and falls back to the product price", asy
     const wrong = await postSale({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-02",
+      businessDate: "2026-10-02",
       lines: [{ productId: product.id, variantId: priced.id, quantity: "1", unitPrice: "10.00" }],
       paymentAmount: "10.00",
       paymentMethod: "CASH",

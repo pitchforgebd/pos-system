@@ -126,14 +126,14 @@ export async function getCustomer(organizationId: string, id: string) {
   }
   const ledger = await prisma.customerLedger.findMany({
     where: { organizationId, customerId: id },
-    orderBy: { occurredOn: "desc" },
+    orderBy: { businessDate: "desc" },
     take: 50,
   });
   return {
     ...present(row, await outstandingReceivable(organizationId, id)),
     ledger: ledger.map((line) => ({
       id: line.id,
-      occurredOn: dateString(line.occurredOn),
+      businessDate: dateString(line.businessDate),
       entryType: line.entryType,
       debit: decimalString(line.debit, 2),
       credit: decimalString(line.credit, 2),
@@ -298,7 +298,7 @@ export async function createCustomer(input: {
           organizationId: input.organizationId,
           branchId: input.branchId ?? null,
           customerId: created.id,
-          occurredOn: today(),
+          businessDate: today(),
           entryType: "OPENING",
           debit: opening,
           referenceType: "customer",
@@ -309,7 +309,7 @@ export async function createCustomer(input: {
         await postBalancedJournal(tx, {
           organizationId: input.organizationId,
           branchId: input.branchId,
-          occurredOn: today(),
+          businessDate: today(),
           description: `Customer opening ${created.name}`,
           createdById: input.actorId,
           lines: [
@@ -420,7 +420,7 @@ export async function listCustomerInvoices(organizationId: string, branchId: str
       number: true,
       total: true,
       customerId: true,
-      sale: { select: { id: true, occurredOn: true, status: true, customer: { select: { name: true } } } },
+      sale: { select: { id: true, businessDate: true, status: true, customer: { select: { name: true } } } },
     },
   });
   return rows.map((row) => ({
@@ -429,7 +429,7 @@ export async function listCustomerInvoices(organizationId: string, branchId: str
     number: row.number,
     customerId: row.customerId,
     customerName: row.sale.customer?.name ?? "",
-    occurredOn: dateString(row.sale.occurredOn),
+    businessDate: dateString(row.sale.businessDate),
     status: row.sale.status,
     total: decimalString(row.total, 2),
   }));

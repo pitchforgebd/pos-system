@@ -70,7 +70,7 @@ test("phase 10 posts customer due and advance without inventing points", async (
       ...actor,
       idempotencyKey: key,
       customerId: created.customer.id,
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       amount: "4.00",
       method: "CASH",
     });
@@ -82,7 +82,7 @@ test("phase 10 posts customer due and advance without inventing points", async (
       ...actor,
       idempotencyKey: key,
       customerId: created.customer.id,
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       amount: "4.00",
       method: "CASH",
     });
@@ -94,7 +94,7 @@ test("phase 10 posts customer due and advance without inventing points", async (
       ...actor,
       idempotencyKey: randomUUID(),
       customerId: created.customer.id,
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       amount: "7.00",
       method: "CASH",
     });
@@ -105,7 +105,7 @@ test("phase 10 posts customer due and advance without inventing points", async (
       ...actor,
       idempotencyKey: randomUUID(),
       customerId: created.customer.id,
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       amount: "2.00",
       method: "BANK",
     });
@@ -136,7 +136,7 @@ test("phase 10 posts customer due and advance without inventing points", async (
         customerId: created.customer.id,
         status: "POSTED",
         total: "10.00",
-        occurredOn: new Date("2026-10-01T00:00:00.000Z"),
+        businessDate: new Date("2026-10-01T00:00:00.000Z"),
         createdById: user.id,
       },
     });
@@ -227,7 +227,7 @@ test("phase 10 posts customer due and advance without inventing points", async (
       ...actor,
       idempotencyKey: randomUUID(),
       customerId: created.customer.id,
-      occurredOn: "2026-10-02",
+      businessDate: "2026-10-02",
       amount: "1.00",
       method: "CASH",
     });

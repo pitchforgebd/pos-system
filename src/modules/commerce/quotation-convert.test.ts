@@ -83,7 +83,7 @@ test("converting a quotation creates exactly one sale, even when asked twice at 
       ...actor,
       idempotencyKey: randomUUID(),
       customerId: customer.id,
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       lines: [{ productId: product.id, quantity: "2", unitPrice: "10.00" }],
     });
     assert.equal(created.ok, true);

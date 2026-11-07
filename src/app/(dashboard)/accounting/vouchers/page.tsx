@@ -78,7 +78,7 @@ export default async function VouchersPage({ searchParams }: { searchParams: Pro
         caption="Vouchers"
         columns={[
           { key: "number", header: "Voucher", cell: (row) => row.journalId ? <Link href={`/accounting/journals/${row.journalId}`}>{row.number}</Link> : row.number },
-          { key: "date", header: "Date", cell: (row) => row.occurredOn },
+          { key: "date", header: "Date", cell: (row) => row.businessDate },
           { key: "type", header: "Type", cell: (row) => row.voucherType },
           { key: "amount", header: "Amount", cell: (row) => row.amount },
           { key: "status", header: "Status", cell: (row) => row.status },

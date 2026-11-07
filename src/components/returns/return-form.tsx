@@ -35,7 +35,7 @@ export function ReturnForm({ lines, kind }: { lines: Line[]; kind: "sale" | "pur
           method: "POST",
           headers: { "content-type": "application/json", "idempotency-key": crypto.randomUUID() },
           body: JSON.stringify({
-            occurredOn: form.get("occurredOn"),
+            businessDate: form.get("businessDate"),
             refundMethod: kind === "purchase" && method ? method : undefined,
             lines: [line],
           }),
@@ -65,7 +65,7 @@ export function ReturnForm({ lines, kind }: { lines: Line[]; kind: "sale" | "pur
           ))}
         </select>
       </label>
-      <Input name="occurredOn" type="date" required aria-label="Date" />
+      <Input name="businessDate" type="date" required aria-label="Date" />
       <Input name="quantity" required placeholder="Quantity" aria-label="Quantity" />
       {kind === "purchase" ? (
         <label className="grid gap-1 text-sm">

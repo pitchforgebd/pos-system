@@ -46,6 +46,6 @@ export async function allocateNumber(
   return `${input.documentType}-${input.year}-${String(next).padStart(6, "0")}`;
 }
 
-export function documentYear(occurredOn: string) {
-  return Number(occurredOn.slice(0, 4));
+export function documentYear(businessDate: string) {
+  return Number(businessDate.slice(0, 4));
 }

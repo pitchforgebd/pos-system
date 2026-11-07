@@ -47,7 +47,7 @@ export default async function JournalsPage({ searchParams }: { searchParams: Pro
         caption="Journals"
         columns={[
           { key: "number", header: "Journal", cell: (row) => <Link href={`/accounting/journals/${row.id}`}>{row.number ?? "Journal"}</Link> },
-          { key: "date", header: "Date", cell: (row) => row.occurredOn },
+          { key: "date", header: "Date", cell: (row) => row.businessDate },
           { key: "description", header: "Description", cell: (row) => row.description },
           { key: "debit", header: "Debit", cell: (row) => row.debit },
           { key: "credit", header: "Credit", cell: (row) => row.credit },

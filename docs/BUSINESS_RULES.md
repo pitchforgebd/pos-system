@@ -341,7 +341,7 @@ Print reads stored documents. An invoice prints the sale lines, stored totals, a
 
 ## 15. Reports
 
-Phase 14 reads posted rows. It does not post a journal, move stock, or change a ledger. The branch is the session branch. The client does not choose it. A date range uses `occurredOn` and applies only when both dates are valid and the start is not after the end. Dates are UTC calendar dates.
+Phase 14 reads posted rows. It does not post a journal, move stock, or change a ledger. The branch is the session branch. The client does not choose it. A date range uses `businessDate` and applies only when both dates are valid and the start is not after the end. Dates are UTC calendar dates.
 
 The sales report total is the sum of `POSTED` sale totals on that branch in the range. A draft and another branch are excluded. Returns are not subtracted from that total. The purchase report total is the sum of `POSTED` purchase totals on the same scope.
 

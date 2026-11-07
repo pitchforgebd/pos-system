@@ -75,14 +75,14 @@ export async function getSupplier(organizationId: string, id: string) {
   }
   const ledger = await prisma.supplierLedger.findMany({
     where: { organizationId, supplierId: id },
-    orderBy: { occurredOn: "desc" },
+    orderBy: { businessDate: "desc" },
     take: 50,
   });
   return {
     ...present(row, await outstandingPayable(organizationId, id)),
     ledger: ledger.map((entry) => ({
       id: entry.id,
-      occurredOn: dateOnly(entry.occurredOn),
+      businessDate: dateOnly(entry.businessDate),
       entryType: entry.entryType,
       debit: decimalString(entry.debit, 2),
       credit: decimalString(entry.credit, 2),
@@ -130,7 +130,7 @@ export async function createSupplier(input: {
       data: {
         organizationId: input.organizationId,
         supplierId: created.id,
-        occurredOn: new Date(),
+        businessDate: new Date(),
         entryType: "OPENING",
         credit: opening,
         referenceType: "supplier",
@@ -141,7 +141,7 @@ export async function createSupplier(input: {
       await postBalancedJournal(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
-        occurredOn: new Date(),
+        businessDate: new Date(),
         description: `Supplier opening ${created.name}`,
         createdById: input.actorId,
         lines: [

@@ -42,7 +42,7 @@ export default async function SalesReportPage({ searchParams }: { searchParams: 
       <DataTable
         caption="Posted sales"
         columns={[
-          { key: "date", header: "Date", cell: (row) => row.occurredOn },
+          { key: "date", header: "Date", cell: (row) => row.businessDate },
           { key: "number", header: "Invoice", cell: (row) => row.number },
           { key: "party", header: "Customer", cell: (row) => row.party },
           { key: "total", header: "Total", cell: (row) => row.total },

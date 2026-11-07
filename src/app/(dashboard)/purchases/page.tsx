@@ -45,7 +45,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Pr
         caption="Purchases"
         columns={[
           { key: "number", header: "Number", cell: (row) => <Link href={`/purchases/${row.id}`}>{row.number}</Link> },
-          { key: "date", header: "Date", cell: (row) => row.occurredOn },
+          { key: "date", header: "Date", cell: (row) => row.businessDate },
           { key: "supplier", header: "Supplier", cell: (row) => row.supplierName },
           { key: "total", header: "Total", cell: (row) => row.total },
           { key: "status", header: "Status", cell: (row) => row.status },

@@ -170,19 +170,19 @@ export async function createLoyaltyCard(input: {
 export async function listLoyaltyTransactions(organizationId: string) {
   const rows = await prisma.loyaltyTransaction.findMany({
     where: { organizationId },
-    orderBy: { occurredOn: "desc" },
+    orderBy: { businessDate: "desc" },
     take: 100,
     select: {
       id: true,
       entryType: true,
       points: true,
-      occurredOn: true,
+      businessDate: true,
       customer: { select: { name: true } },
     },
   });
   return rows.map((row) => ({
     id: row.id,
-    occurredOn: dateOnly(row.occurredOn),
+    businessDate: dateOnly(row.businessDate),
     customerName: row.customer.name,
     entryType: row.entryType,
     points: decimalString(row.points, 4),

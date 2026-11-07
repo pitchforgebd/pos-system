@@ -50,14 +50,14 @@ function failure(error: unknown): Failure | null {
 export async function postPurchaseReturn(
   input: Actor & {
     purchaseId: string;
-    occurredOn: string;
+    businessDate: string;
     refundMethod?: "CASH" | "BANK";
     lines: Array<{ purchaseItemId: string; quantity: string }>;
   },
 ) {
   const requestHash = hashPayload({
     purchaseId: input.purchaseId,
-    occurredOn: input.occurredOn,
+    businessDate: input.businessDate,
     refundMethod: input.refundMethod ?? null,
     lines: input.lines,
   });
@@ -123,7 +123,7 @@ export async function postPurchaseReturn(
       if (refund.eq(0) && input.refundMethod) {
         throw new StockRuleError("A refund method is only used when the return exceeds the outstanding payable.");
       }
-      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "RET", year: documentYear(input.occurredOn) });
+      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "RET", year: documentYear(input.businessDate) });
       const purchaseReturn = await tx.purchaseReturn.create({
         data: {
           organizationId: input.organizationId,
@@ -131,7 +131,7 @@ export async function postPurchaseReturn(
           purchaseId: purchase.id,
           number,
           status: "POSTED",
-          occurredOn: occurredDate(input.occurredOn),
+          businessDate: occurredDate(input.businessDate),
           total,
           items: { create: priced.map((line) => ({ organizationId: input.organizationId, purchaseItemId: line.purchaseItemId, quantity: line.quantity })) },
         },
@@ -163,7 +163,7 @@ export async function postPurchaseReturn(
         const journalId = await postBalancedJournal(tx, {
           organizationId: input.organizationId,
           branchId: input.branchId,
-          occurredOn: occurredDate(input.occurredOn),
+          businessDate: occurredDate(input.businessDate),
           description: `Purchase return ${number}`,
           createdById: input.userId,
           lines: journalLines,
@@ -176,7 +176,7 @@ export async function postPurchaseReturn(
             organizationId: input.organizationId,
             branchId: input.branchId,
             supplierId: purchase.supplierId,
-            occurredOn: occurredDate(input.occurredOn),
+            businessDate: occurredDate(input.businessDate),
             entryType: "RETURN",
             debit: applied,
             referenceType: "purchase_return",
@@ -221,16 +221,16 @@ export async function postPurchaseReturn(
 export async function listPurchaseReturns(organizationId: string, branchId: string) {
   const rows = await prisma.purchaseReturn.findMany({
     where: { organizationId, branchId },
-    orderBy: { occurredOn: "desc" },
+    orderBy: { businessDate: "desc" },
     take: 50,
-    select: { id: true, number: true, status: true, total: true, occurredOn: true, purchase: { select: { number: true, supplier: { select: { name: true } } } } },
+    select: { id: true, number: true, status: true, total: true, businessDate: true, purchase: { select: { number: true, supplier: { select: { name: true } } } } },
   });
   return rows.map((row) => ({
     id: row.id,
     number: row.number,
     status: row.status,
     total: decimalString(row.total, 2),
-    occurredOn: dateOnly(row.occurredOn),
+    businessDate: dateOnly(row.businessDate),
     source: row.purchase.number,
     supplierName: row.purchase.supplier.name,
   }));
@@ -239,7 +239,7 @@ export async function listPurchaseReturns(organizationId: string, branchId: stri
 export async function listReturnablePurchaseLines(organizationId: string, branchId: string) {
   const rows = await prisma.purchaseItem.findMany({
     where: { organizationId, purchase: { branchId, status: "POSTED" } },
-    orderBy: { purchase: { occurredOn: "desc" } },
+    orderBy: { purchase: { businessDate: "desc" } },
     take: 100,
     select: {
       id: true,

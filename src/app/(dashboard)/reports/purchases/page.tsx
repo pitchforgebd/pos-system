@@ -31,7 +31,7 @@ export default async function PurchaseReportPage({ searchParams }: { searchParam
       <DataTable
         caption="Posted purchases"
         columns={[
-          { key: "date", header: "Date", cell: (row) => row.occurredOn },
+          { key: "date", header: "Date", cell: (row) => row.businessDate },
           { key: "number", header: "Purchase", cell: (row) => row.number },
           { key: "party", header: "Supplier", cell: (row) => row.party },
           { key: "total", header: "Total", cell: (row) => row.total },

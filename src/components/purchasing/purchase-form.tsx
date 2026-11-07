@@ -27,7 +27,7 @@ export function PurchaseForm({ suppliers, products }: { suppliers: Option[]; pro
           headers: { "content-type": "application/json", "idempotency-key": attempt.current() },
           body: JSON.stringify({
             supplierId: form.get("supplierId"),
-            occurredOn: form.get("occurredOn"),
+            businessDate: form.get("businessDate"),
             paymentAmount: paymentAmount || undefined,
             paymentMethod: paymentAmount ? form.get("paymentMethod") : undefined,
             lines: [
@@ -74,7 +74,7 @@ export function PurchaseForm({ suppliers, products }: { suppliers: Option[]; pro
           ))}
         </select>
       </label>
-      <Input name="occurredOn" type="date" required aria-label="Date" />
+      <Input name="businessDate" type="date" required aria-label="Date" />
       <Input name="quantity" required placeholder="Quantity" aria-label="Quantity" />
       <Input name="unitCost" required placeholder="Unit cost" aria-label="Unit cost" />
       <Input name="lot" placeholder="Lot (required for expiry-tracked products)" aria-label="Lot" />
@@ -113,7 +113,7 @@ export function SupplierPaymentForm({ suppliers }: { suppliers: Option[] }) {
           method: "POST",
           headers: { "content-type": "application/json", "idempotency-key": crypto.randomUUID() },
           body: JSON.stringify({
-            occurredOn: form.get("occurredOn"),
+            businessDate: form.get("businessDate"),
             amount: form.get("amount"),
             method: form.get("method"),
           }),
@@ -135,7 +135,7 @@ export function SupplierPaymentForm({ suppliers }: { suppliers: Option[] }) {
           ))}
         </select>
       </label>
-      <Input name="occurredOn" type="date" required aria-label="Date" />
+      <Input name="businessDate" type="date" required aria-label="Date" />
       <Input name="amount" required placeholder="Amount" aria-label="Amount" />
       <label className="grid gap-1 text-sm">
         Method

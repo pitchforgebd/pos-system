@@ -50,7 +50,7 @@ export default async function CrmPage() {
       <DataTable
         caption="Follow-ups"
         columns={[
-          { key: "date", header: "Date", cell: (row) => row.occurredOn },
+          { key: "date", header: "Date", cell: (row) => row.businessDate },
           { key: "contact", header: "Contact", cell: (row) => row.contactName },
           { key: "note", header: "Note", cell: (row) => row.note },
         ]}

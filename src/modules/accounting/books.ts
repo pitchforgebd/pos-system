@@ -83,8 +83,8 @@ async function begin(tx: Prisma.TransactionClient, organizationId: string, key: 
   return existing;
 }
 
-export async function postJournal(input: Actor & { occurredOn: string; description: string; lines: JournalLineInput[] }) {
-  const requestHash = hashPayload({ occurredOn: input.occurredOn, description: input.description, lines: input.lines });
+export async function postJournal(input: Actor & { businessDate: string; description: string; lines: JournalLineInput[] }) {
+  const requestHash = hashPayload({ businessDate: input.businessDate, description: input.description, lines: input.lines });
   try {
     const data = await prisma.$transaction(async (tx) => {
       const existing = await begin(tx, input.organizationId, input.idempotencyKey, requestHash);
@@ -92,11 +92,11 @@ export async function postJournal(input: Actor & { occurredOn: string; descripti
         return { id: existing.entityId, replayed: true, number: null as string | null };
       }
       const parsed = parseLines(input.lines);
-      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", year: documentYear(input.occurredOn) });
+      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", year: documentYear(input.businessDate) });
       const journalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
-        occurredOn: occurredDate(input.occurredOn),
+        businessDate: occurredDate(input.businessDate),
         description: input.description.trim() || `Journal ${number}`,
         createdById: input.userId,
         lines: parsed.lines,
@@ -109,7 +109,7 @@ export async function postJournal(input: Actor & { occurredOn: string; descripti
           number,
           voucherType: "JOURNAL",
           amount: parsed.total,
-          occurredOn: occurredDate(input.occurredOn),
+          businessDate: occurredDate(input.businessDate),
           status: "POSTED",
           journalId,
         },
@@ -141,8 +141,8 @@ export async function postJournal(input: Actor & { occurredOn: string; descripti
   }
 }
 
-export async function reverseJournal(input: Actor & { journalId: string; occurredOn: string }) {
-  const requestHash = hashPayload({ journalId: input.journalId, occurredOn: input.occurredOn });
+export async function reverseJournal(input: Actor & { journalId: string; businessDate: string }) {
+  const requestHash = hashPayload({ journalId: input.journalId, businessDate: input.businessDate });
   try {
     const data = await prisma.$transaction(async (tx) => {
       const existing = await begin(tx, input.organizationId, input.idempotencyKey, requestHash);
@@ -173,7 +173,7 @@ export async function reverseJournal(input: Actor & { journalId: string; occurre
       if (journal.sale || journal.purchase || journal.saleReturn || journal.purchaseReturn || journal.customerPayment || journal.supplierPayment || journal.customerAdvance) {
         throw new PostingError("Correct the source document. This journal is not reversed on its own.");
       }
-      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", year: documentYear(input.occurredOn) });
+      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", year: documentYear(input.businessDate) });
       const lines = journal.lines
         .filter((line) => new Prisma.Decimal(line.debit).gt(0) || new Prisma.Decimal(line.credit).gt(0))
         .map((line) => ({ accountCode: line.account.code, debit: new Prisma.Decimal(line.credit), credit: new Prisma.Decimal(line.debit) }));
@@ -181,7 +181,7 @@ export async function reverseJournal(input: Actor & { journalId: string; occurre
       const journalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
-        occurredOn: occurredDate(input.occurredOn),
+        businessDate: occurredDate(input.businessDate),
         description: `Reversal of ${journal.number ?? journal.description ?? "journal"}`,
         createdById: input.userId,
         lines,
@@ -195,7 +195,7 @@ export async function reverseJournal(input: Actor & { journalId: string; occurre
           number,
           voucherType: journal.voucher?.voucherType ?? "JOURNAL",
           amount: total,
-          occurredOn: occurredDate(input.occurredOn),
+          businessDate: occurredDate(input.businessDate),
           status: "POSTED",
           journalId,
         },
@@ -228,10 +228,10 @@ export async function reverseJournal(input: Actor & { journalId: string; occurre
 }
 
 export async function postExpense(
-  input: Actor & { occurredOn: string; accountCode: string; amount: string; method: "CASH" | "BANK"; note?: string },
+  input: Actor & { businessDate: string; accountCode: string; amount: string; method: "CASH" | "BANK"; note?: string },
 ) {
   const requestHash = hashPayload({
-    occurredOn: input.occurredOn,
+    businessDate: input.businessDate,
     accountCode: input.accountCode,
     amount: input.amount,
     method: input.method,
@@ -254,12 +254,12 @@ export async function postExpense(
       if (!account || account.group.code !== "6000") {
         throw new PostingError("Choose an active expense account.");
       }
-      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "EXP", year: documentYear(input.occurredOn) });
+      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "EXP", year: documentYear(input.businessDate) });
       const cashCode = input.method === "BANK" ? "1200" : "1100";
       const journalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
-        occurredOn: occurredDate(input.occurredOn),
+        businessDate: occurredDate(input.businessDate),
         description: `Expense ${number}`,
         createdById: input.userId,
         lines: [
@@ -275,7 +275,7 @@ export async function postExpense(
           accountId: account.id,
           number,
           amount,
-          occurredOn: occurredDate(input.occurredOn),
+          businessDate: occurredDate(input.businessDate),
           journalId,
           note: input.note?.trim() || null,
         },
@@ -308,8 +308,8 @@ export async function postExpense(
   }
 }
 
-export async function postContra(input: Actor & { occurredOn: string; direction: "CASH_TO_BANK" | "BANK_TO_CASH"; amount: string }) {
-  const requestHash = hashPayload({ occurredOn: input.occurredOn, direction: input.direction, amount: input.amount });
+export async function postContra(input: Actor & { businessDate: string; direction: "CASH_TO_BANK" | "BANK_TO_CASH"; amount: string }) {
+  const requestHash = hashPayload({ businessDate: input.businessDate, direction: input.direction, amount: input.amount });
   try {
     const data = await prisma.$transaction(async (tx) => {
       const existing = await begin(tx, input.organizationId, input.idempotencyKey, requestHash);
@@ -320,13 +320,13 @@ export async function postContra(input: Actor & { occurredOn: string; direction:
       if (!amount || amount.lte(0)) {
         throw new PostingError("Enter an amount greater than zero.");
       }
-      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", year: documentYear(input.occurredOn) });
+      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", year: documentYear(input.businessDate) });
       const debitCode = input.direction === "CASH_TO_BANK" ? "1200" : "1100";
       const creditCode = input.direction === "CASH_TO_BANK" ? "1100" : "1200";
       const journalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
-        occurredOn: occurredDate(input.occurredOn),
+        businessDate: occurredDate(input.businessDate),
         description: `Contra ${number}`,
         createdById: input.userId,
         lines: [
@@ -342,7 +342,7 @@ export async function postContra(input: Actor & { occurredOn: string; direction:
           number,
           voucherType: "CONTRA",
           amount,
-          occurredOn: occurredDate(input.occurredOn),
+          businessDate: occurredDate(input.businessDate),
           status: "POSTED",
           journalId,
         },
@@ -429,9 +429,9 @@ export async function listGroups(organizationId: string) {
 export async function listJournals(organizationId: string, branchId: string) {
   const rows = await prisma.journal.findMany({
     where: { organizationId, branchId },
-    orderBy: { occurredOn: "desc" },
+    orderBy: { businessDate: "desc" },
     take: 100,
-    select: { id: true, number: true, description: true, status: true, occurredOn: true, lines: { select: { debit: true, credit: true } } },
+    select: { id: true, number: true, description: true, status: true, businessDate: true, lines: { select: { debit: true, credit: true } } },
   });
   return rows.map((row) => {
     const debit = row.lines.reduce((sum, line) => sum.plus(line.debit), zero());
@@ -441,7 +441,7 @@ export async function listJournals(organizationId: string, branchId: string) {
       number: row.number,
       description: row.description,
       status: row.status,
-      occurredOn: dateOnly(row.occurredOn),
+      businessDate: dateOnly(row.businessDate),
       debit: decimalString(debit, 2),
       credit: decimalString(credit, 2),
       balanced: debit.eq(credit),
@@ -475,7 +475,7 @@ export async function getJournal(organizationId: string, branchId: string, id: s
     number: row.number,
     description: row.description,
     status: row.status,
-    occurredOn: dateOnly(row.occurredOn),
+    businessDate: dateOnly(row.businessDate),
     balanced: debit.eq(credit),
     reversible: row.status === "POSTED" && row.reversals.length === 0 && !source,
     reversals: row.reversals.map((reversal) => ({ id: reversal.id, number: reversal.number })),
@@ -492,15 +492,15 @@ export async function getJournal(organizationId: string, branchId: string, id: s
 export async function listExpenses(organizationId: string, branchId: string) {
   const rows = await prisma.expense.findMany({
     where: { organizationId, branchId },
-    orderBy: { occurredOn: "desc" },
+    orderBy: { businessDate: "desc" },
     take: 100,
-    select: { id: true, number: true, amount: true, occurredOn: true, note: true, account: { select: { code: true, name: true } }, journalId: true },
+    select: { id: true, number: true, amount: true, businessDate: true, note: true, account: { select: { code: true, name: true } }, journalId: true },
   });
   return rows.map((row) => ({
     id: row.id,
     number: row.number,
     amount: decimalString(row.amount, 2),
-    occurredOn: dateOnly(row.occurredOn),
+    businessDate: dateOnly(row.businessDate),
     accountCode: row.account.code,
     accountName: row.account.name,
     note: row.note,
@@ -511,16 +511,16 @@ export async function listExpenses(organizationId: string, branchId: string) {
 export async function listVouchers(organizationId: string, branchId: string) {
   const rows = await prisma.voucher.findMany({
     where: { organizationId, branchId },
-    orderBy: { occurredOn: "desc" },
+    orderBy: { businessDate: "desc" },
     take: 100,
-    select: { id: true, number: true, voucherType: true, amount: true, occurredOn: true, status: true, journalId: true },
+    select: { id: true, number: true, voucherType: true, amount: true, businessDate: true, status: true, journalId: true },
   });
   return rows.map((row) => ({
     id: row.id,
     number: row.number,
     voucherType: row.voucherType,
     amount: decimalString(row.amount, 2),
-    occurredOn: dateOnly(row.occurredOn),
+    businessDate: dateOnly(row.businessDate),
     status: row.status,
     journalId: row.journalId,
   }));
@@ -543,7 +543,7 @@ export async function accountStatement(input: { organizationId: string; branchId
     where: {
       organizationId: input.organizationId,
       accountId: account.id,
-      journal: { status: "POSTED", branchId: input.branchId, occurredOn: { lt: from } },
+      journal: { status: "POSTED", branchId: input.branchId, businessDate: { lt: from } },
     },
     _sum: { debit: true, credit: true },
   });
@@ -553,16 +553,16 @@ export async function accountStatement(input: { organizationId: string; branchId
     where: {
       organizationId: input.organizationId,
       accountId: account.id,
-      journal: { status: "POSTED", branchId: input.branchId, occurredOn: { gte: from, lte: to } },
+      journal: { status: "POSTED", branchId: input.branchId, businessDate: { gte: from, lte: to } },
     },
-    orderBy: [{ journal: { occurredOn: "asc" } }, { createdAt: "asc" }],
-    select: { id: true, debit: true, credit: true, journal: { select: { number: true, description: true, occurredOn: true } } },
+    orderBy: [{ journal: { businessDate: "asc" } }, { createdAt: "asc" }],
+    select: { id: true, debit: true, credit: true, journal: { select: { number: true, description: true, businessDate: true } } },
   });
   const lines = rows.map((row) => {
     running = running.plus(row.debit).minus(row.credit);
     return {
       id: row.id,
-      occurredOn: dateOnly(row.journal.occurredOn),
+      businessDate: dateOnly(row.journal.businessDate),
       reference: row.journal.number ?? row.journal.description ?? "Journal",
       debit: decimalString(row.debit, 2),
       credit: decimalString(row.credit, 2),
@@ -580,10 +580,10 @@ export async function listCashBankLines(organizationId: string, branchId: string
       journal: {
         status: "POSTED",
         branchId,
-        occurredOn: from && to && isIsoDate(from) && isIsoDate(to) ? { gte: occurredDate(from), lte: occurredDate(to) } : undefined,
+        businessDate: from && to && isIsoDate(from) && isIsoDate(to) ? { gte: occurredDate(from), lte: occurredDate(to) } : undefined,
       },
     },
-    orderBy: { journal: { occurredOn: "desc" } },
+    orderBy: { journal: { businessDate: "desc" } },
     take: 100,
     select: {
       id: true,
@@ -594,7 +594,7 @@ export async function listCashBankLines(organizationId: string, branchId: string
         select: {
           number: true,
           description: true,
-          occurredOn: true,
+          businessDate: true,
           createdBy: { select: { email: true } },
           sale: { select: { id: true } },
           purchase: { select: { id: true } },
@@ -613,7 +613,7 @@ export async function listCashBankLines(organizationId: string, branchId: string
   });
   return rows.map((row) => ({
     id: row.id,
-    occurredOn: dateOnly(row.journal.occurredOn),
+    businessDate: dateOnly(row.journal.businessDate),
     reference: row.journal.number ?? row.journal.description ?? "Journal",
     description: row.journal.description,
     accountCode: row.account.code,
@@ -664,7 +664,7 @@ export async function cashFlow(organizationId: string, branchId: string, from?: 
       journal: {
         status: "POSTED",
         branchId,
-        occurredOn: from && to && isIsoDate(from) && isIsoDate(to) ? { gte: occurredDate(from), lte: occurredDate(to) } : undefined,
+        businessDate: from && to && isIsoDate(from) && isIsoDate(to) ? { gte: occurredDate(from), lte: occurredDate(to) } : undefined,
       },
     },
     _sum: { debit: true, credit: true },
@@ -760,10 +760,10 @@ async function finishPost(
 }
 
 export async function postIncome(
-  input: Actor & { occurredOn: string; accountCode: string; amount: string; method: "CASH" | "BANK"; bankCode?: string; category?: string; note?: string },
+  input: Actor & { businessDate: string; accountCode: string; amount: string; method: "CASH" | "BANK"; bankCode?: string; category?: string; note?: string },
 ) {
   const requestHash = hashPayload({
-    occurredOn: input.occurredOn,
+    businessDate: input.businessDate,
     accountCode: input.accountCode,
     amount: input.amount,
     method: input.method,
@@ -789,11 +789,11 @@ export async function postIncome(
         throw new PostingError("Choose an income account other than sales.");
       }
       const moneyAccount = await resolveMoneyAccount(tx, input.organizationId, input.method, input.bankCode);
-      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", year: documentYear(input.occurredOn) });
+      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", year: documentYear(input.businessDate) });
       const journalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
-        occurredOn: occurredDate(input.occurredOn),
+        businessDate: occurredDate(input.businessDate),
         description: `Income ${number}`,
         createdById: input.userId,
         lines: [
@@ -809,7 +809,7 @@ export async function postIncome(
           accountId: account.id,
           category: input.category?.trim() || account.code,
           amount,
-          occurredOn: occurredDate(input.occurredOn),
+          businessDate: occurredDate(input.businessDate),
           journalId,
           note: input.note?.trim() || null,
         },
@@ -829,10 +829,10 @@ export async function postIncome(
 }
 
 export async function postCapital(
-  input: Actor & { occurredOn: string; capitalType: "ADDED" | "WITHDRAW"; ownerName: string; amount: string; method: "CASH" | "BANK"; bankCode?: string },
+  input: Actor & { businessDate: string; capitalType: "ADDED" | "WITHDRAW"; ownerName: string; amount: string; method: "CASH" | "BANK"; bankCode?: string },
 ) {
   const requestHash = hashPayload({
-    occurredOn: input.occurredOn,
+    businessDate: input.businessDate,
     capitalType: input.capitalType,
     ownerName: input.ownerName,
     amount: input.amount,
@@ -852,11 +852,11 @@ export async function postCapital(
       }
       const moneyAccount = await resolveMoneyAccount(tx, input.organizationId, input.method, input.bankCode);
       const equityCode = input.capitalType === "ADDED" ? "3100" : "3200";
-      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", year: documentYear(input.occurredOn) });
+      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", year: documentYear(input.businessDate) });
       const journalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
-        occurredOn: occurredDate(input.occurredOn),
+        businessDate: occurredDate(input.businessDate),
         description: input.capitalType === "ADDED" ? `Capital added ${number}` : `Capital withdrawn ${number}`,
         createdById: input.userId,
         lines:
@@ -878,7 +878,7 @@ export async function postCapital(
           capitalType: input.capitalType,
           ownerName,
           amount,
-          occurredOn: occurredDate(input.occurredOn),
+          businessDate: occurredDate(input.businessDate),
           journalId,
         },
         select: { id: true },
@@ -897,10 +897,10 @@ export async function postCapital(
 }
 
 export async function postLoan(
-  input: Actor & { occurredOn: string; direction: "RECEIVED" | "PAID"; lender: string; amount: string; method: "CASH" | "BANK"; bankCode?: string },
+  input: Actor & { businessDate: string; direction: "RECEIVED" | "PAID"; lender: string; amount: string; method: "CASH" | "BANK"; bankCode?: string },
 ) {
   const requestHash = hashPayload({
-    occurredOn: input.occurredOn,
+    businessDate: input.businessDate,
     direction: input.direction,
     lender: input.lender,
     amount: input.amount,
@@ -919,11 +919,11 @@ export async function postLoan(
         throw new PostingError("Enter a lender and an amount greater than zero.");
       }
       const moneyAccount = await resolveMoneyAccount(tx, input.organizationId, input.method, input.bankCode);
-      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", year: documentYear(input.occurredOn) });
+      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", year: documentYear(input.businessDate) });
       const journalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
-        occurredOn: occurredDate(input.occurredOn),
+        businessDate: occurredDate(input.businessDate),
         description: input.direction === "RECEIVED" ? `Loan received ${lender} ${number}` : `Loan paid ${lender} ${number}`,
         createdById: input.userId,
         lines:
@@ -962,10 +962,10 @@ export async function postLoan(
 }
 
 export async function postCashVoucher(
-  input: Actor & { occurredOn: string; voucherType: "PAYMENT" | "RECEIPT"; accountCode: string; amount: string; method: "CASH" | "BANK"; bankCode?: string },
+  input: Actor & { businessDate: string; voucherType: "PAYMENT" | "RECEIPT"; accountCode: string; amount: string; method: "CASH" | "BANK"; bankCode?: string },
 ) {
   const requestHash = hashPayload({
-    occurredOn: input.occurredOn,
+    businessDate: input.businessDate,
     voucherType: input.voucherType,
     accountCode: input.accountCode,
     amount: input.amount,
@@ -990,11 +990,11 @@ export async function postCashVoucher(
         throw new PostingError("Choose an expense, income, loan, or equity account. Sales, stock, and party balances use their own screens.");
       }
       const moneyAccount = await resolveMoneyAccount(tx, input.organizationId, input.method, input.bankCode);
-      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", year: documentYear(input.occurredOn) });
+      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", year: documentYear(input.businessDate) });
       const journalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
-        occurredOn: occurredDate(input.occurredOn),
+        businessDate: occurredDate(input.businessDate),
         description: `${input.voucherType === "PAYMENT" ? "Payment" : "Receipt"} ${number}`,
         createdById: input.userId,
         lines:
@@ -1016,7 +1016,7 @@ export async function postCashVoucher(
           number,
           voucherType: input.voucherType,
           amount,
-          occurredOn: occurredDate(input.occurredOn),
+          businessDate: occurredDate(input.businessDate),
           status: "POSTED",
           journalId,
         },
@@ -1081,7 +1081,7 @@ export async function createBankAccount(
         await postBalancedJournal(tx, {
           organizationId: input.organizationId,
           branchId: input.branchId,
-          occurredOn: occurredDate(businessDate()),
+          businessDate: occurredDate(businessDate()),
           description: `Bank opening ${name} ${number}`,
           createdById: input.userId,
           lines: [

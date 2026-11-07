@@ -8,7 +8,7 @@ type SaleRow = {
   number: string | null;
   status: string;
   total: string;
-  occurredOn: string;
+  businessDate: string;
   customerName: string;
 };
 
@@ -18,7 +18,7 @@ export function SalesTable({ rows }: { rows: SaleRow[] }) {
       caption="Sales"
       columns={[
         { key: "number", header: "Invoice", cell: (row) => <Link href={`/sales/${row.id}`}>{row.number ?? "Sale"}</Link> },
-        { key: "date", header: "Date", cell: (row) => row.occurredOn },
+        { key: "date", header: "Date", cell: (row) => row.businessDate },
         { key: "customer", header: "Customer", cell: (row) => row.customerName },
         { key: "total", header: "Total", cell: (row) => row.total },
         { key: "status", header: "Status", cell: (row) => row.status },

@@ -49,7 +49,7 @@ export function InboundForm({
             "idempotency-key": attempt.current(),
           },
           body: JSON.stringify({
-            occurredOn: form.get("occurredOn"),
+            businessDate: form.get("businessDate"),
             lines: [
               {
                 productId: form.get("productId"),
@@ -82,7 +82,7 @@ export function InboundForm({
           ))}
         </select>
       </label>
-      <Input name="occurredOn" type="date" required aria-label="Date" />
+      <Input name="businessDate" type="date" required aria-label="Date" />
       <Input name="quantity" required placeholder="Quantity" aria-label="Quantity" />
       <Input name="unitCost" placeholder="Unit cost" aria-label="Unit cost" />
       <Input name="lot" placeholder="Lot, if expiry is tracked" aria-label="Lot" />
@@ -175,7 +175,7 @@ export function DamageForm({ products }: { products: ProductOption[] }) {
           headers: { "content-type": "application/json", "idempotency-key": attempt.current() },
           body: JSON.stringify({
             productId: form.get("productId"),
-            occurredOn: form.get("occurredOn"),
+            businessDate: form.get("businessDate"),
             place: form.get("place"),
             lot: String(form.get("lot") || "") || undefined,
             purchasePrice: form.get("purchasePrice"),
@@ -207,7 +207,7 @@ export function DamageForm({ products }: { products: ProductOption[] }) {
           ))}
         </select>
       </label>
-      <Input name="occurredOn" type="date" required aria-label="Date" />
+      <Input name="businessDate" type="date" required aria-label="Date" />
       <Input name="place" required placeholder="Place" aria-label="Place" />
       <Input name="lot" placeholder="Lot" aria-label="Lot" />
       <Input name="quantity" required placeholder="Quantity" aria-label="Quantity" />

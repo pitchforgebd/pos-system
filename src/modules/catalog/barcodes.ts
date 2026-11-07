@@ -69,7 +69,7 @@ export async function listBarcodePrints(organizationId: string) {
     const record = after as { barcode?: string; product?: string; copies?: number };
     return {
       id: row.id,
-      occurredOn: businessDate(row.createdAt),
+      businessDate: businessDate(row.createdAt),
       barcode: record.barcode ?? "",
       product: record.product ?? "",
       copies: String(record.copies ?? ""),

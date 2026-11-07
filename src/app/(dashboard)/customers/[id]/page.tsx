@@ -37,7 +37,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       <DataTable
         caption="Customer ledger"
         columns={[
-          { key: "date", header: "Date", cell: (row) => row.occurredOn },
+          { key: "date", header: "Date", cell: (row) => row.businessDate },
           { key: "type", header: "Type", cell: (row) => row.entryType },
           { key: "debit", header: "Debit", cell: (row) => row.debit },
           { key: "credit", header: "Credit", cell: (row) => row.credit },

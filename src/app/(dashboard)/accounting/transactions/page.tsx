@@ -51,7 +51,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
       <DataTable
         caption="Cash and bank"
         columns={[
-          { key: "date", header: "Date", cell: (row) => row.occurredOn },
+          { key: "date", header: "Date", cell: (row) => row.businessDate },
           { key: "reference", header: "Reference", cell: (row) => row.reference },
           { key: "source", header: "Source", cell: (row) => row.source },
           { key: "account", header: "Cash / bank", cell: (row) => row.accountName },

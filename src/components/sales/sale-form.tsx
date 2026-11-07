@@ -156,7 +156,7 @@ export function SaleForm({
   const [customerQuery, setCustomerQuery] = useState("");
   const [customerOpen, setCustomerOpen] = useState(false);
   const [extraPay, setExtraPay] = useState(false);
-  const [occurredOn, setOccurredOn] = useState(today);
+  const [businessDate, setOccurredOn] = useState(today);
   const [tender, setTender] = useState<Tender>("CASH");
   const [cash, setCash] = useState("");
   const [cashEdited, setCashEdited] = useState(false);
@@ -401,7 +401,7 @@ export function SaleForm({
     const body = hold
       ? { customerId: customerId || undefined, lines }
       : {
-          occurredOn,
+          businessDate,
           customerId: customerId || undefined,
           chargesTotal: chargesText,
           paymentAmount: money(postedPay ?? zero),
@@ -468,7 +468,7 @@ export function SaleForm({
     >
       <div className="flex flex-wrap items-center gap-2 border-b border-border bg-white px-3 py-2">
         <span className="text-sm font-semibold text-[#123a63]">{branchName}</span>
-        <input aria-label="Date" type="date" required value={occurredOn} onChange={(event) => setOccurredOn(event.target.value)} className="h-8 rounded-md border border-border px-2 text-sm" />
+        <input aria-label="Date" type="date" required value={businessDate} onChange={(event) => setOccurredOn(event.target.value)} className="h-8 rounded-md border border-border px-2 text-sm" />
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <button type="button" className="h-9 rounded-md bg-[#1f9d55] px-3 text-sm font-semibold text-white" onClick={() => { setCustomerId(""); setCustomerOpen(false); }}>
             Walking

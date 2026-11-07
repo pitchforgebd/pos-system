@@ -9,7 +9,7 @@ import { StockRuleError } from "@/modules/inventory/stock";
 const bodySchema = z.object({
   fileName: z.string().trim().max(255).optional(),
   csv: z.string(),
-  occurredOn: z.string(),
+  businessDate: z.string(),
   warehouseId: z.string().uuid().optional(),
 });
 
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
       idempotencyKey: key,
       fileName: parsed.data.fileName ?? "opening-stock.csv",
       csv: parsed.data.csv,
-      occurredOn: parsed.data.occurredOn,
+      businessDate: parsed.data.businessDate,
       ip: clientIp(request),
       userAgent: actor.userAgent,
     });

@@ -7,7 +7,7 @@ import { createRequisition, listRequisitions } from "@/modules/commerce/requisit
 import { idempotencyKey, stockActor } from "@/modules/inventory/actor";
 
 const bodySchema = z.object({
-  occurredOn: isoDate,
+  businessDate: isoDate,
   note: z.string().trim().min(1).max(255),
 });
 

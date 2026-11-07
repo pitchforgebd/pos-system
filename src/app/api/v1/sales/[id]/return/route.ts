@@ -7,7 +7,7 @@ import { idempotencyKey, stockActor } from "@/modules/inventory/actor";
 import { postSaleReturn } from "@/modules/sales/returns";
 
 const bodySchema = z.object({
-  occurredOn: isoDate,
+  businessDate: isoDate,
   lines: z.array(z.object({ saleItemId: z.string().uuid(), quantity: z.string() })).min(1).max(100),
 });
 

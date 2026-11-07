@@ -5,15 +5,15 @@ import { decimalString } from "@/modules/inventory/money";
 export async function listIncomeRows(organizationId: string, branchId: string) {
   const rows = await prisma.income.findMany({
     where: { organizationId, branchId },
-    orderBy: { occurredOn: "desc" },
+    orderBy: { businessDate: "desc" },
     take: 100,
-    select: { id: true, category: true, amount: true, occurredOn: true, journalId: true },
+    select: { id: true, category: true, amount: true, businessDate: true, journalId: true },
   });
   return rows.map((row) => ({
     id: row.id,
     category: row.category ?? "",
     amount: decimalString(row.amount, 2),
-    occurredOn: dateOnly(row.occurredOn),
+    businessDate: dateOnly(row.businessDate),
     posted: row.journalId ? "Posted" : "Not posted",
   }));
 }
@@ -21,13 +21,13 @@ export async function listIncomeRows(organizationId: string, branchId: string) {
 export async function listLoanMovements(organizationId: string, branchId: string) {
   const rows = await prisma.journalLine.findMany({
     where: { organizationId, account: { code: "2200" }, journal: { status: "POSTED", branchId } },
-    orderBy: { journal: { occurredOn: "desc" } },
+    orderBy: { journal: { businessDate: "desc" } },
     take: 100,
-    select: { id: true, debit: true, credit: true, journal: { select: { number: true, description: true, occurredOn: true } } },
+    select: { id: true, debit: true, credit: true, journal: { select: { number: true, description: true, businessDate: true } } },
   });
   return rows.map((row) => ({
     id: row.id,
-    occurredOn: dateOnly(row.journal.occurredOn),
+    businessDate: dateOnly(row.journal.businessDate),
     number: row.journal.number ?? "",
     description: row.journal.description ?? "",
     debit: decimalString(row.debit, 2),
@@ -52,16 +52,16 @@ export async function listLoanRows(organizationId: string) {
 export async function listCapitalRows(organizationId: string, branchId: string) {
   const rows = await prisma.capitalTransaction.findMany({
     where: { organizationId, branchId },
-    orderBy: { occurredOn: "desc" },
+    orderBy: { businessDate: "desc" },
     take: 100,
-    select: { id: true, capitalType: true, ownerName: true, amount: true, occurredOn: true, journalId: true },
+    select: { id: true, capitalType: true, ownerName: true, amount: true, businessDate: true, journalId: true },
   });
   return rows.map((row) => ({
     id: row.id,
     capitalType: row.capitalType,
     ownerName: row.ownerName,
     amount: decimalString(row.amount, 2),
-    occurredOn: dateOnly(row.occurredOn),
+    businessDate: dateOnly(row.businessDate),
     posted: row.journalId ? "Posted" : "Not posted",
   }));
 }

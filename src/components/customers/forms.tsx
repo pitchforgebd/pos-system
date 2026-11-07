@@ -208,7 +208,7 @@ function MoneyForm({
           url,
           {
             customerId: form.get("customerId"),
-            occurredOn: form.get("occurredOn"),
+            businessDate: form.get("businessDate"),
             amount: form.get("amount"),
             method: form.get("method"),
           },
@@ -232,7 +232,7 @@ function MoneyForm({
           </option>
         ))}
       </select>
-      <Input name="occurredOn" type="date" required aria-label="Date" />
+      <Input name="businessDate" type="date" required aria-label="Date" />
       <Input name="amount" required placeholder="Amount" aria-label="Amount" />
       <select name="method" required aria-label="Method" className="h-10 rounded-md border border-border bg-surface px-3 text-sm">
         <option value="CASH">Cash</option>
@@ -518,7 +518,7 @@ export function CrmForms({
           setPending(true);
           void postJson("/api/v1/crm/activities", {
             contactId: form.get("contactId"),
-            occurredOn: form.get("occurredOn"),
+            businessDate: form.get("businessDate"),
             note: form.get("note"),
           }).then((result) => {
             if (!result.ok) {
@@ -538,7 +538,7 @@ export function CrmForms({
             </option>
           ))}
         </select>
-        <Input name="occurredOn" type="date" required aria-label="Follow-up date" />
+        <Input name="businessDate" type="date" required aria-label="Follow-up date" />
         <Input name="note" required placeholder="Follow-up note" aria-label="Follow-up note" />
         <Button type="submit" variant="secondary" loading={pending}>
           Save follow-up

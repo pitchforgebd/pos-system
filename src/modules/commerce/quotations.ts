@@ -40,7 +40,7 @@ function present(row: {
   id: string;
   number: string;
   status: "DRAFT" | "SENT" | "ACCEPTED";
-  occurredOn: Date;
+  businessDate: Date;
   note: string | null;
   customer: { name: string };
   saleId?: string | null;
@@ -51,7 +51,7 @@ function present(row: {
     id: row.id,
     number: row.number,
     status: row.status,
-    occurredOn: dateString(row.occurredOn),
+    businessDate: dateString(row.businessDate),
     note: row.note,
     customerName: row.customer.name,
     saleId: row.saleId ?? null,
@@ -82,13 +82,13 @@ async function lockQuotation(tx: Prisma.TransactionClient, organizationId: strin
 export async function listQuotations(organizationId: string, branchId: string) {
   const rows = await prisma.quotation.findMany({
     where: { organizationId, branchId },
-    orderBy: { occurredOn: "desc" },
+    orderBy: { businessDate: "desc" },
     take: 100,
     select: {
       id: true,
       number: true,
       status: true,
-      occurredOn: true,
+      businessDate: true,
       note: true,
       saleId: true,
       customer: { select: { name: true } },
@@ -105,7 +105,7 @@ export async function getQuotation(organizationId: string, branchId: string, id:
       id: true,
       number: true,
       status: true,
-      occurredOn: true,
+      businessDate: true,
       note: true,
       saleId: true,
       customer: { select: { name: true } },
@@ -115,13 +115,13 @@ export async function getQuotation(organizationId: string, branchId: string, id:
   return row ? present(row) : null;
 }
 
-export async function createQuotation(input: Actor & { customerId: string; occurredOn: string; note?: string | null; lines?: { productId: string; quantity: string; unitPrice: string }[] }) {
+export async function createQuotation(input: Actor & { customerId: string; businessDate: string; note?: string | null; lines?: { productId: string; quantity: string; unitPrice: string }[] }) {
   const note = input.note?.trim() || null;
   if (note && note.length > 255) {
     return { ok: false as const, status: 422 as const, code: "BUSINESS_RULE" as const, message: "The note is too long." };
   }
   const lines = input.lines ?? [];
-  const requestHash = hashPayload({ customerId: input.customerId, occurredOn: input.occurredOn, note, lines });
+  const requestHash = hashPayload({ customerId: input.customerId, businessDate: input.businessDate, note, lines });
   try {
     const data = await prisma.$transaction(async (tx) => {
       const existing = await readIdempotency(tx, {
@@ -149,7 +149,7 @@ export async function createQuotation(input: Actor & { customerId: string; occur
       const number = await allocateNumber(tx, {
         organizationId: input.organizationId,
         documentType: "QUO",
-        year: documentYear(input.occurredOn),
+        year: documentYear(input.businessDate),
       });
       const priced = [];
       for (const line of lines) {
@@ -179,7 +179,7 @@ export async function createQuotation(input: Actor & { customerId: string; occur
           branchId: input.branchId,
           customerId: customer.id,
           number,
-          occurredOn: occurredDate(input.occurredOn),
+          businessDate: occurredDate(input.businessDate),
           note,
           createdById: input.userId,
           items: { create: priced },
@@ -299,7 +299,7 @@ export async function convertQuotation(input: {
       id: true,
       saleId: true,
       customerId: true,
-      occurredOn: true,
+      businessDate: true,
       items: { select: { productId: true, quantity: true, unitPrice: true } },
     },
   });
@@ -322,7 +322,7 @@ export async function convertQuotation(input: {
     idempotencyKey: input.idempotencyKey,
     ip: input.ip ?? "127.0.0.1",
     userAgent: input.userAgent ?? null,
-    occurredOn: dateOnly(current.occurredOn),
+    businessDate: dateOnly(current.businessDate),
     customerId: current.customerId,
     paymentAmount: "0.00",
     allowPriceOverride: true,

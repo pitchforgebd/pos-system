@@ -32,7 +32,7 @@ export default async function DamagePage() {
       <DataTable
         caption="Damage products"
         columns={[
-          { key: "date", header: "Date", cell: (row) => row.occurredOn },
+          { key: "date", header: "Date", cell: (row) => row.businessDate },
           { key: "sku", header: "SKU", cell: (row) => row.sku },
           { key: "name", header: "Product", cell: (row) => row.name },
           { key: "place", header: "Place", cell: (row) => row.place },

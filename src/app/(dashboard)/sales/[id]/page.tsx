@@ -24,7 +24,7 @@ export default async function SaleDetailPage({ params, searchParams }: { params:
     <div className="space-y-6">
       <PageHeader
         title={sale.number ?? "Sale"}
-        description={`${sale.customerName} · ${sale.occurredOn} · ${sale.total}`}
+        description={`${sale.customerName} · ${sale.businessDate} · ${sale.total}`}
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Sales", href: "/sales" }, { label: sale.number ?? "Sale" }]}
         actions={
           <div className="flex gap-2 print:hidden">
@@ -37,7 +37,7 @@ export default async function SaleDetailPage({ params, searchParams }: { params:
       />
       <PrintSheet title={query.print === "thermal" ? "Receipt" : "Invoice"} note={query.print === "thermal" ? "80mm" : "A4"} thermal={query.print === "thermal"}>
         <p>Invoice {sale.number ?? "Sale"}</p>
-        <p>Date {sale.occurredOn}</p>
+        <p>Date {sale.businessDate}</p>
         <p>Customer {sale.customerName}</p>
         {sale.items.map((item) => (
           <p key={item.id}>

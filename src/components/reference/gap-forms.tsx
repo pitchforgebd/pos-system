@@ -160,7 +160,7 @@ export function DirectReturnForm({ products }: { products: Option[] }) {
     quantity: data.get("quantity"),
     refundAmount: data.get("refundAmount"),
     method: data.get("method"),
-    occurredOn: data.get("occurredOn"),
+    businessDate: data.get("businessDate"),
   }));
   return (
     <form className="grid max-w-xl gap-3" onSubmit={form.onSubmit}>
@@ -176,7 +176,7 @@ export function DirectReturnForm({ products }: { products: Option[] }) {
         <option value="CASH">Cash</option>
         <option value="BANK">Bank</option>
       </select>
-      <Input name="occurredOn" type="date" required aria-label="Date" />
+      <Input name="businessDate" type="date" required aria-label="Date" />
       <p className="text-sm text-muted">Stock comes back at the average stock-in cost. Cash or bank is refunded. There is no separate return rate.</p>
       {form.message ? <p className="text-sm text-error">{form.message}</p> : null}
       <Button type="submit" loading={form.pending}>Post direct return</Button>
@@ -204,7 +204,7 @@ export function RedeemForm({ customers }: { customers: Option[] }) {
   const form = useSubmit("/api/v1/loyalty/redeem", (data) => ({
     customerId: data.get("customerId"),
     points: data.get("points"),
-    occurredOn: data.get("occurredOn"),
+    businessDate: data.get("businessDate"),
   }));
   return (
     <form className="grid max-w-xl gap-3" onSubmit={form.onSubmit}>
@@ -215,7 +215,7 @@ export function RedeemForm({ customers }: { customers: Option[] }) {
         ))}
       </select>
       <Input name="points" required placeholder="Points" aria-label="Points" />
-      <Input name="occurredOn" type="date" required aria-label="Date" />
+      <Input name="businessDate" type="date" required aria-label="Date" />
       <p className="text-sm text-muted">Taka per point comes from shop settings. Points are not redeemed when that rate is blank.</p>
       {form.message ? <p className="text-sm text-error">{form.message}</p> : null}
       <Button type="submit" loading={form.pending}>Redeem points</Button>

@@ -33,7 +33,7 @@ export function PartyAmountForm({
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState<Party | null>(null);
   const [amount, setAmount] = useState("");
-  const [occurredOn, setOccurredOn] = useState(today);
+  const [businessDate, setOccurredOn] = useState(today);
   const [method, setMethod] = useState("CASH");
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
@@ -130,7 +130,7 @@ export function PartyAmountForm({
           setPending(true);
           setMessage("");
           const target = typeof url === "function" ? url(selected.id) : url;
-          const body = typeof url === "function" ? { occurredOn, amount, method } : { customerId: selected.id, occurredOn, amount, method };
+          const body = typeof url === "function" ? { businessDate, amount, method } : { customerId: selected.id, businessDate, amount, method };
           void fetch(target, {
             method: "POST",
             headers: { "content-type": "application/json", "idempotency-key": crypto.randomUUID() },
@@ -159,7 +159,7 @@ export function PartyAmountForm({
           <p className="mt-2 text-sm text-muted">Select a name from the list.</p>
         )}
         <div className="mt-3 grid gap-3">
-          <Input type="date" required aria-label="Date" value={occurredOn} onChange={(event) => setOccurredOn(event.target.value)} />
+          <Input type="date" required aria-label="Date" value={businessDate} onChange={(event) => setOccurredOn(event.target.value)} />
           <Input required aria-label="Amount" placeholder="Amount" value={amount} onChange={(event) => setAmount(event.target.value)} />
           <select aria-label="Method" value={method} onChange={(event) => setMethod(event.target.value)} className="h-10 rounded-md border border-border bg-surface px-3 text-sm">
             <option value="CASH">Cash</option>

@@ -68,9 +68,9 @@ function lineQuantity(line: StockLine) {
 
 async function postInbound(
   kind: "OPENING" | "OWN_STOCK",
-  input: Actor & { occurredOn: string; lines: StockLine[] },
+  input: Actor & { businessDate: string; lines: StockLine[] },
 ) {
-  const requestHash = hashPayload({ kind, occurredOn: input.occurredOn, warehouseId: input.warehouseId ?? null, lines: input.lines });
+  const requestHash = hashPayload({ kind, businessDate: input.businessDate, warehouseId: input.warehouseId ?? null, lines: input.lines });
   try {
     const data = await idempotentTransaction(async (tx) => {
       const existing = await readIdempotency(tx, {
@@ -92,7 +92,7 @@ async function postInbound(
                 organizationId: input.organizationId,
                 branchId: input.branchId,
                 warehouseId: warehouse.id,
-                occurredOn: occurredDate(input.occurredOn),
+                businessDate: occurredDate(input.businessDate),
               },
             })
           : await tx.ownStockInvoice.create({
@@ -100,7 +100,7 @@ async function postInbound(
                 organizationId: input.organizationId,
                 branchId: input.branchId,
                 warehouseId: warehouse.id,
-                occurredOn: occurredDate(input.occurredOn),
+                businessDate: occurredDate(input.businessDate),
               },
             });
       for (const line of input.lines) {
@@ -181,11 +181,11 @@ async function postInbound(
   }
 }
 
-export function postOpeningStock(input: Actor & { occurredOn: string; lines: StockLine[] }) {
+export function postOpeningStock(input: Actor & { businessDate: string; lines: StockLine[] }) {
   return postInbound("OPENING", input);
 }
 
-export function postOwnStock(input: Actor & { occurredOn: string; lines: StockLine[] }) {
+export function postOwnStock(input: Actor & { businessDate: string; lines: StockLine[] }) {
   return postInbound("OWN_STOCK", input);
 }
 
@@ -280,7 +280,7 @@ export async function postAdjustment(
 export async function postDamage(
   input: Actor & {
     productId: string;
-    occurredOn: string;
+    businessDate: string;
     place: string;
     lot?: string;
     purchasePrice: string;
@@ -301,7 +301,7 @@ export async function postDamage(
   }
   const requestHash = hashPayload({
     productId: input.productId,
-    occurredOn: input.occurredOn,
+    businessDate: input.businessDate,
     place: input.place,
     lot: input.lot ?? null,
     purchasePrice: input.purchasePrice,
@@ -331,7 +331,7 @@ export async function postDamage(
           organizationId: input.organizationId,
           branchId: input.branchId,
           productId: input.productId,
-          occurredOn: occurredDate(input.occurredOn),
+          businessDate: occurredDate(input.businessDate),
           place: input.place,
           lot: input.lot ?? null,
           purchasePrice,
@@ -519,11 +519,11 @@ function day(value: Date) {
 export async function listDamageRecords(organizationId: string, branchId: string) {
   const rows = await prisma.damageRecord.findMany({
     where: { organizationId, branchId },
-    orderBy: { occurredOn: "desc" },
+    orderBy: { businessDate: "desc" },
     take: 100,
     select: {
       id: true,
-      occurredOn: true,
+      businessDate: true,
       place: true,
       lot: true,
       quantity: true,
@@ -533,7 +533,7 @@ export async function listDamageRecords(organizationId: string, branchId: string
   });
   return rows.map((row) => ({
     id: row.id,
-    occurredOn: day(row.occurredOn),
+    businessDate: day(row.businessDate),
     place: row.place,
     lot: row.lot ?? "",
     quantity: decimalString(row.quantity, 4),
@@ -546,14 +546,14 @@ export async function listDamageRecords(organizationId: string, branchId: string
 export async function listOpeningInvoices(organizationId: string, branchId: string) {
   const rows = await prisma.openingStock.findMany({
     where: { organizationId, branchId },
-    orderBy: { occurredOn: "desc" },
+    orderBy: { businessDate: "desc" },
     take: 100,
-    select: { id: true, number: true, occurredOn: true, warehouse: { select: { name: true } } },
+    select: { id: true, number: true, businessDate: true, warehouse: { select: { name: true } } },
   });
   return rows.map((row) => ({
     id: row.id,
     number: row.number ?? "",
-    occurredOn: day(row.occurredOn),
+    businessDate: day(row.businessDate),
     warehouseName: row.warehouse.name,
   }));
 }
@@ -561,14 +561,14 @@ export async function listOpeningInvoices(organizationId: string, branchId: stri
 export async function listOwnInvoices(organizationId: string, branchId: string) {
   const rows = await prisma.ownStockInvoice.findMany({
     where: { organizationId, branchId },
-    orderBy: { occurredOn: "desc" },
+    orderBy: { businessDate: "desc" },
     take: 100,
-    select: { id: true, number: true, occurredOn: true, warehouse: { select: { name: true } } },
+    select: { id: true, number: true, businessDate: true, warehouse: { select: { name: true } } },
   });
   return rows.map((row) => ({
     id: row.id,
     number: row.number ?? "",
-    occurredOn: day(row.occurredOn),
+    businessDate: day(row.businessDate),
     warehouseName: row.warehouse.name,
   }));
 }

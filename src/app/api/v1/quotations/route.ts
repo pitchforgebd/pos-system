@@ -8,7 +8,7 @@ import { idempotencyKey, stockActor } from "@/modules/inventory/actor";
 
 const bodySchema = z.object({
   customerId: z.string().uuid(),
-  occurredOn: isoDate,
+  businessDate: isoDate,
   note: z.string().trim().max(255).nullable().optional(),
   lines: z
     .array(

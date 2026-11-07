@@ -27,13 +27,13 @@ test("phase 11 quotations and requisitions do not post money or stock", async ()
 
   try {
     const key = randomUUID();
-    const created = await createQuotation({ ...actor, idempotencyKey: key, customerId: customer.id, occurredOn: "2026-10-01", note: "Window quote" });
+    const created = await createQuotation({ ...actor, idempotencyKey: key, customerId: customer.id, businessDate: "2026-10-01", note: "Window quote" });
     assert.equal(created.ok, true);
     if (!created.ok) {
       return;
     }
     assert.equal(created.number?.startsWith("QUO-2026-"), true);
-    const replay = await createQuotation({ ...actor, idempotencyKey: key, customerId: customer.id, occurredOn: "2026-10-01", note: "Window quote" });
+    const replay = await createQuotation({ ...actor, idempotencyKey: key, customerId: customer.id, businessDate: "2026-10-01", note: "Window quote" });
     assert.equal(replay.ok && replay.replayed, true);
     const skipped = await acceptQuotation({ ...actor, quotationId: created.id });
     assert.equal(skipped.ok, false);
@@ -51,7 +51,7 @@ test("phase 11 quotations and requisitions do not post money or stock", async ()
     assert.equal(await prisma.journal.count({ where: { organizationId: org.id } }), 0);
     assert.equal(await prisma.customerLedger.count({ where: { organizationId: org.id } }), 0);
 
-    const request = await createRequisition({ ...actor, idempotencyKey: randomUUID(), occurredOn: "2026-10-01", note: "Need bags" });
+    const request = await createRequisition({ ...actor, idempotencyKey: randomUUID(), businessDate: "2026-10-01", note: "Need bags" });
     assert.equal(request.ok, true);
     if (!request.ok) {
       return;

@@ -8,7 +8,7 @@ import { postDamage } from "@/modules/inventory/documents";
 
 const bodySchema = z.object({
   productId: z.string().uuid(),
-  occurredOn: isoDate,
+  businessDate: isoDate,
   place: z.string().trim().min(1).max(191),
   lot: z.string().trim().max(64).optional(),
   purchasePrice: z.string(),

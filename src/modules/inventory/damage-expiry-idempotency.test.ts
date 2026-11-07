@@ -69,14 +69,14 @@ test("damage and expiry write-off are idempotent", async () => {
       { productId: plain, quantity: "10" },
       { productId: expiring, quantity: "10", lot: "L1", expiresOn: "2026-12-31" },
     ]) {
-      const opened = await postOpeningStock({ ...actor, idempotencyKey: randomUUID(), occurredOn: "2026-10-01", lines: [line] });
+      const opened = await postOpeningStock({ ...actor, idempotencyKey: randomUUID(), businessDate: "2026-10-01", lines: [line] });
       assert.equal(opened.ok, true);
     }
 
     const damage = {
       ...actor,
       productId: plain,
-      occurredOn: "2026-10-02",
+      businessDate: "2026-10-02",
       place: "Shelf",
       purchasePrice: "10.00",
       salePrice: "15.00",

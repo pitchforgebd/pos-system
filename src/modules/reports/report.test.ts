@@ -49,7 +49,7 @@ test("phase 14 reports sum posted rows and keep the trial balance equal", async 
 
   async function post(description: string, lines: [string, string, string][]) {
     const journal = await prisma.journal.create({
-      data: { organizationId: org.id, branchId: branch.id, status: "POSTED", description, occurredOn: new Date("2026-10-01T00:00:00.000Z") },
+      data: { organizationId: org.id, branchId: branch.id, status: "POSTED", description, businessDate: new Date("2026-10-01T00:00:00.000Z") },
     });
     await prisma.journalLine.createMany({
       data: lines.map(([code, debit, credit]) => ({
@@ -69,18 +69,18 @@ test("phase 14 reports sum posted rows and keep the trial balance equal", async 
         branchId: branch.id,
         status: "POSTED",
         total: "10.00",
-        occurredOn: new Date("2026-10-01T00:00:00.000Z"),
+        businessDate: new Date("2026-10-01T00:00:00.000Z"),
         invoice: { create: { organizationId: org.id, branchId: branch.id, number: `RPT-${stamp}`, total: "10.00" } },
       },
     });
     await prisma.sale.create({
-      data: { organizationId: org.id, branchId: branch.id, status: "POSTED", total: "2.50", occurredOn: new Date("2026-10-02T00:00:00.000Z") },
+      data: { organizationId: org.id, branchId: branch.id, status: "POSTED", total: "2.50", businessDate: new Date("2026-10-02T00:00:00.000Z") },
     });
     await prisma.sale.create({
-      data: { organizationId: org.id, branchId: branch.id, status: "DRAFT", total: "99.00", occurredOn: new Date("2026-10-01T00:00:00.000Z") },
+      data: { organizationId: org.id, branchId: branch.id, status: "DRAFT", total: "99.00", businessDate: new Date("2026-10-01T00:00:00.000Z") },
     });
     await prisma.sale.create({
-      data: { organizationId: org.id, branchId: other.id, status: "POSTED", total: "50.00", occurredOn: new Date("2026-10-01T00:00:00.000Z") },
+      data: { organizationId: org.id, branchId: other.id, status: "POSTED", total: "50.00", businessDate: new Date("2026-10-01T00:00:00.000Z") },
     });
     await prisma.purchase.create({
       data: {
@@ -90,20 +90,20 @@ test("phase 14 reports sum posted rows and keep the trial balance equal", async 
         status: "POSTED",
         number: `PUR-${stamp}`,
         total: "7.00",
-        occurredOn: new Date("2026-10-01T00:00:00.000Z"),
+        businessDate: new Date("2026-10-01T00:00:00.000Z"),
       },
     });
     await prisma.customerLedger.create({
-      data: { organizationId: org.id, customerId: customer.id, occurredOn: new Date("2026-10-01T00:00:00.000Z"), entryType: "OPENING", debit: "8.00", credit: "0.00" },
+      data: { organizationId: org.id, customerId: customer.id, businessDate: new Date("2026-10-01T00:00:00.000Z"), entryType: "OPENING", debit: "8.00", credit: "0.00" },
     });
     await prisma.customerLedger.create({
-      data: { organizationId: org.id, customerId: customer.id, occurredOn: new Date("2026-10-02T00:00:00.000Z"), entryType: "PAYMENT", debit: "0.00", credit: "3.00" },
+      data: { organizationId: org.id, customerId: customer.id, businessDate: new Date("2026-10-02T00:00:00.000Z"), entryType: "PAYMENT", debit: "0.00", credit: "3.00" },
     });
     await prisma.supplierLedger.create({
-      data: { organizationId: org.id, supplierId: supplier.id, occurredOn: new Date("2026-10-01T00:00:00.000Z"), entryType: "OPENING", debit: "0.00", credit: "7.00" },
+      data: { organizationId: org.id, supplierId: supplier.id, businessDate: new Date("2026-10-01T00:00:00.000Z"), entryType: "OPENING", debit: "0.00", credit: "7.00" },
     });
     await prisma.supplierLedger.create({
-      data: { organizationId: org.id, supplierId: supplier.id, occurredOn: new Date("2026-10-02T00:00:00.000Z"), entryType: "PAYMENT", debit: "2.00", credit: "0.00" },
+      data: { organizationId: org.id, supplierId: supplier.id, businessDate: new Date("2026-10-02T00:00:00.000Z"), entryType: "PAYMENT", debit: "2.00", credit: "0.00" },
     });
 
     const sales = await salesReport(scope);

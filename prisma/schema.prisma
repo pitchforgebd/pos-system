@@ -190,6 +190,14 @@ model Organization {
   logoUrl   String?  @db.VarChar(255)
   pointsPerHundred Decimal? @db.Decimal(18, 4)
   takaPerPoint     Decimal? @db.Decimal(18, 4)
+  /// IANA time zone of the business day (N17). Documents and reports use this zone, never the server one.
+  timezone             String    @default("Asia/Dhaka") @db.VarChar(64)
+  /// First month of the fiscal year (D9: July).
+  fiscalYearStartMonth Int       @default(7)
+  /// No posting on or before this date (N9, invariant I11). Null means nothing is locked.
+  lockedThrough        DateTime? @db.Date
+  /// A posting dated further back than this many days needs the posting.backdate permission (D18).
+  backdateDays         Int       @default(3)
   status    RecordStatus @default(ACTIVE)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -923,7 +931,7 @@ model DamageRecord {
   organizationId String   @db.Char(36)
   branchId       String   @db.Char(36)
   productId      String   @db.Char(36)
-  occurredOn     DateTime @db.Date
+  businessDate     DateTime @db.Date
   place          String   @db.VarChar(191)
   lot            String?  @db.VarChar(64)
   purchasePrice  Decimal  @db.Decimal(18, 2)
@@ -940,7 +948,7 @@ model DamageRecord {
   product      Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
   user         User         @relation(fields: [userId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, productId, occurredOn])
+  @@index([organizationId, productId, businessDate])
   @@map("damage_records")
 }
 
@@ -972,7 +980,7 @@ model OpeningStock {
   branchId       String    @db.Char(36)
   warehouseId    String    @db.Char(36)
   number         String?   @db.VarChar(32)
-  occurredOn     DateTime  @db.Date
+  businessDate     DateTime  @db.Date
   createdAt      DateTime  @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
@@ -990,7 +998,7 @@ model OwnStockInvoice {
   branchId       String   @db.Char(36)
   warehouseId    String   @db.Char(36)
   number         String?  @db.VarChar(32)
-  occurredOn     DateTime @db.Date
+  businessDate     DateTime @db.Date
   createdAt      DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
@@ -1078,7 +1086,7 @@ model CustomerLedger {
   organizationId String             @db.Char(36)
   branchId       String?            @db.Char(36)
   customerId     String             @db.Char(36)
-  occurredOn     DateTime           @db.Date
+  businessDate     DateTime           @db.Date
   entryType      CustomerLedgerType
   debit          Decimal            @default(0) @db.Decimal(18, 2)
   credit         Decimal            @default(0) @db.Decimal(18, 2)
@@ -1090,7 +1098,7 @@ model CustomerLedger {
   branch       Branch?      @relation(fields: [branchId], references: [id], onDelete: Restrict)
   customer     Customer     @relation(fields: [customerId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, customerId, occurredOn])
+  @@index([organizationId, customerId, businessDate])
   @@map("customer_ledgers")
 }
 
@@ -1100,7 +1108,7 @@ model CustomerPayment {
   branchId       String?  @db.Char(36)
   customerId     String   @db.Char(36)
   number         String?  @db.VarChar(32)
-  occurredOn     DateTime @db.Date
+  businessDate     DateTime @db.Date
   method         String   @db.VarChar(32)
   amount         Decimal  @db.Decimal(18, 2)
   journalId      String?  @unique @db.Char(36)
@@ -1112,7 +1120,7 @@ model CustomerPayment {
   journal      Journal?     @relation(fields: [journalId], references: [id], onDelete: Restrict)
 
   @@unique([organizationId, number])
-  @@index([organizationId, customerId, occurredOn])
+  @@index([organizationId, customerId, businessDate])
   @@map("customer_payments")
 }
 
@@ -1121,7 +1129,7 @@ model CustomerAdvance {
   organizationId String   @db.Char(36)
   branchId       String?  @db.Char(36)
   customerId     String   @db.Char(36)
-  occurredOn     DateTime @db.Date
+  businessDate     DateTime @db.Date
   method         String   @db.VarChar(32)
   amount         Decimal  @db.Decimal(18, 2)
   journalId      String?  @unique @db.Char(36)
@@ -1132,7 +1140,7 @@ model CustomerAdvance {
   customer     Customer     @relation(fields: [customerId], references: [id], onDelete: Restrict)
   journal      Journal?     @relation("AdvanceJournal", fields: [journalId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, customerId, occurredOn])
+  @@index([organizationId, customerId, businessDate])
   @@map("customer_advances")
 }
 
@@ -1188,7 +1196,7 @@ model SupplierLedger {
   organizationId String             @db.Char(36)
   branchId       String?            @db.Char(36)
   supplierId     String             @db.Char(36)
-  occurredOn     DateTime           @db.Date
+  businessDate     DateTime           @db.Date
   entryType      SupplierLedgerType
   debit          Decimal            @default(0) @db.Decimal(18, 2)
   credit         Decimal            @default(0) @db.Decimal(18, 2)
@@ -1200,7 +1208,7 @@ model SupplierLedger {
   branch       Branch?      @relation(fields: [branchId], references: [id], onDelete: Restrict)
   supplier     Supplier     @relation(fields: [supplierId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, supplierId, occurredOn])
+  @@index([organizationId, supplierId, businessDate])
   @@map("supplier_ledgers")
 }
 
@@ -1210,7 +1218,7 @@ model SupplierPayment {
   branchId       String?  @db.Char(36)
   supplierId     String   @db.Char(36)
   number         String?  @db.VarChar(32)
-  occurredOn     DateTime @db.Date
+  businessDate     DateTime @db.Date
   method         String   @db.VarChar(32)
   amount         Decimal  @db.Decimal(18, 2)
   journalId      String?  @unique @db.Char(36)
@@ -1222,7 +1230,7 @@ model SupplierPayment {
   journal      Journal?     @relation("SupplierPaymentJournal", fields: [journalId], references: [id], onDelete: Restrict)
 
   @@unique([organizationId, number])
-  @@index([organizationId, supplierId, occurredOn])
+  @@index([organizationId, supplierId, businessDate])
   @@map("supplier_payments")
 }
 
@@ -1274,7 +1282,7 @@ model LoyaltyTransaction {
   cardId         String?          @db.Char(36)
   entryType      LoyaltyEntryType
   points         Decimal          @db.Decimal(18, 4)
-  occurredOn     DateTime         @db.Date
+  businessDate     DateTime         @db.Date
   referenceType  String?          @db.VarChar(64)
   referenceId    String?          @db.Char(36)
   createdAt      DateTime         @default(now())
@@ -1283,7 +1291,7 @@ model LoyaltyTransaction {
   customer     Customer     @relation(fields: [customerId], references: [id], onDelete: Restrict)
   card         LoyaltyCard? @relation(fields: [cardId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, customerId, occurredOn])
+  @@index([organizationId, customerId, businessDate])
   @@map("loyalty_transactions")
 }
 
@@ -1300,7 +1308,7 @@ model Sale {
   vatTotal       Decimal        @default(0) @db.Decimal(18, 2)
   chargesTotal   Decimal        @default(0) @db.Decimal(18, 2)
   total          Decimal        @default(0) @db.Decimal(18, 2)
-  occurredOn     DateTime       @db.Date
+  businessDate     DateTime       @db.Date
   createdById    String?        @db.Char(36)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
@@ -1318,7 +1326,7 @@ model Sale {
   quotation    Quotation?
   serials      ProductSerial[]
 
-  @@index([organizationId, branchId, occurredOn])
+  @@index([organizationId, branchId, businessDate])
   @@index([organizationId, status])
   @@map("sales")
 }
@@ -1368,7 +1376,7 @@ model SaleReturn {
   saleId         String         @db.Char(36)
   number         String?        @db.VarChar(32)
   status         DocumentStatus @default(DRAFT)
-  occurredOn     DateTime       @db.Date
+  businessDate     DateTime       @db.Date
   total          Decimal        @default(0) @db.Decimal(18, 2)
   journalId      String?        @unique @db.Char(36)
   createdAt      DateTime       @default(now())
@@ -1381,7 +1389,7 @@ model SaleReturn {
   items        SaleReturnItem[]
 
   @@unique([organizationId, number])
-  @@index([organizationId, branchId, occurredOn])
+  @@index([organizationId, branchId, businessDate])
   @@map("sale_returns")
 }
 
@@ -1428,7 +1436,7 @@ model Quotation {
   customerId     String          @db.Char(36)
   number         String          @db.VarChar(32)
   status         QuotationStatus @default(DRAFT)
-  occurredOn     DateTime        @db.Date
+  businessDate     DateTime        @db.Date
   note           String?         @db.VarChar(255)
   saleId         String?         @unique @db.Char(36)
   createdById    String?         @db.Char(36)
@@ -1443,7 +1451,7 @@ model Quotation {
   items        QuotationItem[]
 
   @@unique([organizationId, number])
-  @@index([organizationId, branchId, occurredOn])
+  @@index([organizationId, branchId, businessDate])
   @@map("quotations")
 }
 
@@ -1453,7 +1461,7 @@ model Requisition {
   branchId       String            @db.Char(36)
   number         String            @db.VarChar(32)
   status         RequisitionStatus @default(REQUESTED)
-  occurredOn     DateTime          @db.Date
+  businessDate     DateTime          @db.Date
   note           String            @db.VarChar(255)
   requestedById  String            @db.Char(36)
   decidedById    String?           @db.Char(36)
@@ -1466,7 +1474,7 @@ model Requisition {
   decidedBy    User?        @relation("RequisitionDecidedBy", fields: [decidedById], references: [id], onDelete: Restrict)
 
   @@unique([organizationId, number])
-  @@index([organizationId, branchId, occurredOn])
+  @@index([organizationId, branchId, businessDate])
   @@map("requisitions")
 }
 
@@ -1522,7 +1530,7 @@ model Purchase {
   vatTotal       Decimal        @default(0) @db.Decimal(18, 2)
   chargesTotal   Decimal        @default(0) @db.Decimal(18, 2)
   total          Decimal        @default(0) @db.Decimal(18, 2)
-  occurredOn     DateTime       @db.Date
+  businessDate     DateTime       @db.Date
   createdById    String?        @db.Char(36)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
@@ -1538,7 +1546,7 @@ model Purchase {
   returns      PurchaseReturn[]
 
   @@unique([organizationId, number])
-  @@index([organizationId, branchId, occurredOn])
+  @@index([organizationId, branchId, businessDate])
   @@map("purchases")
 }
 
@@ -1584,7 +1592,7 @@ model PurchaseReturn {
   purchaseId     String         @db.Char(36)
   number         String?        @db.VarChar(32)
   status         DocumentStatus @default(DRAFT)
-  occurredOn     DateTime       @db.Date
+  businessDate     DateTime       @db.Date
   total          Decimal        @default(0) @db.Decimal(18, 2)
   journalId      String?        @unique @db.Char(36)
   createdAt      DateTime       @default(now())
@@ -1597,7 +1605,7 @@ model PurchaseReturn {
   items        PurchaseReturnItem[]
 
   @@unique([organizationId, number])
-  @@index([organizationId, branchId, occurredOn])
+  @@index([organizationId, branchId, businessDate])
   @@map("purchase_returns")
 }
 
@@ -1662,7 +1670,7 @@ model Journal {
   organizationId String        @db.Char(36)
   branchId       String?       @db.Char(36)
   number         String?       @db.VarChar(32)
-  occurredOn     DateTime      @db.Date
+  businessDate     DateTime      @db.Date
   status         JournalStatus @default(DRAFT)
   description    String?       @db.VarChar(255)
   postedAt       DateTime?
@@ -1692,8 +1700,8 @@ model Journal {
   directReturn    DirectReturn?
 
   @@unique([organizationId, number])
-  @@index([organizationId, status, occurredOn])
-  @@index([organizationId, branchId, status, occurredOn])
+  @@index([organizationId, status, businessDate])
+  @@index([organizationId, branchId, status, businessDate])
   @@map("journals")
 }
 
@@ -1723,7 +1731,7 @@ model Voucher {
   number         String?       @db.VarChar(32)
   voucherType    VoucherType
   amount         Decimal       @db.Decimal(18, 2)
-  occurredOn     DateTime      @db.Date
+  businessDate     DateTime      @db.Date
   status         JournalStatus @default(DRAFT)
   journalId      String?       @unique @db.Char(36)
   createdAt      DateTime      @default(now())
@@ -1734,7 +1742,7 @@ model Voucher {
   journal      Journal?     @relation(fields: [journalId], references: [id], onDelete: Restrict)
 
   @@unique([organizationId, number])
-  @@index([organizationId, occurredOn])
+  @@index([organizationId, businessDate])
   @@map("vouchers")
 }
 
@@ -1745,7 +1753,7 @@ model Expense {
   accountId      String   @db.Char(36)
   number         String?  @db.VarChar(32)
   amount         Decimal  @db.Decimal(18, 2)
-  occurredOn     DateTime @db.Date
+  businessDate     DateTime @db.Date
   cashAccountId  String?  @db.Char(36)
   bankAccountId  String?  @db.Char(36)
   journalId      String?  @unique @db.Char(36)
@@ -1760,7 +1768,7 @@ model Expense {
   journal      Journal?     @relation(fields: [journalId], references: [id], onDelete: Restrict)
 
   @@unique([organizationId, number])
-  @@index([organizationId, occurredOn])
+  @@index([organizationId, businessDate])
   @@map("expenses")
 }
 
@@ -1771,7 +1779,7 @@ model Income {
   accountId      String   @db.Char(36)
   category       String?  @db.VarChar(64)
   amount         Decimal  @db.Decimal(18, 2)
-  occurredOn     DateTime @db.Date
+  businessDate     DateTime @db.Date
   cashAccountId  String?  @db.Char(36)
   bankAccountId  String?  @db.Char(36)
   journalId      String?  @unique @db.Char(36)
@@ -1785,7 +1793,7 @@ model Income {
   bankAccount  BankAccount? @relation("IncomeBank", fields: [bankAccountId], references: [id], onDelete: Restrict)
   journal      Journal?     @relation(fields: [journalId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, occurredOn])
+  @@index([organizationId, businessDate])
   @@map("income")
 }
 
@@ -1846,7 +1854,7 @@ model CapitalTransaction {
   capitalType    CapitalType
   ownerName      String      @db.VarChar(191)
   amount         Decimal     @db.Decimal(18, 2)
-  occurredOn     DateTime    @db.Date
+  businessDate     DateTime    @db.Date
   journalId      String?     @unique @db.Char(36)
   createdAt      DateTime    @default(now())
 
@@ -1854,7 +1862,7 @@ model CapitalTransaction {
   branch       Branch?      @relation(fields: [branchId], references: [id], onDelete: Restrict)
   journal      Journal?     @relation(fields: [journalId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, occurredOn])
+  @@index([organizationId, businessDate])
   @@map("capital_transactions")
 }
 
@@ -1906,7 +1914,7 @@ model BankTransaction {
   branchId        String?                   @db.Char(36)
   transactionType AccountingTransactionType
   amount          Decimal                   @db.Decimal(18, 2)
-  occurredOn      DateTime                  @db.Date
+  businessDate      DateTime                  @db.Date
   cashAccountId   String?                   @db.Char(36)
   bankAccountId   String?                   @db.Char(36)
   reference       String?                   @db.VarChar(64)
@@ -1919,7 +1927,7 @@ model BankTransaction {
   bankAccount  BankAccount? @relation("TxnBank", fields: [bankAccountId], references: [id], onDelete: Restrict)
   journal      Journal?     @relation(fields: [journalId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, occurredOn])
+  @@index([organizationId, businessDate])
   @@index([organizationId, transactionType])
   @@map("bank_transactions")
 }
@@ -2089,14 +2097,14 @@ model CrmActivity {
   id             String   @id @default(uuid()) @db.Char(36)
   organizationId String   @db.Char(36)
   contactId      String   @db.Char(36)
-  occurredOn     DateTime @db.Date
+  businessDate     DateTime @db.Date
   note           String   @db.VarChar(255)
   createdAt      DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   contact      CrmContact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
-  @@index([contactId, occurredOn])
+  @@index([contactId, businessDate])
   @@map("crm_activities")
 }
 
@@ -2205,6 +2213,7 @@ model AuditLog {
 
   @@index([organizationId, createdAt])
   @@index([organizationId, module, entityType])
+  @@index([action, ip, createdAt])
   @@map("audit_logs")
 }
 
@@ -2266,6 +2275,7 @@ model IdempotencyKey {
   user         User         @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@unique([organizationId, key])
+  @@index([createdAt])
   @@map("idempotency_keys")
 }
 
@@ -2369,7 +2379,7 @@ model DirectReturn {
   refundAmount   Decimal  @db.Decimal(18, 2)
   method         String   @db.VarChar(16)
   journalId      String?  @unique @db.Char(36)
-  occurredOn     DateTime @db.Date
+  businessDate     DateTime @db.Date
   createdAt      DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
@@ -2378,6 +2388,6 @@ model DirectReturn {
   product      Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
   journal      Journal?     @relation(fields: [journalId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, branchId, occurredOn])
+  @@index([organizationId, branchId, businessDate])
   @@map("direct_returns")
 }

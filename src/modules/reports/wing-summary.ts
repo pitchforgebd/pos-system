@@ -41,12 +41,12 @@ function branchFilter(branchId: string | null, branchIds: string[]) {
   return { branchId: { in: branchIds } };
 }
 
-async function netProfit(organizationId: string, branchId: string | null, branchIds: string[], occurredOn: Date) {
+async function netProfit(organizationId: string, branchId: string | null, branchIds: string[], businessDate: Date) {
   const sums = await prisma.journalLine.groupBy({
     by: ["accountId"],
     where: {
       organizationId,
-      journal: { status: "POSTED", occurredOn, ...branchFilter(branchId, branchIds) },
+      journal: { status: "POSTED", businessDate, ...branchFilter(branchId, branchIds) },
     },
     _sum: { debit: true, credit: true },
   });
@@ -127,10 +127,10 @@ export async function wingSummary(
   if (scoped.length === 0) {
     return empty;
   }
-  const occurredOn = new Date(`${day}T00:00:00.000Z`);
-  const weekStart = new Date(occurredOn);
+  const businessDate = new Date(`${day}T00:00:00.000Z`);
+  const weekStart = new Date(businessDate);
   weekStart.setUTCDate(weekStart.getUTCDate() - 6);
-  const posted = { organizationId, status: "POSTED" as const, occurredOn, ...branchFilter(branchId, branchIds) };
+  const posted = { organizationId, status: "POSTED" as const, businessDate, ...branchFilter(branchId, branchIds) };
   const [
     sales,
     cash,
@@ -156,20 +156,20 @@ export async function wingSummary(
     }),
     prisma.saleReturn.aggregate({ where: posted, _sum: { total: true } }),
     prisma.saleReturn.aggregate({
-      where: { ...posted, sale: { occurredOn: { lt: occurredOn } } },
+      where: { ...posted, sale: { businessDate: { lt: businessDate } } },
       _sum: { total: true },
     }),
     prisma.purchase.aggregate({ where: posted, _sum: { total: true } }),
     prisma.expense.aggregate({
-      where: { organizationId, occurredOn, ...branchFilter(branchId, branchIds) },
+      where: { organizationId, businessDate, ...branchFilter(branchId, branchIds) },
       _sum: { amount: true },
     }),
     prisma.customerPayment.aggregate({
-      where: { organizationId, occurredOn, ...branchFilter(branchId, branchIds) },
+      where: { organizationId, businessDate, ...branchFilter(branchId, branchIds) },
       _sum: { amount: true },
     }),
     prisma.supplierPayment.aggregate({
-      where: { organizationId, occurredOn, ...branchFilter(branchId, branchIds) },
+      where: { organizationId, businessDate, ...branchFilter(branchId, branchIds) },
       _sum: { amount: true },
     }),
     prisma.customerAdvance.aggregate({
@@ -185,7 +185,7 @@ export async function wingSummary(
       where: {
         organizationId,
         status: "OPEN",
-        dueOn: occurredOn,
+        dueOn: businessDate,
         ...(branchId || branchIds.length > 0 ? { invoice: branchFilter(branchId, branchIds) } : {}),
       },
     }),
@@ -193,23 +193,23 @@ export async function wingSummary(
       where: {
         organizationId,
         status: "POSTED",
-        occurredOn: { gte: weekStart, lte: occurredOn },
+        businessDate: { gte: weekStart, lte: businessDate },
         ...branchFilter(branchId, branchIds),
       },
       _sum: { total: true },
     }),
     prisma.sale.groupBy({
-      by: ["occurredOn"],
+      by: ["businessDate"],
       where: {
         organizationId,
         status: "POSTED",
-        occurredOn: { gte: weekStart, lte: occurredOn },
+        businessDate: { gte: weekStart, lte: businessDate },
         ...branchFilter(branchId, branchIds),
       },
       _sum: { total: true },
     }),
-    netProfit(organizationId, branchId, branchIds, occurredOn),
-    reportBoards(organizationId, branchId, branchIds, occurredOn),
+    netProfit(organizationId, branchId, branchIds, businessDate),
+    reportBoards(organizationId, branchId, branchIds, businessDate),
   ]);
   const salesTotal = new Prisma.Decimal(sales._sum.total ?? 0);
   const cashTotal = new Prisma.Decimal(cash._sum.amount ?? 0);
@@ -231,7 +231,7 @@ export async function wingSummary(
     supplierAdvanceBalance: boards.supplierAdvance,
     customerAdvanceBalance: money(advances._sum.amount),
     weekSales: money(week._sum.total),
-    weekDays: weekList(weekStart, occurredOn, weekRows),
+    weekDays: weekList(weekStart, businessDate, weekRows),
     sell: boards.sell,
     products: boards.products,
     suppliers: boards.suppliers,
@@ -242,9 +242,9 @@ export async function wingSummary(
 function weekList(
   start: Date,
   end: Date,
-  rows: Array<{ occurredOn: Date; _sum: { total: Prisma.Decimal | null } }>,
+  rows: Array<{ businessDate: Date; _sum: { total: Prisma.Decimal | null } }>,
 ) {
-  const totals = new Map(rows.map((row) => [dateOnly(row.occurredOn), new Prisma.Decimal(row._sum.total ?? 0)]));
+  const totals = new Map(rows.map((row) => [dateOnly(row.businessDate), new Prisma.Decimal(row._sum.total ?? 0)]));
   const days: { date: string; total: string }[] = [];
   for (let cursor = new Date(end); cursor >= start; cursor = new Date(cursor.getTime() - 86_400_000)) {
     const key = dateOnly(cursor);
@@ -287,11 +287,11 @@ async function reportBoards(organizationId: string, branchId: string | null, bra
     bank,
   ] = await Promise.all([
     prisma.sale.aggregate({ where: posted, _sum: { total: true } }),
-    prisma.sale.aggregate({ where: { ...posted, occurredOn: { gte: monthStart, lte: day } }, _sum: { total: true } }),
-    prisma.sale.aggregate({ where: { ...posted, occurredOn: { gte: yearStart, lte: day } }, _sum: { total: true } }),
+    prisma.sale.aggregate({ where: { ...posted, businessDate: { gte: monthStart, lte: day } }, _sum: { total: true } }),
+    prisma.sale.aggregate({ where: { ...posted, businessDate: { gte: yearStart, lte: day } }, _sum: { total: true } }),
     prisma.saleReturn.aggregate({ where: posted, _sum: { total: true } }),
-    prisma.saleReturn.aggregate({ where: { ...posted, occurredOn: { gte: monthStart, lte: day } }, _sum: { total: true } }),
-    prisma.saleReturn.aggregate({ where: { ...posted, occurredOn: { gte: yearStart, lte: day } }, _sum: { total: true } }),
+    prisma.saleReturn.aggregate({ where: { ...posted, businessDate: { gte: monthStart, lte: day } }, _sum: { total: true } }),
+    prisma.saleReturn.aggregate({ where: { ...posted, businessDate: { gte: yearStart, lte: day } }, _sum: { total: true } }),
     prisma.salePayment.aggregate({
       where: { organizationId, method: { in: ["CASH", "BANK", "CARD"] }, sale: posted },
       _sum: { amount: true },

@@ -32,11 +32,11 @@ function failure(error: unknown): Failure | null {
 }
 
 export async function postCustomerAdvance(
-  input: Actor & { customerId: string; occurredOn: string; amount: string; method: "CASH" | "BANK" },
+  input: Actor & { customerId: string; businessDate: string; amount: string; method: "CASH" | "BANK" },
 ) {
   const requestHash = hashPayload({
     customerId: input.customerId,
-    occurredOn: input.occurredOn,
+    businessDate: input.businessDate,
     amount: input.amount,
     method: input.method,
   });
@@ -70,7 +70,7 @@ export async function postCustomerAdvance(
       const journalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
-        occurredOn: occurredDate(input.occurredOn),
+        businessDate: occurredDate(input.businessDate),
         description: "Customer advance",
         createdById: input.userId,
         lines: [
@@ -83,7 +83,7 @@ export async function postCustomerAdvance(
           organizationId: input.organizationId,
           branchId: input.branchId,
           customerId: input.customerId,
-          occurredOn: occurredDate(input.occurredOn),
+          businessDate: occurredDate(input.businessDate),
           method: input.method,
           amount,
           journalId,
@@ -95,7 +95,7 @@ export async function postCustomerAdvance(
           organizationId: input.organizationId,
           branchId: input.branchId,
           customerId: input.customerId,
-          occurredOn: occurredDate(input.occurredOn),
+          businessDate: occurredDate(input.businessDate),
           entryType: "ADVANCE",
           credit: amount,
           referenceType: "customer_advance",
@@ -138,11 +138,11 @@ export async function postCustomerAdvance(
 export async function listCustomerAdvances(organizationId: string, branchId: string) {
   const rows = await prisma.customerAdvance.findMany({
     where: { organizationId, branchId },
-    orderBy: { occurredOn: "desc" },
+    orderBy: { businessDate: "desc" },
     take: 100,
     select: {
       id: true,
-      occurredOn: true,
+      businessDate: true,
       method: true,
       amount: true,
       customer: { select: { name: true } },
@@ -150,7 +150,7 @@ export async function listCustomerAdvances(organizationId: string, branchId: str
   });
   return rows.map((row) => ({
     id: row.id,
-    occurredOn: dateOnly(row.occurredOn),
+    businessDate: dateOnly(row.businessDate),
     customerName: row.customer.name,
     method: row.method,
     amount: decimalString(row.amount, 2),

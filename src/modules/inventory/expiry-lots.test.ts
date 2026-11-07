@@ -82,7 +82,7 @@ test("stock going out uses up the expiry lots, earliest expiry first", async () 
       const opened = await postOpeningStock({
         ...actor,
         idempotencyKey: randomUUID(),
-        occurredOn: "2026-10-01",
+        businessDate: "2026-10-01",
         lines: [{ productId: product.id, quantity: "5", unitCost: "1.00", lot, expiresOn }],
       });
       assert.equal(opened.ok, true);
@@ -92,7 +92,7 @@ test("stock going out uses up the expiry lots, earliest expiry first", async () 
     const sold = await postSale({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-02",
+      businessDate: "2026-10-02",
       lines: [{ productId: product.id, quantity: "6" }],
       paymentAmount: "12.00",
       paymentMethod: "CASH",
@@ -115,7 +115,7 @@ test("stock going out uses up the expiry lots, earliest expiry first", async () 
     const added = await postOwnStock({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-03",
+      businessDate: "2026-10-03",
       lines: [{ productId: product.id, quantity: "4", unitCost: "1.00", lot: "L3", expiresOn: "2027-01-01" }],
     });
     assert.equal(added.ok, true);
@@ -126,7 +126,7 @@ test("stock going out uses up the expiry lots, earliest expiry first", async () 
       ...actor,
       idempotencyKey: randomUUID(),
       productId: product.id,
-      occurredOn: "2026-10-03",
+      businessDate: "2026-10-03",
       place: "Shelf",
       lot: "L3",
       purchasePrice: "1.00",
@@ -151,7 +151,7 @@ test("stock going out uses up the expiry lots, earliest expiry first", async () 
     const tooMuch = await postSale({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-04",
+      businessDate: "2026-10-04",
       lines: [{ productId: product.id, quantity: "3" }],
       paymentAmount: "6.00",
       paymentMethod: "CASH",
@@ -163,16 +163,16 @@ test("stock going out uses up the expiry lots, earliest expiry first", async () 
     const old = await postOwnStock({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-04",
+      businessDate: "2026-10-04",
       lines: [{ productId: product.id, quantity: "3", unitCost: "1.00", lot: "OLD", expiresOn: "2026-09-01" }],
     });
     assert.equal(old.ok, true);
     assert.equal(await stock(), "5");
-    const sale = (quantity: string, occurredOn = "2026-10-04") =>
+    const sale = (quantity: string, businessDate = "2026-10-04") =>
       postSale({
         ...actor,
         idempotencyKey: randomUUID(),
-        occurredOn,
+        businessDate,
         lines: [{ productId: product.id, quantity }],
         paymentAmount: (Number(quantity) * 2).toFixed(2),
         paymentMethod: "CASH",

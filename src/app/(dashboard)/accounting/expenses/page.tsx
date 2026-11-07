@@ -47,7 +47,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
         caption="Expenses"
         columns={[
           { key: "number", header: "Expense", cell: (row) => row.journalId ? <Link href={`/accounting/journals/${row.journalId}`}>{row.number}</Link> : row.number },
-          { key: "date", header: "Date", cell: (row) => row.occurredOn },
+          { key: "date", header: "Date", cell: (row) => row.businessDate },
           { key: "account", header: "Account", cell: (row) => row.accountName },
           { key: "amount", header: "Amount", cell: (row) => row.amount },
         ]}

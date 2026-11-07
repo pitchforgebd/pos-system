@@ -59,7 +59,7 @@ test("an opening-stock import posts one document for all valid rows", async () =
       userId: user.id,
       warehouseId: warehouse.id,
       fileName: "opening.csv",
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       csv,
       ip: "127.0.0.1",
       userAgent: "test",

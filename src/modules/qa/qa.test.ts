@@ -103,7 +103,7 @@ test("phase 18 checks money, numbers, permissions, and the sale path", async () 
     const opened = await postOpeningStock({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       lines: [{ productId: created.product.id, quantity: "2.0000", unitCost: "10.00" }],
     });
     assert.equal(opened.ok, true);
@@ -112,7 +112,7 @@ test("phase 18 checks money, numbers, permissions, and the sale path", async () 
     const discount = await postSale({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       customerId: customer.id,
       lines: [{ productId: created.product.id, quantity: "1", discountAmount: "100.00" }],
       paymentAmount: "0.00",
@@ -121,7 +121,7 @@ test("phase 18 checks money, numbers, permissions, and the sale path", async () 
     const vat = await postSale({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       customerId: customer.id,
       lines: [{ productId: created.product.id, quantity: "1", vatAmount: "1.00" }],
       paymentAmount: "0.00",
@@ -135,7 +135,7 @@ test("phase 18 checks money, numbers, permissions, and the sale path", async () 
     const sold = await postSale({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       customerId: customer.id,
       lines: [{ productId: created.product.id, quantity: "1" }],
       paymentAmount: "2.00",
@@ -151,7 +151,7 @@ test("phase 18 checks money, numbers, permissions, and the sale path", async () 
       ...actor,
       idempotencyKey: randomUUID(),
       customerId: customer.id,
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       amount: "4.00",
       method: "CASH",
     });
@@ -199,7 +199,7 @@ test("phase 18 checks money, numbers, permissions, and the sale path", async () 
     const lastOpened = await postOpeningStock({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       lines: [{ productId: last.product.id, quantity: "1.0000", unitCost: "10.00" }],
     });
     assert.equal(lastOpened.ok, true);
@@ -207,7 +207,7 @@ test("phase 18 checks money, numbers, permissions, and the sale path", async () 
       postSale({
         ...actor,
         idempotencyKey: randomUUID(),
-        occurredOn: "2026-10-01",
+        businessDate: "2026-10-01",
         lines: [{ productId: last.product.id, quantity: "1" }],
         paymentAmount: "12.00",
         paymentMethod: "CASH",
@@ -215,7 +215,7 @@ test("phase 18 checks money, numbers, permissions, and the sale path", async () 
       postSale({
         ...actor,
         idempotencyKey: randomUUID(),
-        occurredOn: "2026-10-01",
+        businessDate: "2026-10-01",
         lines: [{ productId: last.product.id, quantity: "1" }],
         paymentAmount: "12.00",
         paymentMethod: "CASH",

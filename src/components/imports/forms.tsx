@@ -79,7 +79,7 @@ export function ProductImportForm({ canExport }: { canExport: boolean }) {
 
 export function OpeningImportForm() {
   const [csv, setCsv] = useState("sku,quantity,unitCost,lot,manufacturedOn,expiresOn,rack\n");
-  const [occurredOn, setOccurredOn] = useState("");
+  const [businessDate, setOccurredOn] = useState("");
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
 
@@ -93,7 +93,7 @@ export function OpeningImportForm() {
         void fetch("/api/v1/inventory/opening-stock/import", {
           method: "POST",
           headers: { "content-type": "application/json", "idempotency-key": crypto.randomUUID() },
-          body: JSON.stringify({ fileName: "opening-stock.csv", csv, occurredOn }),
+          body: JSON.stringify({ fileName: "opening-stock.csv", csv, businessDate }),
         })
           .then(async (response) => {
             const body = (await response.json()) as { error?: { message?: string }; data?: { successRows?: number; failedRows?: number } };
@@ -108,7 +108,7 @@ export function OpeningImportForm() {
     >
       <label className="grid gap-1 text-sm">
         Date
-        <input name="occurredOn" type="date" required aria-label="Opening date" className="h-10 rounded-md border border-border bg-surface px-3 text-sm" value={occurredOn} onChange={(event) => setOccurredOn(event.target.value)} />
+        <input name="businessDate" type="date" required aria-label="Opening date" className="h-10 rounded-md border border-border bg-surface px-3 text-sm" value={businessDate} onChange={(event) => setOccurredOn(event.target.value)} />
       </label>
       <textarea aria-label="Opening stock CSV" className="min-h-32 rounded-md border border-border bg-surface px-3 py-2 font-mono text-sm" value={csv} onChange={(event) => setCsv(event.target.value)} />
       <p className="text-sm text-muted">Rack is kept in the file and is not stored. Unit cost is not posted to accounting.</p>

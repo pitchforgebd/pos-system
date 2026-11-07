@@ -7,7 +7,7 @@ import { createCrmActivity } from "@/modules/customers/crm";
 
 const bodySchema = z.object({
   contactId: z.string().uuid(),
-  occurredOn: isoDate,
+  businessDate: isoDate,
   note: z.string().trim().min(1).max(255),
 });
 

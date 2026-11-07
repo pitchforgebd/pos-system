@@ -25,12 +25,12 @@ export default async function JournalDetailPage({ params }: { params: Promise<{ 
     <div className="space-y-6">
       <PageHeader
         title={journal.number ?? "Journal"}
-        description={`${journal.occurredOn} · ${journal.description ?? ""} · ${journal.balanced ? "Debit equals credit" : "Not balanced"}`}
+        description={`${journal.businessDate} · ${journal.description ?? ""} · ${journal.balanced ? "Debit equals credit" : "Not balanced"}`}
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Journals", href: "/accounting/journals" }, { label: journal.number ?? "Journal" }]}
         actions={<PrintButton label="Print voucher" />}
       />
       <PrintSheet title={journal.number ?? "Voucher"} note="Debit equals credit on a posted journal.">
-        <p>{journal.occurredOn}</p>
+        <p>{journal.businessDate}</p>
         {journal.description ? <p>{journal.description}</p> : null}
         {journal.lines.map((line) => (
           <p key={line.id}>

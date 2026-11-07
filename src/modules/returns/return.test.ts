@@ -101,7 +101,7 @@ test("phase 08 returns cannot exceed the eligible quantity", async () => {
     const sold = await postSale({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       lines: [{ productId: product.id, quantity: "2" }],
       paymentAmount: "24.00",
       paymentMethod: "CASH",
@@ -113,7 +113,7 @@ test("phase 08 returns cannot exceed the eligible quantity", async () => {
       ...actor,
       idempotencyKey: randomUUID(),
       saleId: sold.ok ? sold.id : "",
-      occurredOn: "2026-10-02",
+      businessDate: "2026-10-02",
       lines: [{ saleItemId, quantity: "3" }],
     });
     assert.equal(tooMuch.ok, false);
@@ -124,7 +124,7 @@ test("phase 08 returns cannot exceed the eligible quantity", async () => {
       ...actor,
       idempotencyKey: key,
       saleId: sold.ok ? sold.id : "",
-      occurredOn: "2026-10-02",
+      businessDate: "2026-10-02",
       lines: [{ saleItemId, quantity: "1" }],
     });
     assert.equal(returned.ok, true);
@@ -136,7 +136,7 @@ test("phase 08 returns cannot exceed the eligible quantity", async () => {
       ...actor,
       idempotencyKey: key,
       saleId: sold.ok ? sold.id : "",
-      occurredOn: "2026-10-02",
+      businessDate: "2026-10-02",
       lines: [{ saleItemId, quantity: "1" }],
     });
     assert.equal(replay.ok && replay.replayed, true);
@@ -145,7 +145,7 @@ test("phase 08 returns cannot exceed the eligible quantity", async () => {
       ...actor,
       idempotencyKey: randomUUID(),
       saleId: sold.ok ? sold.id : "",
-      occurredOn: "2026-10-02",
+      businessDate: "2026-10-02",
       lines: [{ saleItemId, quantity: "2" }],
     });
     assert.equal(again.ok, false);
@@ -153,7 +153,7 @@ test("phase 08 returns cannot exceed the eligible quantity", async () => {
     const credit = await postSale({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       customerId: customer.id,
       lines: [{ productId: product.id, quantity: "1" }],
       paymentAmount: "0.00",
@@ -164,7 +164,7 @@ test("phase 08 returns cannot exceed the eligible quantity", async () => {
       ...actor,
       idempotencyKey: randomUUID(),
       saleId: credit.ok ? credit.id : "",
-      occurredOn: "2026-10-02",
+      businessDate: "2026-10-02",
       lines: [{ saleItemId: creditSale?.items[0]?.id ?? "", quantity: "1" }],
     });
     assert.equal(creditReturn.ok, true);
@@ -173,7 +173,7 @@ test("phase 08 returns cannot exceed the eligible quantity", async () => {
     const partial = await postSale({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       customerId: customer.id,
       lines: [{ productId: product.id, quantity: "1" }],
       paymentAmount: "8.00",
@@ -185,7 +185,7 @@ test("phase 08 returns cannot exceed the eligible quantity", async () => {
       ...actor,
       idempotencyKey: randomUUID(),
       saleId: partial.ok ? partial.id : "",
-      occurredOn: "2026-10-02",
+      businessDate: "2026-10-02",
       lines: [{ saleItemId: partialSale?.items[0]?.id ?? "", quantity: "1" }],
     });
     assert.equal(partialReturn.ok, true);
@@ -204,7 +204,7 @@ test("phase 08 returns cannot exceed the eligible quantity", async () => {
       ...actor,
       idempotencyKey: randomUUID(),
       supplierId,
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       lines: [{ productId: product.id, quantity: "1", unitCost: "10.00" }],
       paymentAmount: "10.00",
       paymentMethod: "CASH",
@@ -217,7 +217,7 @@ test("phase 08 returns cannot exceed the eligible quantity", async () => {
       ...actor,
       idempotencyKey: randomUUID(),
       purchaseId: bought.ok ? bought.id : "",
-      occurredOn: "2026-10-03",
+      businessDate: "2026-10-03",
       lines: [{ purchaseItemId: purchase?.id ?? "", quantity: "1" }],
     });
     assert.equal(missingMethod.ok, false);
@@ -225,7 +225,7 @@ test("phase 08 returns cannot exceed the eligible quantity", async () => {
       ...actor,
       idempotencyKey: randomUUID(),
       purchaseId: bought.ok ? bought.id : "",
-      occurredOn: "2026-10-03",
+      businessDate: "2026-10-03",
       refundMethod: "CASH",
       lines: [{ purchaseItemId: purchase?.id ?? "", quantity: "1" }],
     });
@@ -237,7 +237,7 @@ test("phase 08 returns cannot exceed the eligible quantity", async () => {
       ...actor,
       idempotencyKey: randomUUID(),
       purchaseId: bought.ok ? bought.id : "",
-      occurredOn: "2026-10-03",
+      businessDate: "2026-10-03",
       refundMethod: "CASH",
       lines: [{ purchaseItemId: purchase?.id ?? "", quantity: "1" }],
     });

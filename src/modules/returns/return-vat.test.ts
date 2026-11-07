@@ -106,7 +106,7 @@ test("a customer return reverses the discount, the sales credit, and the VAT pay
     const sold = await postSale({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       lines: [{ productId: discounted.id, quantity: "3", discountAmount: "3.00" }],
       paymentAmount: "29.70",
       paymentMethod: "CASH",
@@ -122,7 +122,7 @@ test("a customer return reverses the discount, the sales credit, and the VAT pay
       ...actor,
       idempotencyKey: randomUUID(),
       saleId: sold.ok ? sold.id : "",
-      occurredOn: "2026-10-02",
+      businessDate: "2026-10-02",
       lines: [{ saleItemId: itemId, quantity: "1" }],
     });
     assert.equal(first.ok, true);
@@ -136,7 +136,7 @@ test("a customer return reverses the discount, the sales credit, and the VAT pay
       ...actor,
       idempotencyKey: randomUUID(),
       saleId: sold.ok ? sold.id : "",
-      occurredOn: "2026-10-03",
+      businessDate: "2026-10-03",
       lines: [{ saleItemId: itemId, quantity: "2" }],
     });
     assert.equal(rest.ok, true);
@@ -153,7 +153,7 @@ test("a customer return reverses the discount, the sales credit, and the VAT pay
     const soldRounded = await postSale({
       ...actor,
       idempotencyKey: randomUUID(),
-      occurredOn: "2026-10-01",
+      businessDate: "2026-10-01",
       lines: [{ productId: rounded.id, quantity: "3" }],
       paymentAmount: "10.99",
       paymentMethod: "CASH",
@@ -167,7 +167,7 @@ test("a customer return reverses the discount, the sales credit, and the VAT pay
         ...actor,
         idempotencyKey: randomUUID(),
         saleId: soldRounded.ok ? soldRounded.id : "",
-        occurredOn: "2026-10-04",
+        businessDate: "2026-10-04",
         lines: [{ saleItemId: roundedItem, quantity: "1" }],
       });
       assert.equal(result.ok, true);

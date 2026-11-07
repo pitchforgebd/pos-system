@@ -193,7 +193,7 @@ Phase 17 added indexes only where `EXPLAIN` showed the chosen key did not cover 
 - `products (organizationId, deletedAt, name)`, because the product list sorts by name after an organization filter and `EXPLAIN` reported a filesort
 - `stock_ledgers (organizationId, branchId, createdAt)`, because the ledger list orders by time. `EXPLAIN` can still filesort that list while the table is empty, because an older organization prefix looks cheaper. The new index is listed as a possible key.
 - `sale_payments (organizationId, method, createdAt)`, because shift cash sales filtered method and time after the organization foreign key. `EXPLAIN` now uses this index.
-- `journals (organizationId, branchId, status, occurredOn)`, because posted reports filter branch, status, and date. On a small table `EXPLAIN` can still start from the organization-and-number key. The new index is listed as a possible key.
+- `journals (organizationId, branchId, status, businessDate)`, because posted reports filter branch, status, and date. On a small table `EXPLAIN` can still start from the organization-and-number key. The new index is listed as a possible key.
 
 - `organizationId` plus `branchId` on operational tables
 - `productId`, `customerId`, `supplierId`

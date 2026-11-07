@@ -8,7 +8,7 @@ import { listPurchases, postPurchase } from "@/modules/purchasing/purchases";
 
 const bodySchema = z.object({
   supplierId: z.string().uuid(),
-  occurredOn: isoDate,
+  businessDate: isoDate,
   warehouseId: z.string().uuid().optional(),
   paymentAmount: z.string().optional(),
   paymentMethod: z.enum(["CASH", "BANK"]).optional(),

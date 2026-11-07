@@ -31,7 +31,7 @@ export default async function CashReportPage({ searchParams }: { searchParams: P
       <DataTable
         caption="Cash lines"
         columns={[
-          { key: "date", header: "Date", cell: (row) => row.occurredOn },
+          { key: "date", header: "Date", cell: (row) => row.businessDate },
           { key: "reference", header: "Reference", cell: (row) => row.reference },
           { key: "debit", header: "In", cell: (row) => row.debit },
           { key: "credit", header: "Out", cell: (row) => row.credit },

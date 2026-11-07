@@ -22,7 +22,7 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
     <div className="space-y-6">
       <PageHeader
         title={purchase.number ?? "Purchase"}
-        description={`${purchase.supplier.name} · ${purchase.occurredOn} · ${purchase.total}`}
+        description={`${purchase.supplier.name} · ${purchase.businessDate} · ${purchase.total}`}
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Purchases", href: "/purchases" }, { label: purchase.number ?? "Purchase" }]}
       />
       <DataTable

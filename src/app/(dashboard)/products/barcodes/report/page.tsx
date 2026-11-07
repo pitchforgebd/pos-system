@@ -27,7 +27,7 @@ export default async function BarcodeReportPage() {
       <DataTable
         caption="Prints"
         columns={[
-          { key: "date", header: "Date", cell: (row) => row.occurredOn },
+          { key: "date", header: "Date", cell: (row) => row.businessDate },
           { key: "barcode", header: "Barcode", cell: (row) => row.barcode },
           { key: "product", header: "Product", cell: (row) => row.product },
           { key: "copies", header: "Copies", cell: (row) => row.copies },

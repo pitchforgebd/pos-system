@@ -7,7 +7,7 @@ import { idempotencyKey, stockActor } from "@/modules/inventory/actor";
 import { listJournals, postJournal } from "@/modules/accounting/books";
 
 const bodySchema = z.object({
-  occurredOn: isoDate,
+  businessDate: isoDate,
   description: z.string().trim().max(255).default(""),
   lines: z.array(z.object({ accountCode: z.string().trim().min(1).max(16), debit: z.string(), credit: z.string() })).min(2).max(20),
 });

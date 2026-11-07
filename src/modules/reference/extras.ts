@@ -204,9 +204,9 @@ export async function addShipment(input: Actor & { courierId: string; customerId
 export async function listDirectReturns(organizationId: string, branchId: string) {
   const rows = await prisma.directReturn.findMany({
     where: { organizationId, branchId },
-    orderBy: { occurredOn: "desc" },
+    orderBy: { businessDate: "desc" },
     take: 100,
-    select: { id: true, quantity: true, refundAmount: true, method: true, occurredOn: true, product: { select: { name: true } } },
+    select: { id: true, quantity: true, refundAmount: true, method: true, businessDate: true, product: { select: { name: true } } },
   });
   return rows.map((row) => ({
     id: row.id,
@@ -214,11 +214,11 @@ export async function listDirectReturns(organizationId: string, branchId: string
     quantity: decimalString(row.quantity, 4),
     refundAmount: decimalString(row.refundAmount, 2),
     method: row.method,
-    occurredOn: dateOnly(row.occurredOn),
+    businessDate: dateOnly(row.businessDate),
   }));
 }
 
-export async function postDirectReturn(input: Actor & { productId: string; quantity: string; refundAmount: string; method: "CASH" | "BANK"; occurredOn: string }) {
+export async function postDirectReturn(input: Actor & { productId: string; quantity: string; refundAmount: string; method: "CASH" | "BANK"; businessDate: string }) {
   try {
     const data = await prisma.$transaction(async (tx) => {
       const quantity = parseQuantity(input.quantity);
@@ -255,7 +255,7 @@ export async function postDirectReturn(input: Actor & { productId: string; quant
       const journalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
-        occurredOn: day(input.occurredOn),
+        businessDate: day(input.businessDate),
         description: "Direct return",
         createdById: input.userId,
         lines: [
@@ -289,7 +289,7 @@ export async function postDirectReturn(input: Actor & { productId: string; quant
           refundAmount: moneyRefund,
           method: input.method,
           journalId,
-          occurredOn: day(input.occurredOn),
+          businessDate: day(input.businessDate),
         },
       });
       return { id };
@@ -332,7 +332,7 @@ export async function markDealer(input: { organizationId: string; customerId: st
   return { ok: true as const, id: customer.id };
 }
 
-export async function redeemLoyalty(input: Actor & { customerId: string; points: string; occurredOn: string }) {
+export async function redeemLoyalty(input: Actor & { customerId: string; points: string; businessDate: string }) {
   const points = parseQuantity(input.points);
   if (!points || points.lte(0)) {
     return { ok: false as const, status: 422 as const, code: "BUSINESS_RULE" as const, message: "Enter the points to redeem." };
@@ -374,7 +374,7 @@ export async function redeemLoyalty(input: Actor & { customerId: string; points:
       const journalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
-        occurredOn: day(input.occurredOn),
+        businessDate: day(input.businessDate),
         description: "Loyalty redeem",
         createdById: input.userId,
         lines: [
@@ -387,7 +387,7 @@ export async function redeemLoyalty(input: Actor & { customerId: string; points:
           organizationId: input.organizationId,
           branchId: input.branchId,
           customerId: input.customerId,
-          occurredOn: day(input.occurredOn),
+          businessDate: day(input.businessDate),
           entryType: "ADJUSTMENT",
           credit: taka,
           referenceType: "loyalty",
@@ -400,7 +400,7 @@ export async function redeemLoyalty(input: Actor & { customerId: string; points:
           customerId: input.customerId,
           entryType: "REDEEM",
           points,
-          occurredOn: day(input.occurredOn),
+          businessDate: day(input.businessDate),
           referenceType: "journal",
           referenceId: journalId,
         },

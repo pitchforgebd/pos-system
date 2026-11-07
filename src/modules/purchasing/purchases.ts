@@ -57,7 +57,7 @@ function failure(error: unknown): Failure | null {
 export async function postPurchase(
   input: Actor & {
     supplierId: string;
-    occurredOn: string;
+    businessDate: string;
     lines: PurchaseLine[];
     paymentAmount?: string;
     paymentMethod?: "CASH" | "BANK";
@@ -65,7 +65,7 @@ export async function postPurchase(
 ) {
   const requestHash = hashPayload({
     supplierId: input.supplierId,
-    occurredOn: input.occurredOn,
+    businessDate: input.businessDate,
     warehouseId: input.warehouseId ?? null,
     lines: input.lines,
     paymentAmount: input.paymentAmount ?? "0.00",
@@ -120,7 +120,7 @@ export async function postPurchase(
       const number = await allocateNumber(tx, {
         organizationId: input.organizationId,
         documentType: "PUR",
-        year: documentYear(input.occurredOn),
+        year: documentYear(input.businessDate),
       });
       const purchase = await tx.purchase.create({
         data: {
@@ -135,7 +135,7 @@ export async function postPurchase(
           vatTotal: new Prisma.Decimal(0),
           chargesTotal: new Prisma.Decimal(0),
           total: subtotal,
-          occurredOn: occurredDate(input.occurredOn),
+          businessDate: occurredDate(input.businessDate),
           createdById: input.userId,
           items: {
             create: priced.map((line) => ({
@@ -200,7 +200,7 @@ export async function postPurchase(
       const purchaseJournalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
-        occurredOn: occurredDate(input.occurredOn),
+        businessDate: occurredDate(input.businessDate),
         description: `Purchase ${number}`,
         createdById: input.userId,
         lines: [
@@ -214,7 +214,7 @@ export async function postPurchase(
           organizationId: input.organizationId,
           branchId: input.branchId,
           supplierId: supplier.id,
-          occurredOn: occurredDate(input.occurredOn),
+          businessDate: occurredDate(input.businessDate),
           entryType: "PURCHASE",
           credit: subtotal,
           referenceType: "purchase",
@@ -225,7 +225,7 @@ export async function postPurchase(
         await settleSupplier(tx, {
           ...input,
           supplierId: supplier.id,
-          occurredOn: input.occurredOn,
+          businessDate: input.businessDate,
           amount: payment,
           method: input.paymentMethod,
           purchaseId: purchase.id,
@@ -273,17 +273,17 @@ export async function postPurchase(
 
 async function settleSupplier(
   tx: Prisma.TransactionClient,
-  input: Actor & { supplierId: string; occurredOn: string; amount: Prisma.Decimal; method: "CASH" | "BANK"; purchaseId?: string },
+  input: Actor & { supplierId: string; businessDate: string; amount: Prisma.Decimal; method: "CASH" | "BANK"; purchaseId?: string },
 ) {
   const number = await allocateNumber(tx, {
     organizationId: input.organizationId,
     documentType: "PAY",
-    year: documentYear(input.occurredOn),
+    year: documentYear(input.businessDate),
   });
   const journalId = await postBalancedJournal(tx, {
     organizationId: input.organizationId,
     branchId: input.branchId,
-    occurredOn: occurredDate(input.occurredOn),
+    businessDate: occurredDate(input.businessDate),
     description: `Supplier payment ${number}`,
     createdById: input.userId,
     lines: [
@@ -297,7 +297,7 @@ async function settleSupplier(
       branchId: input.branchId,
       supplierId: input.supplierId,
       number,
-      occurredOn: occurredDate(input.occurredOn),
+      businessDate: occurredDate(input.businessDate),
       method: input.method,
       amount: input.amount,
       journalId,
@@ -319,7 +319,7 @@ async function settleSupplier(
       organizationId: input.organizationId,
       branchId: input.branchId,
       supplierId: input.supplierId,
-      occurredOn: occurredDate(input.occurredOn),
+      businessDate: occurredDate(input.businessDate),
       entryType: "PAYMENT",
       debit: input.amount,
       referenceType: "supplier_payment",
@@ -330,11 +330,11 @@ async function settleSupplier(
 }
 
 export async function postSupplierPayment(
-  input: Actor & { supplierId: string; occurredOn: string; amount: string; method: "CASH" | "BANK" },
+  input: Actor & { supplierId: string; businessDate: string; amount: string; method: "CASH" | "BANK" },
 ) {
   const requestHash = hashPayload({
     supplierId: input.supplierId,
-    occurredOn: input.occurredOn,
+    businessDate: input.businessDate,
     amount: input.amount,
     method: input.method,
   });
@@ -404,14 +404,14 @@ export async function postSupplierPayment(
 export async function listPurchases(organizationId: string, branchId: string) {
   const rows = await prisma.purchase.findMany({
     where: { organizationId, branchId },
-    orderBy: { occurredOn: "desc" },
+    orderBy: { businessDate: "desc" },
     take: 100,
     select: {
       id: true,
       number: true,
       status: true,
       total: true,
-      occurredOn: true,
+      businessDate: true,
       supplier: { select: { name: true } },
     },
   });
@@ -420,7 +420,7 @@ export async function listPurchases(organizationId: string, branchId: string) {
     number: row.number,
     status: row.status,
     total: decimalString(row.total, 2),
-    occurredOn: dateOnly(row.occurredOn),
+    businessDate: dateOnly(row.businessDate),
     supplierName: row.supplier.name,
   }));
 }
@@ -444,7 +444,7 @@ export async function getPurchase(organizationId: string, branchId: string, id: 
     id: row.id,
     number: row.number,
     status: row.status,
-    occurredOn: dateOnly(row.occurredOn),
+    businessDate: dateOnly(row.businessDate),
     supplier: row.supplier,
     subtotal: decimalString(row.subtotal, 2),
     discountTotal: decimalString(row.discountTotal, 2),

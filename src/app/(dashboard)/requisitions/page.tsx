@@ -43,7 +43,7 @@ export default async function RequisitionsPage({ searchParams }: { searchParams:
         caption="Requisitions"
         columns={[
           { key: "number", header: "Request", cell: (row) => <Link href={`/requisitions/${row.id}`}>{row.number}</Link> },
-          { key: "date", header: "Date", cell: (row) => row.occurredOn },
+          { key: "date", header: "Date", cell: (row) => row.businessDate },
           { key: "requester", header: "Requester", cell: (row) => row.requesterName },
           { key: "status", header: "Status", cell: (row) => row.status },
         ]}
