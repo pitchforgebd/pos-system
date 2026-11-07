@@ -6,6 +6,7 @@ import { PostingError, postBalancedJournal } from "@/modules/accounting/post";
 import { allocateNumber, documentYear } from "@/modules/documents/numbers";
 import { hashPayload, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
 import { decimalString, parseMoney } from "@/modules/inventory/money";
+import { isIsoDate, occurredDate } from "@/lib/format/date";
 
 type Failure = { ok: false; status: 404 | 409 | 422; code: "NOT_FOUND" | "CONFLICT" | "BUSINESS_RULE"; message: string };
 
@@ -26,10 +27,6 @@ function money(value: Prisma.Decimal) {
 
 function zero() {
   return new Prisma.Decimal(0);
-}
-
-function occurredDate(value: string) {
-  return new Date(`${value}T00:00:00.000Z`);
 }
 
 function failure(error: unknown): Failure | null {
@@ -536,6 +533,9 @@ export async function accountStatement(input: { organizationId: string; branchId
   if (!account) {
     return null;
   }
+  if (!isIsoDate(input.from) || !isIsoDate(input.to)) {
+    return null;
+  }
   const from = occurredDate(input.from);
   const to = occurredDate(input.to);
   const prior = await prisma.journalLine.aggregate({
@@ -579,7 +579,7 @@ export async function listCashBankLines(organizationId: string, branchId: string
       journal: {
         status: "POSTED",
         branchId,
-        occurredOn: from && to ? { gte: occurredDate(from), lte: occurredDate(to) } : undefined,
+        occurredOn: from && to && isIsoDate(from) && isIsoDate(to) ? { gte: occurredDate(from), lte: occurredDate(to) } : undefined,
       },
     },
     orderBy: { journal: { occurredOn: "desc" } },
@@ -663,7 +663,7 @@ export async function cashFlow(organizationId: string, branchId: string, from?: 
       journal: {
         status: "POSTED",
         branchId,
-        occurredOn: from && to ? { gte: occurredDate(from), lte: occurredDate(to) } : undefined,
+        occurredOn: from && to && isIsoDate(from) && isIsoDate(to) ? { gte: occurredDate(from), lte: occurredDate(to) } : undefined,
       },
     },
     _sum: { debit: true, credit: true },

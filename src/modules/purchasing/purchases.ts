@@ -4,14 +4,24 @@ import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
 import { PostingError, postBalancedJournal } from "@/modules/accounting/post";
 import { allocateNumber, documentYear } from "@/modules/documents/numbers";
-import { hashPayload, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
+import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
 import { decimalString, parseMoney, parseQuantity } from "@/modules/inventory/money";
-import { applyMovement, resolveWarehouse, StockRuleError } from "@/modules/inventory/stock";
+import { addExpiryLots, applyMovement, resolveWarehouse, StockRuleError } from "@/modules/inventory/stock";
 import { outstandingPayable } from "@/modules/purchasing/suppliers";
+import { isIsoDate, occurredDate } from "@/lib/format/date";
 
 type Failure = { ok: false; status: 404 | 409 | 422; code: "NOT_FOUND" | "CONFLICT" | "BUSINESS_RULE"; message: string };
 
-export type PurchaseLine = { productId: string; variantId?: string; quantity: string; unitCost: string };
+export type PurchaseLine = {
+  productId: string;
+  variantId?: string;
+  quantity: string;
+  unitCost: string;
+  /** Required with `expiresOn` for an expiry-tracked product. */
+  lot?: string;
+  manufacturedOn?: string;
+  expiresOn?: string;
+};
 
 type Actor = {
   organizationId: string;
@@ -43,10 +53,6 @@ function failure(error: unknown): Failure | null {
   return null;
 }
 
-function occurredDate(value: string) {
-  return new Date(`${value}T00:00:00.000Z`);
-}
-
 export async function postPurchase(
   input: Actor & {
     supplierId: string;
@@ -65,7 +71,7 @@ export async function postPurchase(
     paymentMethod: input.paymentMethod ?? null,
   });
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await idempotentTransaction(async (tx) => {
       const existing = await readIdempotency(tx, {
         organizationId: input.organizationId,
         key: input.idempotencyKey,
@@ -144,6 +150,20 @@ export async function postPurchase(
         select: { id: true, number: true },
       });
       for (const line of priced) {
+        const product = await tx.product.findFirst({
+          where: { id: line.productId, organizationId: input.organizationId, deletedAt: null },
+          select: { trackExpiry: true },
+        });
+        if (!product) {
+          throw new StockRuleError("That record was not found.", 404);
+        }
+        const lotDates = [line.manufacturedOn, line.expiresOn].filter((value): value is string => Boolean(value));
+        if (lotDates.some((value) => !isIsoDate(value))) {
+          throw new StockRuleError("Dates use YYYY-MM-DD.");
+        }
+        if (product.trackExpiry && (!line.lot || !line.expiresOn)) {
+          throw new StockRuleError("Expiry-tracked products need a lot and an expiry date.");
+        }
         await applyMovement(tx, {
           organizationId: input.organizationId,
           productId: line.productId,
@@ -158,6 +178,23 @@ export async function postPurchase(
           userId: input.userId,
           unitCost: line.unitCost,
         });
+        // The received quantity becomes a lot, so selling and expiring it later can be tracked.
+        if (product.trackExpiry && line.lot && line.expiresOn) {
+          await addExpiryLots(tx, {
+            organizationId: input.organizationId,
+            branchId: input.branchId,
+            productId: line.productId,
+            variantId: line.variantId,
+            lots: [
+              {
+                lot: line.lot,
+                expiresOn: occurredDate(line.expiresOn),
+                manufacturedOn: line.manufacturedOn ? occurredDate(line.manufacturedOn) : null,
+                quantity: line.quantity,
+              },
+            ],
+          });
+        }
       }
       const purchaseJournalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
@@ -301,7 +338,7 @@ export async function postSupplierPayment(
     method: input.method,
   });
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await idempotentTransaction(async (tx) => {
       const existing = await readIdempotency(tx, {
         organizationId: input.organizationId,
         key: input.idempotencyKey,

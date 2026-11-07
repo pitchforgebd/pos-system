@@ -1,15 +1,15 @@
 import { prisma } from "@/lib/db/client";
+import { isIsoDate } from "@/lib/format/date";
 import { writeAudit } from "@/modules/auth/audit";
 import { headerMap, parseCsv } from "@/modules/imports/csv";
 import { safeImportName } from "@/modules/imports/files";
-import { hashPayload, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
-import { postOpeningStock } from "@/modules/inventory/documents";
+import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
+import { postOpeningStock, type StockLine } from "@/modules/inventory/documents";
+import { parseMoney, parseQuantity } from "@/modules/inventory/money";
 import { StockRuleError } from "@/modules/inventory/stock";
 
 const required = ["sku", "quantity"];
 const optional = ["unitCost", "lot", "manufacturedOn", "expiresOn", "rack"];
-const datePattern = /^\d{4}-\d{2}-\d{2}$/;
-
 type Actor = {
   organizationId: string;
   branchId: string;
@@ -38,6 +38,8 @@ export function previewOpeningCsv(csv: string) {
   return { ok: true as const, parsed, map };
 }
 
+type RowOutcome = { rowNumber: number; sku: string; status: "IMPORTED" | "FAILED"; message: string; line?: StockLine };
+
 export async function confirmOpeningImport(input: Actor) {
   const fileName = safeImportName(input.fileName);
   if (!fileName) {
@@ -47,17 +49,18 @@ export async function confirmOpeningImport(input: Actor) {
   if (!preview.ok) {
     return preview;
   }
-  if (!datePattern.test(input.occurredOn)) {
+  if (!isIsoDate(input.occurredOn)) {
     return { ok: false as const, status: 422 as const, message: "Enter the opening date as YYYY-MM-DD." };
   }
   const requestHash = hashPayload({ kind: "opening", csv: input.csv, occurredOn: input.occurredOn, warehouseId: input.warehouseId ?? null });
   let fresh = false;
-  const started = await prisma.$transaction(async (tx) => {
+  const started = await idempotentTransaction(async (tx) => {
     const existing = await readIdempotency(tx, { organizationId: input.organizationId, key: input.idempotencyKey, requestHash });
     if (existing === "mismatch") {
       throw new StockRuleError("This idempotency key was already used for a different request.", 409);
     }
     if (existing) {
+      fresh = false;
       return existing.entityId;
     }
     fresh = true;
@@ -80,57 +83,94 @@ export async function confirmOpeningImport(input: Actor) {
     });
     return batch.id;
   });
-  const done = new Set((await prisma.importRow.findMany({ where: { importId: started }, select: { rowNumber: true } })).map((row) => row.rowNumber));
+
+  // Every run checks the whole file, so a resumed import builds exactly the same document.
+  const outcomes: RowOutcome[] = [];
   for (const [index, cells] of preview.parsed.rows.entries()) {
     const rowNumber = index + 2;
-    if (done.has(rowNumber)) {
-      continue;
-    }
     const record = preview.map(cells);
     const sku = record.sku ?? "";
-    let status: "IMPORTED" | "FAILED" = "FAILED";
-    let message = "The row was not imported.";
     const manufacturedOn = record.manufacturedOn ?? "";
     const expiresOn = record.expiresOn ?? "";
-    if ((manufacturedOn && !datePattern.test(manufacturedOn)) || (expiresOn && !datePattern.test(expiresOn))) {
-      message = "Dates use YYYY-MM-DD.";
-    } else {
-      const product = sku
-        ? await prisma.product.findFirst({ where: { organizationId: input.organizationId, liveSku: sku, deletedAt: null }, select: { id: true } })
-        : null;
-      if (!product) {
-        message = "That record was not found.";
-      } else {
-        const posted = await postOpeningStock({
-          organizationId: input.organizationId,
-          branchId: input.branchId,
-          userId: input.userId,
-          warehouseId: input.warehouseId,
-          idempotencyKey: hashPayload({ importId: started, rowNumber }),
-          occurredOn: input.occurredOn,
-          lines: [
-            {
-              productId: product.id,
-              quantity: record.quantity ?? "",
-              unitCost: record.unitCost || undefined,
-              lot: record.lot || undefined,
-              manufacturedOn: manufacturedOn || undefined,
-              expiresOn: expiresOn || undefined,
-            },
-          ],
-          ip: input.ip,
-          userAgent: input.userAgent,
-        });
-        if (posted.ok) {
-          status = "IMPORTED";
-          message = `${sku}: Posted.`;
-        } else {
-          message = posted.message;
+    const fail = (message: string): RowOutcome => ({ rowNumber, sku, status: "FAILED", message });
+    if ((manufacturedOn && !isIsoDate(manufacturedOn)) || (expiresOn && !isIsoDate(expiresOn))) {
+      outcomes.push(fail("Dates use YYYY-MM-DD."));
+      continue;
+    }
+    const product = sku
+      ? await prisma.product.findFirst({
+          where: { organizationId: input.organizationId, liveSku: sku, deletedAt: null },
+          select: { id: true, trackExpiry: true },
+        })
+      : null;
+    if (!product) {
+      outcomes.push(fail("That record was not found."));
+      continue;
+    }
+    if (!parseQuantity(record.quantity ?? "")) {
+      outcomes.push(fail("Enter a quantity greater than zero with up to four decimals."));
+      continue;
+    }
+    if (record.unitCost && !parseMoney(record.unitCost)) {
+      outcomes.push(fail("Enter a unit cost with up to two decimals."));
+      continue;
+    }
+    if (product.trackExpiry && (!record.lot || !expiresOn)) {
+      outcomes.push(fail("Expiry-tracked products need a lot and an expiry date."));
+      continue;
+    }
+    outcomes.push({
+      rowNumber,
+      sku,
+      status: "IMPORTED",
+      message: `${sku}: Posted.`,
+      line: {
+        productId: product.id,
+        quantity: record.quantity ?? "",
+        unitCost: record.unitCost || undefined,
+        lot: record.lot || undefined,
+        manufacturedOn: manufacturedOn || undefined,
+        expiresOn: expiresOn || undefined,
+      },
+    });
+  }
+
+  // All valid rows go into one opening-stock document, in one transaction. If it cannot be
+  // posted, nothing is posted and each of those rows says why.
+  const lines = outcomes.flatMap((outcome) => (outcome.line ? [outcome.line] : []));
+  if (lines.length > 0) {
+    const posted = await postOpeningStock({
+      organizationId: input.organizationId,
+      branchId: input.branchId,
+      userId: input.userId,
+      warehouseId: input.warehouseId,
+      idempotencyKey: hashPayload({ importId: started }),
+      occurredOn: input.occurredOn,
+      lines,
+      ip: input.ip,
+      userAgent: input.userAgent,
+    });
+    if (!posted.ok) {
+      for (const outcome of outcomes) {
+        if (outcome.line) {
+          outcome.status = "FAILED";
+          outcome.message = posted.message;
         }
       }
     }
-    await prisma.importRow.create({
-      data: { organizationId: input.organizationId, importId: started, rowNumber, status, message: message.slice(0, 255) },
+  }
+
+  const done = new Set((await prisma.importRow.findMany({ where: { importId: started }, select: { rowNumber: true } })).map((row) => row.rowNumber));
+  const missing = outcomes.filter((outcome) => !done.has(outcome.rowNumber));
+  if (missing.length > 0) {
+    await prisma.importRow.createMany({
+      data: missing.map((outcome) => ({
+        organizationId: input.organizationId,
+        importId: started,
+        rowNumber: outcome.rowNumber,
+        status: outcome.status,
+        message: outcome.message.slice(0, 255),
+      })),
     });
   }
   const rows = await prisma.importRow.findMany({ where: { importId: started }, orderBy: { rowNumber: "asc" } });

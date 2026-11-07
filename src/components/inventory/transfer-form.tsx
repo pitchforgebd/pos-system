@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useAttemptKey } from "@/lib/client/attempt-key";
 
 type Branch = { id: string; name: string; warehouses: { id: string; name: string }[] };
 type Product = { id: string; name: string; sku: string };
@@ -10,6 +11,7 @@ type Product = { id: string; name: string; sku: string };
 export function TransferForm({ branches, products }: { branches: Branch[]; products: Product[] }) {
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
+  const attempt = useAttemptKey();
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -18,7 +20,7 @@ export function TransferForm({ branches, products }: { branches: Branch[]; produ
     setMessage("");
     void fetch("/api/v1/inventory/transfers", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "idempotency-key": attempt.current() },
       body: JSON.stringify({
         fromBranchId: data.get("fromBranchId"),
         toBranchId: data.get("toBranchId"),
@@ -33,6 +35,7 @@ export function TransferForm({ branches, products }: { branches: Branch[]; produ
           setMessage(payload.error?.message ?? "The transfer was not posted.");
           return;
         }
+        attempt.renew();
         window.location.reload();
       })
       .finally(() => setPending(false));

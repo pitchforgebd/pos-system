@@ -4,12 +4,14 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAttemptKey } from "@/lib/client/attempt-key";
 
 type Option = { id: string; label: string };
 
 export function PurchaseForm({ suppliers, products }: { suppliers: Option[]; products: Option[] }) {
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
+  const attempt = useAttemptKey();
 
   return (
     <form
@@ -22,7 +24,7 @@ export function PurchaseForm({ suppliers, products }: { suppliers: Option[]; pro
         setMessage("");
         void fetch("/api/v1/purchases", {
           method: "POST",
-          headers: { "content-type": "application/json", "idempotency-key": crypto.randomUUID() },
+          headers: { "content-type": "application/json", "idempotency-key": attempt.current() },
           body: JSON.stringify({
             supplierId: form.get("supplierId"),
             occurredOn: form.get("occurredOn"),
@@ -33,6 +35,9 @@ export function PurchaseForm({ suppliers, products }: { suppliers: Option[]; pro
                 productId: form.get("productId"),
                 quantity: form.get("quantity"),
                 unitCost: form.get("unitCost"),
+                lot: String(form.get("lot") || "") || undefined,
+                manufacturedOn: String(form.get("manufacturedOn") || "") || undefined,
+                expiresOn: String(form.get("expiresOn") || "") || undefined,
               },
             ],
           }),
@@ -43,6 +48,7 @@ export function PurchaseForm({ suppliers, products }: { suppliers: Option[]; pro
               setMessage(body.error?.message ?? "The purchase was not saved.");
               return;
             }
+            attempt.renew();
             window.location.replace(`/purchases/${body.data.id}`);
           })
           .finally(() => setPending(false));
@@ -71,6 +77,9 @@ export function PurchaseForm({ suppliers, products }: { suppliers: Option[]; pro
       <Input name="occurredOn" type="date" required aria-label="Date" />
       <Input name="quantity" required placeholder="Quantity" aria-label="Quantity" />
       <Input name="unitCost" required placeholder="Unit cost" aria-label="Unit cost" />
+      <Input name="lot" placeholder="Lot (required for expiry-tracked products)" aria-label="Lot" />
+      <Input name="manufacturedOn" type="date" aria-label="Manufactured on" />
+      <Input name="expiresOn" type="date" aria-label="Expiry date" />
       <Input name="paymentAmount" placeholder="Payment amount" aria-label="Payment amount" defaultValue="0.00" />
       <label className="grid gap-1 text-sm">
         Payment method

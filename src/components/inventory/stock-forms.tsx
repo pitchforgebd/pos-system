@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAttemptKey } from "@/lib/client/attempt-key";
 
 type ProductOption = { id: string; label: string };
 
@@ -30,20 +31,22 @@ export function InboundForm({
 }) {
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
+  const attempt = useAttemptKey();
 
   return (
     <form
       className="grid max-w-xl gap-3"
       onSubmit={(event) => {
         event.preventDefault();
-        const form = new FormData(event.currentTarget);
+        const element = event.currentTarget;
+        const form = new FormData(element);
         setPending(true);
         setMessage("");
         void fetch(action, {
           method: "POST",
           headers: {
             "content-type": "application/json",
-            "idempotency-key": crypto.randomUUID(),
+            "idempotency-key": attempt.current(),
           },
           body: JSON.stringify({
             occurredOn: form.get("occurredOn"),
@@ -61,6 +64,10 @@ export function InboundForm({
           .then(async (response) => {
             const body = (await response.json()) as { error?: { message?: string } };
             setMessage(response.ok ? "Saved." : messageFrom(body, "The stock was not updated."));
+            if (response.ok) {
+              attempt.renew();
+              element.reset();
+            }
           })
           .finally(() => setPending(false));
       }}
@@ -91,6 +98,7 @@ export function InboundForm({
 export function AdjustmentForm({ products }: { products: ProductOption[] }) {
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
+  const attempt = useAttemptKey();
 
   return (
     <form
@@ -102,7 +110,7 @@ export function AdjustmentForm({ products }: { products: ProductOption[] }) {
         setMessage("");
         void fetch("/api/v1/inventory/adjustments", {
           method: "POST",
-          headers: { "content-type": "application/json", "idempotency-key": crypto.randomUUID() },
+          headers: { "content-type": "application/json", "idempotency-key": attempt.current() },
           body: JSON.stringify({
             productId: form.get("productId"),
             quantity: form.get("quantity"),
@@ -114,6 +122,7 @@ export function AdjustmentForm({ products }: { products: ProductOption[] }) {
             const body = (await response.json()) as { error?: { message?: string } };
             setMessage(response.ok ? "Saved." : messageFrom(body, "The adjustment was not saved."));
             if (response.ok) {
+              attempt.renew();
               window.location.reload();
             }
           })
@@ -150,18 +159,20 @@ export function AdjustmentForm({ products }: { products: ProductOption[] }) {
 export function DamageForm({ products }: { products: ProductOption[] }) {
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
+  const attempt = useAttemptKey();
 
   return (
     <form
       className="grid max-w-xl gap-3"
       onSubmit={(event) => {
         event.preventDefault();
-        const form = new FormData(event.currentTarget);
+        const element = event.currentTarget;
+        const form = new FormData(element);
         setPending(true);
         setMessage("");
         void fetch("/api/v1/inventory/damage", {
           method: "POST",
-          headers: { "content-type": "application/json" },
+          headers: { "content-type": "application/json", "idempotency-key": attempt.current() },
           body: JSON.stringify({
             productId: form.get("productId"),
             occurredOn: form.get("occurredOn"),
@@ -178,6 +189,10 @@ export function DamageForm({ products }: { products: ProductOption[] }) {
           .then(async (response) => {
             const body = (await response.json()) as { error?: { message?: string } };
             setMessage(response.ok ? "Saved." : messageFrom(body, "The damage record was not saved."));
+            if (response.ok) {
+              attempt.renew();
+              element.reset();
+            }
           })
           .finally(() => setPending(false));
       }}
@@ -212,6 +227,7 @@ export function DamageForm({ products }: { products: ProductOption[] }) {
 export function ExpiryWriteOffForm({ batches }: { batches: { id: string; label: string }[] }) {
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
+  const attempt = useAttemptKey();
 
   return (
     <form
@@ -223,13 +239,14 @@ export function ExpiryWriteOffForm({ batches }: { batches: { id: string; label: 
         setMessage("");
         void fetch("/api/v1/inventory/expiry", {
           method: "POST",
-          headers: { "content-type": "application/json" },
+          headers: { "content-type": "application/json", "idempotency-key": attempt.current() },
           body: JSON.stringify({ batchId: form.get("batchId"), quantity: form.get("quantity") }),
         })
           .then(async (response) => {
             const body = (await response.json()) as { error?: { message?: string } };
             setMessage(response.ok ? "Saved." : messageFrom(body, "The write-off was not saved."));
             if (response.ok) {
+              attempt.renew();
               window.location.reload();
             }
           })

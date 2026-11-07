@@ -18,6 +18,9 @@ const bodySchema = z.object({
         variantId: z.string().uuid().optional(),
         quantity: z.string(),
         unitCost: z.string(),
+        lot: z.string().trim().min(1).max(64).optional(),
+        manufacturedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        expiresOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
       }),
     )
     .min(1)

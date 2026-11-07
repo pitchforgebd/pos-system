@@ -808,6 +808,8 @@ model StockBalance {
   branchId       String  @db.Char(36)
   warehouseId    String  @db.Char(36)
   quantity       Decimal @db.Decimal(18, 4)
+  /// Moving-average unit cost of the stock on hand. Null until a stock-in with a cost arrives.
+  averageCost    Decimal? @db.Decimal(18, 4)
   updatedAt      DateTime @updatedAt
 
   organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)

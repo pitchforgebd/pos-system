@@ -16,7 +16,7 @@ test("phase 05 stock and products", async () => {
   const { prisma } = await import("../../lib/db/client.ts");
   const { hashPassword } = await import("../auth/password.ts");
   const { createProduct, disableProduct, getProduct } = await import("../catalog/products.ts");
-  const { postAdjustment, postOpeningStock, rejectTransfer } = await import("./documents.ts");
+  const { postAdjustment, postOpeningStock } = await import("./documents.ts");
   const { ledgerMatchesBalance, listStock } = await import("./stock.ts");
 
   const stamp = Date.now().toString();
@@ -166,7 +166,6 @@ test("phase 05 stock and products", async () => {
     });
     assert.equal(removed.ok, true);
     assert.equal(await getProduct(org.id, created.product.id), null);
-    assert.equal(rejectTransfer().status, 422);
   } finally {
     await prisma.auditLog.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
     await prisma.idempotencyKey.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });

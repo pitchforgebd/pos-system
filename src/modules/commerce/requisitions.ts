@@ -5,6 +5,7 @@ import { writeAudit } from "@/modules/auth/audit";
 import { allocateNumber, documentYear } from "@/modules/documents/numbers";
 import { hashPayload, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
 import { StockRuleError } from "@/modules/inventory/stock";
+import { occurredDate } from "@/lib/format/date";
 
 type Failure = { ok: false; status: 404 | 409 | 422; code: "NOT_FOUND" | "CONFLICT" | "BUSINESS_RULE"; message: string };
 
@@ -16,10 +17,6 @@ type Actor = {
   ip: string;
   userAgent: string | null;
 };
-
-function occurredDate(value: string) {
-  return new Date(`${value}T00:00:00.000Z`);
-}
 
 function dateString(value: Date) {
   return value.toISOString().slice(0, 10);

@@ -7,6 +7,7 @@ import { hashPayload, readIdempotency, saveIdempotency } from "@/modules/invento
 import { decimalString, parseMoney, parseQuantity } from "@/modules/inventory/money";
 import { StockRuleError } from "@/modules/inventory/stock";
 import { postSale } from "@/modules/sales/sales";
+import { occurredDate } from "@/lib/format/date";
 
 type Failure = { ok: false; status: 404 | 409 | 422; code: "NOT_FOUND" | "CONFLICT" | "BUSINESS_RULE"; message: string };
 
@@ -18,10 +19,6 @@ type Actor = {
   ip: string;
   userAgent: string | null;
 };
-
-function occurredDate(value: string) {
-  return new Date(`${value}T00:00:00.000Z`);
-}
 
 function dateString(value: Date) {
   return value.toISOString().slice(0, 10);
@@ -333,10 +330,25 @@ export async function convertQuotation(input: {
       quantity: decimalString(line.quantity, 4),
       unitPrice: decimalString(line.unitPrice, 2),
     })),
+    // The link to the quotation is written in the same transaction as the sale, so a
+    // failure can never leave a sale behind that a second convert would duplicate.
+    inTransaction: async (tx, created) => {
+      const rows = await tx.$queryRaw<Array<{ saleId: string | null }>>`
+        SELECT saleId FROM quotations
+        WHERE id = ${current.id} AND organizationId = ${input.organizationId} AND branchId = ${input.branchId}
+        FOR UPDATE
+      `;
+      if (!rows[0]) {
+        throw new StockRuleError("That record was not found.", 404);
+      }
+      if (rows[0].saleId) {
+        throw new StockRuleError("This quotation was already converted to a sale.", 409);
+      }
+      await tx.quotation.update({ where: { id: current.id }, data: { saleId: created.id, status: "ACCEPTED" } });
+    },
   });
   if (!sale.ok) {
     return sale;
   }
-  await prisma.quotation.update({ where: { id: current.id }, data: { saleId: sale.id, status: "ACCEPTED" } });
   return { ok: true as const, id: sale.id, replayed: sale.replayed };
 }

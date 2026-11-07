@@ -83,7 +83,9 @@ TRANSFER_IN, TRANSFER_OUT, DAMAGE, EXPIRY, ADJUSTMENT, OWN_STOCK
 
 A ledger row records product, variant when present, branch, warehouse when present, quantity, direction, movement type, reference type, reference id, user, timestamp, and unit cost when the operation has a cost.
 
-`stock_balances` is a projection of the ledger for the same product, variant, branch, and warehouse. Reconciliation must be able to rebuild it from `stock_ledgers`.
+`stock_balances` is a projection of the ledger for the same product, variant, branch, and warehouse. Reconciliation must be able to rebuild it from `stock_ledgers`. `stock_balances.averageCost` (nullable, 4 decimals) is the moving-average unit cost of the stock on hand; it is updated in the same transaction as every stock-in that carries a cost (see `BUSINESS_RULES.md` section 7).
+
+`expiry_batches` holds the lots of expiry-tracked products per branch. Every stock-out except an expiry write-off uses lots up earliest expiry first, a sale uses only in-date lots, and a purchase or transfer-in creates or tops up the lot, so the lots of a product add up to its stock (stock that predates lots is the only difference).
 
 ### Sales and purchases
 

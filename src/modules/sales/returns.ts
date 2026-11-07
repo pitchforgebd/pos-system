@@ -5,10 +5,11 @@ import { writeAudit } from "@/modules/auth/audit";
 import { PostingError, postBalancedJournal } from "@/modules/accounting/post";
 import { outstandingReceivable } from "@/modules/customers/customers";
 import { allocateNumber, documentYear } from "@/modules/documents/numbers";
-import { hashPayload, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
+import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
 import { decimalString, parseQuantity } from "@/modules/inventory/money";
 import { applyMovement, StockRuleError } from "@/modules/inventory/stock";
 import { returnLineAmount } from "@/modules/returns/amount";
+import { occurredDate } from "@/lib/format/date";
 
 type Failure = { ok: false; status: 404 | 409 | 422; code: "NOT_FOUND" | "CONFLICT" | "BUSINESS_RULE"; message: string };
 
@@ -27,10 +28,6 @@ function money(value: Prisma.Decimal) {
 
 function zero() {
   return new Prisma.Decimal(0);
-}
-
-function occurredDate(value: string) {
-  return new Date(`${value}T00:00:00.000Z`);
 }
 
 function failure(error: unknown): Failure | null {
@@ -54,7 +51,7 @@ export async function postSaleReturn(
 ) {
   const requestHash = hashPayload({ saleId: input.saleId, occurredOn: input.occurredOn, lines: input.lines });
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await idempotentTransaction(async (tx) => {
       const existing = await readIdempotency(tx, { organizationId: input.organizationId, key: input.idempotencyKey, requestHash });
       if (existing === "mismatch") {
         throw new StockRuleError("This idempotency key was already used for a different request.", 409);
@@ -81,8 +78,8 @@ export async function postSaleReturn(
         if (!quantity) {
           throw new StockRuleError("Enter a quantity greater than zero.");
         }
-        const locked = await tx.$queryRaw<Array<{ id: string; productId: string; variantId: string | null; quantity: Prisma.Decimal; unitPrice: Prisma.Decimal; lineTotal: Prisma.Decimal }>>`
-          SELECT id, productId, variantId, quantity, unitPrice, lineTotal FROM sale_items
+        const locked = await tx.$queryRaw<Array<{ id: string; productId: string; variantId: string | null; quantity: Prisma.Decimal; unitPrice: Prisma.Decimal; lineTotal: Prisma.Decimal; vatAmount: Prisma.Decimal }>>`
+          SELECT id, productId, variantId, quantity, unitPrice, lineTotal, vatAmount FROM sale_items
           WHERE id = ${line.saleItemId} AND saleId = ${sale.id} AND organizationId = ${input.organizationId}
           FOR UPDATE
         `;
@@ -95,11 +92,23 @@ export async function postSaleReturn(
           orderBy: [{ saleReturn: { createdAt: "asc" } }, { id: "asc" }],
           select: { quantity: true },
         });
+        // What the customer paid for the line (after discount, VAT included) is shared by quantity.
+        // The line total and its VAT are split separately so the sales credit and the VAT payable
+        // are each reversed by their own share. The last unit takes the rounding remainder.
+        const sourceQuantity = new Prisma.Decimal(item.quantity);
+        const priorQuantities = prior.map((row) => new Prisma.Decimal(row.quantity));
         const amount = returnLineAmount({
-          sourceQuantity: new Prisma.Decimal(item.quantity),
-          unitAmount: new Prisma.Decimal(item.unitPrice),
+          sourceQuantity,
+          unitAmount: new Prisma.Decimal(item.lineTotal).div(sourceQuantity),
           sourceTotal: new Prisma.Decimal(item.lineTotal),
-          priorQuantities: prior.map((row) => new Prisma.Decimal(row.quantity)),
+          priorQuantities,
+          quantity,
+        });
+        const vat = returnLineAmount({
+          sourceQuantity,
+          unitAmount: new Prisma.Decimal(item.vatAmount).div(sourceQuantity),
+          sourceTotal: new Prisma.Decimal(item.vatAmount),
+          priorQuantities,
           quantity,
         });
         const unitCost = await saleUnitCost(tx, input.organizationId, sale.id, item.productId, item.variantId);
@@ -110,9 +119,11 @@ export async function postSaleReturn(
           priorQuantities: prior.map((row) => new Prisma.Decimal(row.quantity)),
           quantity,
         });
-        priced.push({ saleItemId: item.id, productId: item.productId, variantId: item.variantId, quantity, amount, unitCost, cost });
+        priced.push({ saleItemId: item.id, productId: item.productId, variantId: item.variantId, quantity, amount, vat, unitCost, cost });
       }
       const total = money(priced.reduce((sum, line) => sum.plus(line.amount), zero()));
+      const vatTotal = money(priced.reduce((sum, line) => sum.plus(line.vat), zero()));
+      const salesTotal = money(total.minus(vatTotal));
       const cost = money(priced.reduce((sum, line) => sum.plus(line.cost), zero()));
       const split = await receivableSplit(tx, input.organizationId, sale.customerId, total);
       const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "RET", year: documentYear(input.occurredOn) });
@@ -146,7 +157,8 @@ export async function postSaleReturn(
         });
       }
       const journalLines = [
-        ...(total.gt(0) ? [{ accountCode: "4100", debit: total, credit: zero() }] : []),
+        ...(salesTotal.gt(0) ? [{ accountCode: "4100", debit: salesTotal, credit: zero() }] : []),
+        ...(vatTotal.gt(0) ? [{ accountCode: "2300", debit: vatTotal, credit: zero() }] : []),
         ...(split.applied.gt(0) ? [{ accountCode: "1300", debit: zero(), credit: split.applied }] : []),
         ...(split.refund.gt(0) ? [{ accountCode: "1100", debit: zero(), credit: split.refund }] : []),
         ...(cost.gt(0)

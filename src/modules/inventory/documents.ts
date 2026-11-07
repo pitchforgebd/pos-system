@@ -1,10 +1,12 @@
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/client";
+import { occurredDate } from "@/lib/format/date";
+import { allocateNumber } from "@/modules/documents/numbers";
 import { writeAudit } from "@/modules/auth/audit";
-import { hashPayload, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
+import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
 import { decimalString, parseMoney, parseQuantity } from "@/modules/inventory/money";
-import { applyMovement, resolveWarehouse, StockRuleError } from "@/modules/inventory/stock";
+import { addExpiryLots, applyMovement, currentUnitCost, resolveWarehouse, StockRuleError, type ConsumedLot } from "@/modules/inventory/stock";
 
 type Failure = { ok: false; status: 404 | 409 | 422; code: "NOT_FOUND" | "CONFLICT" | "BUSINESS_RULE"; message: string };
 
@@ -33,7 +35,7 @@ function failure(error: unknown): Failure | null {
     return {
       ok: false,
       status: error.status,
-      code: error.status === 404 ? "NOT_FOUND" : "BUSINESS_RULE",
+      code: error.status === 404 ? "NOT_FOUND" : error.status === 409 ? "CONFLICT" : "BUSINESS_RULE",
       message: error.message,
     };
   }
@@ -69,7 +71,7 @@ async function postInbound(
 ) {
   const requestHash = hashPayload({ kind, occurredOn: input.occurredOn, warehouseId: input.warehouseId ?? null, lines: input.lines });
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await idempotentTransaction(async (tx) => {
       const existing = await readIdempotency(tx, {
         organizationId: input.organizationId,
         key: input.idempotencyKey,
@@ -89,7 +91,7 @@ async function postInbound(
                 organizationId: input.organizationId,
                 branchId: input.branchId,
                 warehouseId: warehouse.id,
-                occurredOn: new Date(input.occurredOn),
+                occurredOn: occurredDate(input.occurredOn),
               },
             })
           : await tx.ownStockInvoice.create({
@@ -97,7 +99,7 @@ async function postInbound(
                 organizationId: input.organizationId,
                 branchId: input.branchId,
                 warehouseId: warehouse.id,
-                occurredOn: new Date(input.occurredOn),
+                occurredOn: occurredDate(input.occurredOn),
               },
             });
       for (const line of input.lines) {
@@ -134,8 +136,8 @@ async function postInbound(
               productId: line.productId,
               variantId: line.variantId ?? null,
               lot: line.lot,
-              manufacturedOn: line.manufacturedOn ? new Date(line.manufacturedOn) : null,
-              expiresOn: new Date(line.expiresOn),
+              manufacturedOn: line.manufacturedOn ? occurredDate(line.manufacturedOn) : null,
+              expiresOn: occurredDate(line.expiresOn),
               quantity: parsed.quantity,
             },
           });
@@ -198,7 +200,7 @@ export async function postAdjustment(
     warehouseId: input.warehouseId ?? null,
   });
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await idempotentTransaction(async (tx) => {
       const existing = await readIdempotency(tx, {
         organizationId: input.organizationId,
         key: input.idempotencyKey,
@@ -296,15 +298,39 @@ export async function postDamage(
   if (!quantity || !purchasePrice || !salePrice || !discountAmount || !vatAmount) {
     return { ok: false as const, status: 422 as const, code: "BUSINESS_RULE" as const, message: "Check the quantity and money fields." };
   }
+  const requestHash = hashPayload({
+    productId: input.productId,
+    occurredOn: input.occurredOn,
+    place: input.place,
+    lot: input.lot ?? null,
+    purchasePrice: input.purchasePrice,
+    salePrice: input.salePrice,
+    discountAmount: input.discountAmount,
+    vatAmount: input.vatAmount,
+    quantity: input.quantity,
+    reason: input.reason,
+    warehouseId: input.warehouseId ?? null,
+  });
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await idempotentTransaction(async (tx) => {
+      const existing = await readIdempotency(tx, {
+        organizationId: input.organizationId,
+        key: input.idempotencyKey,
+        requestHash,
+      });
+      if (existing === "mismatch") {
+        throw new StockRuleError("This idempotency key was already used for a different request.", 409);
+      }
+      if (existing) {
+        return { id: existing.entityId, replayed: true };
+      }
       const warehouse = await warehouseOrThrow(input.organizationId, input.branchId, input.warehouseId);
       const row = await tx.damageRecord.create({
         data: {
           organizationId: input.organizationId,
           branchId: input.branchId,
           productId: input.productId,
-          occurredOn: new Date(input.occurredOn),
+          occurredOn: occurredDate(input.occurredOn),
           place: input.place,
           lot: input.lot ?? null,
           purchasePrice,
@@ -328,22 +354,33 @@ export async function postDamage(
         referenceId: row.id,
         userId: input.userId,
         unitCost: purchasePrice,
+        lot: input.lot,
       });
-      return { id: row.id };
+      await saveIdempotency(tx, {
+        organizationId: input.organizationId,
+        userId: input.userId,
+        key: input.idempotencyKey,
+        requestHash,
+        entityType: "damage_record",
+        entityId: row.id,
+      });
+      return { id: row.id, replayed: false };
     });
-    await writeAudit({
-      organizationId: input.organizationId,
-      branchId: input.branchId,
-      userId: input.userId,
-      action: "create",
-      module: "inventory",
-      entityType: "damage_record",
-      entityId: data.id,
-      after: { quantity: input.quantity },
-      ip: input.ip,
-      userAgent: input.userAgent,
-    });
-    return { ok: true as const, id: data.id };
+    if (!data.replayed) {
+      await writeAudit({
+        organizationId: input.organizationId,
+        branchId: input.branchId,
+        userId: input.userId,
+        action: "create",
+        module: "inventory",
+        entityType: "damage_record",
+        entityId: data.id,
+        after: { quantity: input.quantity },
+        ip: input.ip,
+        userAgent: input.userAgent,
+      });
+    }
+    return { ok: true as const, id: data.id, replayed: data.replayed };
   } catch (error) {
     const mapped = failure(error);
     if (mapped) {
@@ -402,13 +439,25 @@ export async function writeOffExpiry(input: Actor & { batchId: string; quantity:
   if (!quantity) {
     return { ok: false as const, status: 422 as const, code: "BUSINESS_RULE" as const, message: "Enter a quantity greater than zero." };
   }
+  const requestHash = hashPayload({ batchId: input.batchId, quantity: input.quantity, warehouseId: input.warehouseId ?? null });
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await idempotentTransaction(async (tx) => {
+      const existing = await readIdempotency(tx, {
+        organizationId: input.organizationId,
+        key: input.idempotencyKey,
+        requestHash,
+      });
+      if (existing === "mismatch") {
+        throw new StockRuleError("This idempotency key was already used for a different request.", 409);
+      }
       const batch = await tx.expiryBatch.findFirst({
         where: { id: input.batchId, organizationId: input.organizationId, branchId: input.branchId },
       });
       if (!batch) {
         throw new StockRuleError("That record was not found.", 404);
+      }
+      if (existing) {
+        return { id: batch.id, quantity: decimalString(batch.quantity, 4), replayed: true };
       }
       if (quantity.gt(batch.quantity)) {
         throw new StockRuleError("The write-off quantity is greater than the lot quantity.");
@@ -428,20 +477,30 @@ export async function writeOffExpiry(input: Actor & { batchId: string; quantity:
         userId: input.userId,
       });
       await tx.expiryBatch.update({ where: { id: batch.id }, data: { quantity: batch.quantity.minus(quantity) } });
-      return { id: batch.id, quantity: decimalString(batch.quantity.minus(quantity), 4) };
+      await saveIdempotency(tx, {
+        organizationId: input.organizationId,
+        userId: input.userId,
+        key: input.idempotencyKey,
+        requestHash,
+        entityType: "expiry_writeoff",
+        entityId: batch.id,
+      });
+      return { id: batch.id, quantity: decimalString(batch.quantity.minus(quantity), 4), replayed: false };
     });
-    await writeAudit({
-      organizationId: input.organizationId,
-      branchId: input.branchId,
-      userId: input.userId,
-      action: "update",
-      module: "inventory",
-      entityType: "expiry_batch",
-      entityId: data.id,
-      after: { quantity: input.quantity },
-      ip: input.ip,
-      userAgent: input.userAgent,
-    });
+    if (!data.replayed) {
+      await writeAudit({
+        organizationId: input.organizationId,
+        branchId: input.branchId,
+        userId: input.userId,
+        action: "update",
+        module: "inventory",
+        entityType: "expiry_batch",
+        entityId: data.id,
+        after: { quantity: input.quantity },
+        ip: input.ip,
+        userAgent: input.userAgent,
+      });
+    }
     return { ok: true as const, ...data };
   } catch (error) {
     const mapped = failure(error);
@@ -513,25 +572,48 @@ export async function listOwnInvoices(organizationId: string, branchId: string) 
   }));
 }
 
-export async function postTransfer(input: {
-  organizationId: string;
-  userId: string;
-  fromBranchId: string;
-  toBranchId: string;
-  fromWarehouseId: string;
-  toWarehouseId: string;
-  lines: { productId: string; quantity: string }[];
-  ip: string;
-  userAgent: string | null;
-}) {
+export async function postTransfer(
+  input: {
+    organizationId: string;
+    userId: string;
+    fromBranchId: string;
+    toBranchId: string;
+    fromWarehouseId: string;
+    toWarehouseId: string;
+    lines: { productId: string; variantId?: string; quantity: string }[];
+    idempotencyKey: string;
+    ip: string;
+    userAgent: string | null;
+  },
+) {
   if (input.fromWarehouseId === input.toWarehouseId) {
     return { ok: false as const, status: 422 as const, code: "BUSINESS_RULE" as const, message: "Choose a different destination warehouse." };
   }
   if (input.lines.length === 0) {
     return { ok: false as const, status: 422 as const, code: "BUSINESS_RULE" as const, message: "Add a product to transfer." };
   }
+  const requestHash = hashPayload({
+    fromBranchId: input.fromBranchId,
+    toBranchId: input.toBranchId,
+    fromWarehouseId: input.fromWarehouseId,
+    toWarehouseId: input.toWarehouseId,
+    lines: input.lines,
+  });
   try {
-    const transferId = await prisma.$transaction(async (tx) => {
+    // A transfer is received the moment it is posted (BUSINESS_RULES section 8, option A):
+    // stock leaves the source and reaches the destination in one transaction, never in transit.
+    const data = await idempotentTransaction(async (tx) => {
+      const existing = await readIdempotency(tx, { organizationId: input.organizationId, key: input.idempotencyKey, requestHash });
+      if (existing === "mismatch") {
+        throw new StockRuleError("This idempotency key was already used for a different request.", 409);
+      }
+      if (existing) {
+        const stored = await tx.stockTransfer.findFirst({
+          where: { id: existing.entityId, organizationId: input.organizationId },
+          select: { id: true, number: true },
+        });
+        return { id: existing.entityId, number: stored?.number ?? null, replayed: true };
+      }
       const fromWarehouse = await tx.warehouse.findFirst({
         where: { id: input.fromWarehouseId, organizationId: input.organizationId, branchId: input.fromBranchId, status: "ACTIVE" },
         select: { id: true },
@@ -543,9 +625,15 @@ export async function postTransfer(input: {
       if (!fromWarehouse || !toWarehouse) {
         throw new StockRuleError("Choose an active warehouse on each branch.", 404);
       }
+      const number = await allocateNumber(tx, {
+        organizationId: input.organizationId,
+        documentType: "TRF",
+        year: new Date().getUTCFullYear(),
+      });
       const transfer = await tx.stockTransfer.create({
         data: {
           organizationId: input.organizationId,
+          number,
           fromBranchId: input.fromBranchId,
           toBranchId: input.toBranchId,
           fromWarehouseId: fromWarehouse.id,
@@ -567,37 +655,22 @@ export async function postTransfer(input: {
         if (!product) {
           throw new StockRuleError("That record was not found.", 404);
         }
-        const ins = await tx.stockLedger.findMany({
-          where: {
-            organizationId: input.organizationId,
-            productId: product.id,
-            variantId: null,
-            branchId: input.fromBranchId,
-            warehouseId: fromWarehouse.id,
-            direction: "IN",
-          },
-          select: { unitCost: true, quantity: true },
+        // The goods move at what they cost the source, so the destination's average blends it in.
+        const unitCost = await currentUnitCost(tx, {
+          organizationId: input.organizationId,
+          productId: product.id,
+          variantId: line.variantId,
+          branchId: input.fromBranchId,
+          warehouseId: fromWarehouse.id,
         });
-        if (ins.length === 0 || ins.some((row) => row.unitCost === null)) {
-          throw new StockRuleError("This stock has no unit cost to transfer.");
-        }
-        let qty = new Prisma.Decimal(0);
-        let amount = new Prisma.Decimal(0);
-        for (const row of ins) {
-          const rowQuantity = new Prisma.Decimal(row.quantity);
-          qty = qty.plus(rowQuantity);
-          amount = amount.plus(rowQuantity.mul(row.unitCost ?? 0));
-        }
-        const unitCost = qty.lte(0) ? null : amount.div(qty);
-        if (!unitCost) {
-          throw new StockRuleError("This stock has no unit cost to transfer.");
-        }
         await tx.stockTransferItem.create({
-          data: { organizationId: input.organizationId, transferId: transfer.id, productId: product.id, quantity },
+          data: { organizationId: input.organizationId, transferId: transfer.id, productId: product.id, variantId: line.variantId ?? null, quantity },
         });
+        const lots: ConsumedLot[] = [];
         await applyMovement(tx, {
           organizationId: input.organizationId,
           productId: product.id,
+          variantId: line.variantId,
           branchId: input.fromBranchId,
           warehouseId: fromWarehouse.id,
           quantity,
@@ -607,10 +680,12 @@ export async function postTransfer(input: {
           referenceId: transfer.id,
           userId: input.userId,
           unitCost,
+          lotsOut: lots,
         });
         await applyMovement(tx, {
           organizationId: input.organizationId,
           productId: product.id,
+          variantId: line.variantId,
           branchId: input.toBranchId,
           warehouseId: toWarehouse.id,
           quantity,
@@ -621,34 +696,46 @@ export async function postTransfer(input: {
           userId: input.userId,
           unitCost,
         });
+        if (lots.length > 0) {
+          await addExpiryLots(tx, {
+            organizationId: input.organizationId,
+            branchId: input.toBranchId,
+            productId: product.id,
+            variantId: line.variantId,
+            lots,
+          });
+        }
       }
-      return transfer.id;
+      await saveIdempotency(tx, {
+        organizationId: input.organizationId,
+        userId: input.userId,
+        key: input.idempotencyKey,
+        requestHash,
+        entityType: "stock_transfer",
+        entityId: transfer.id,
+      });
+      return { id: transfer.id, number, replayed: false };
     });
-    await writeAudit({
-      organizationId: input.organizationId,
-      userId: input.userId,
-      action: "create",
-      module: "inventory",
-      entityType: "stock_transfer",
-      entityId: transferId,
-      ip: input.ip,
-      userAgent: input.userAgent,
-    });
-    return { ok: true as const, id: transferId };
+    if (!data.replayed) {
+      await writeAudit({
+        organizationId: input.organizationId,
+        branchId: input.fromBranchId,
+        userId: input.userId,
+        action: "create",
+        module: "inventory",
+        entityType: "stock_transfer",
+        entityId: data.id,
+        after: { number: data.number, toBranchId: input.toBranchId },
+        ip: input.ip,
+        userAgent: input.userAgent,
+      });
+    }
+    return { ok: true as const, id: data.id, number: data.number, replayed: data.replayed };
   } catch (error) {
-    if (error instanceof StockRuleError) {
-      const code = error.status === 404 ? "NOT_FOUND" : "BUSINESS_RULE";
-      return { ok: false as const, status: error.status, code, message: error.message };
+    const mapped = failure(error);
+    if (mapped) {
+      return mapped;
     }
     throw error;
   }
-}
-
-export function rejectTransfer() {
-  return {
-    ok: false as const,
-    status: 422 as const,
-    code: "BUSINESS_RULE" as const,
-    message: "Stock transfers are not available until the in-transit rule is approved.",
-  };
 }

@@ -24,7 +24,7 @@ test("phase 18 checks money, numbers, permissions, and the sale path", async () 
   const { outstandingReceivable } = await import("../customers/customers.ts");
   const { allocateNumber, documentYear } = await import("../documents/numbers.ts");
   const { createProduct } = await import("../catalog/products.ts");
-  const { postOpeningStock, rejectTransfer } = await import("../inventory/documents.ts");
+  const { postOpeningStock } = await import("../inventory/documents.ts");
   const { decimalString, parseMoney, parseQuantity } = await import("../inventory/money.ts");
   const { ledgerMatchesBalance } = await import("../inventory/stock.ts");
   const { postSale } = await import("../sales/sales.ts");
@@ -37,8 +37,6 @@ test("phase 18 checks money, numbers, permissions, and the sale path", async () 
   assert.equal(decidePageAccess("/users", new Set(["sales.view"])), "forbidden");
   assert.equal(decidePageAccess("/pos", new Set(["sales.view"])), "allow");
   assert.equal(decidePageAccess("/users", null), "login");
-  const transfer = rejectTransfer();
-  assert.equal(transfer.status, 422);
 
   const stamp = Date.now().toString();
   const org = await prisma.organization.create({ data: { name: "QA", slug: `qa-${stamp}` } });

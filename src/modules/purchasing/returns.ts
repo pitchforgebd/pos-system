@@ -4,11 +4,12 @@ import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
 import { PostingError, postBalancedJournal } from "@/modules/accounting/post";
 import { allocateNumber, documentYear } from "@/modules/documents/numbers";
-import { hashPayload, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
+import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
 import { decimalString, parseQuantity } from "@/modules/inventory/money";
 import { applyMovement, StockRuleError } from "@/modules/inventory/stock";
 import { outstandingPayable } from "@/modules/purchasing/suppliers";
 import { returnLineAmount } from "@/modules/returns/amount";
+import { occurredDate } from "@/lib/format/date";
 
 type Failure = { ok: false; status: 404 | 409 | 422; code: "NOT_FOUND" | "CONFLICT" | "BUSINESS_RULE"; message: string };
 
@@ -27,10 +28,6 @@ function money(value: Prisma.Decimal) {
 
 function zero() {
   return new Prisma.Decimal(0);
-}
-
-function occurredDate(value: string) {
-  return new Date(`${value}T00:00:00.000Z`);
 }
 
 function failure(error: unknown): Failure | null {
@@ -64,7 +61,7 @@ export async function postPurchaseReturn(
     lines: input.lines,
   });
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await idempotentTransaction(async (tx) => {
       const existing = await readIdempotency(tx, { organizationId: input.organizationId, key: input.idempotencyKey, requestHash });
       if (existing === "mismatch") {
         throw new StockRuleError("This idempotency key was already used for a different request.", 409);

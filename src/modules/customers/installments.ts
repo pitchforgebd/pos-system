@@ -4,12 +4,9 @@ import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
 import { decimalString, parseMoney } from "@/modules/inventory/money";
 import { StockRuleError } from "@/modules/inventory/stock";
+import { occurredDate } from "@/lib/format/date";
 
 type Failure = { ok: false; status: 404 | 422; code: "NOT_FOUND" | "BUSINESS_RULE"; message: string };
-
-function occurredDate(value: string) {
-  return new Date(`${value}T00:00:00.000Z`);
-}
 
 function dateString(value: Date) {
   return value.toISOString().slice(0, 10);

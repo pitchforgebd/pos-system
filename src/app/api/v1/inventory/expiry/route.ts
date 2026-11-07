@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { jsonError, jsonOk, rejectCrossSite } from "@/lib/api/http";
 import { requirePermission, requireSession } from "@/modules/access/guard";
-import { stockActor } from "@/modules/inventory/actor";
+import { idempotencyKey, stockActor } from "@/modules/inventory/actor";
 import { listExpiry, writeOffExpiry } from "@/modules/inventory/documents";
 
 const bodySchema = z.object({
@@ -53,13 +53,14 @@ export async function POST(request: Request) {
     return denied;
   }
   const actor = stockActor(auth.session, request);
+  const key = idempotencyKey(request);
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
-  if (!actor || !parsed.success) {
-    return jsonError("VALIDATION_ERROR", "Validation failed", 400);
+  if (!actor || !key || !parsed.success) {
+    return jsonError("VALIDATION_ERROR", "A branch, an Idempotency-Key, and a write-off are required.", 400);
   }
-  const result = await writeOffExpiry({ ...actor, idempotencyKey: "", ...parsed.data });
+  const result = await writeOffExpiry({ ...actor, idempotencyKey: key, ...parsed.data });
   if (!result.ok) {
     return jsonError(result.code, result.message, result.status);
   }
-  return jsonOk({ id: result.id, quantity: result.quantity });
+  return jsonOk({ id: result.id, quantity: result.quantity, replayed: result.replayed });
 }

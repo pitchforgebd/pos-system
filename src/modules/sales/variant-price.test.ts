@@ -1,0 +1,132 @@
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+
+for (const line of readFileSync(new URL("../../../.env", import.meta.url), "utf8").split(/\r?\n/)) {
+  const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
+  if (match && !process.env[match[1]]) {
+    process.env[match[1]] = match[2].replace(/^"|"$/g, "");
+  }
+}
+process.env.AUTH_SECRET ??= "test-secret-variant-price-value";
+process.env.BCRYPT_COST = "4";
+
+test("a variant sells at its own price and falls back to the product price", async () => {
+  const { prisma } = await import("../../lib/db/client.ts");
+  const { hashPassword } = await import("../auth/password.ts");
+  const { postOpeningStock } = await import("../inventory/documents.ts");
+  const { postSale } = await import("./sales.ts");
+
+  const stamp = `${Date.now()}-variant`;
+  const org = await prisma.organization.create({ data: { name: "Variant price", slug: `variant-price-${stamp}` } });
+  const branch = await prisma.branch.create({ data: { organizationId: org.id, name: "Main" } });
+  const warehouse = await prisma.warehouse.create({ data: { organizationId: org.id, branchId: branch.id, name: "Main" } });
+  const user = await prisma.user.create({
+    data: { organizationId: org.id, name: "Cashier", email: `variant-${stamp}@example.com`, passwordHash: await hashPassword("correct-password") },
+  });
+  const asset = await prisma.accountGroup.create({ data: { organizationId: org.id, code: "1000", name: "Assets" } });
+  const liability = await prisma.accountGroup.create({ data: { organizationId: org.id, code: "2000", name: "Liabilities" } });
+  const revenue = await prisma.accountGroup.create({ data: { organizationId: org.id, code: "4000", name: "Revenue" } });
+  const cost = await prisma.accountGroup.create({ data: { organizationId: org.id, code: "5000", name: "Cost of Sales" } });
+  await prisma.account.createMany({
+    data: [
+      { organizationId: org.id, groupId: asset.id, code: "1100", name: "Cash" },
+      { organizationId: org.id, groupId: asset.id, code: "1200", name: "Bank" },
+      { organizationId: org.id, groupId: asset.id, code: "1300", name: "Accounts Receivable" },
+      { organizationId: org.id, groupId: asset.id, code: "1400", name: "Inventory" },
+      { organizationId: org.id, groupId: liability.id, code: "2300", name: "VAT Payable" },
+      { organizationId: org.id, groupId: revenue.id, code: "4100", name: "Sales" },
+      { organizationId: org.id, groupId: revenue.id, code: "4200", name: "Other Charges" },
+      { organizationId: org.id, groupId: cost.id, code: "5100", name: "COGS" },
+    ],
+  });
+  const product = await prisma.product.create({
+    data: {
+      organizationId: org.id,
+      sku: `V-${stamp}`,
+      liveSku: `V-${stamp}`,
+      name: "Shirt",
+      slug: `shirt-${stamp}`,
+      purchasePrice: "5.00",
+      sellingPrice: "10.00",
+      wholesalePrice: "10.00",
+      minimumPrice: "5.00",
+      trackStock: true,
+      trackExpiry: false,
+      trackBatch: false,
+      trackSerial: false,
+    },
+  });
+  const priced = await prisma.productVariant.create({
+    data: { organizationId: org.id, productId: product.id, sku: `V-L-${stamp}`, price: "12.50" },
+  });
+  const unpriced = await prisma.productVariant.create({
+    data: { organizationId: org.id, productId: product.id, sku: `V-S-${stamp}`, price: null },
+  });
+  const actor = { organizationId: org.id, branchId: branch.id, userId: user.id, warehouseId: warehouse.id, ip: "127.0.0.1", userAgent: "test" };
+
+  try {
+    const opened = await postOpeningStock({
+      ...actor,
+      idempotencyKey: randomUUID(),
+      occurredOn: "2026-10-01",
+      lines: [
+        { productId: product.id, variantId: priced.id, quantity: "5", unitCost: "5.00" },
+        { productId: product.id, variantId: unpriced.id, quantity: "5", unitCost: "5.00" },
+      ],
+    });
+    assert.equal(opened.ok, true);
+
+    const sold = await postSale({
+      ...actor,
+      idempotencyKey: randomUUID(),
+      occurredOn: "2026-10-02",
+      lines: [
+        { productId: product.id, variantId: priced.id, quantity: "2" },
+        { productId: product.id, variantId: unpriced.id, quantity: "1" },
+      ],
+      paymentAmount: "35.00",
+      paymentMethod: "CASH",
+    });
+    assert.equal(sold.ok, true);
+    const items = await prisma.saleItem.findMany({ where: { organizationId: org.id } });
+    const priceOf = (variantId: string) => items.find((item) => item.variantId === variantId)?.unitPrice.toFixed(2);
+    assert.equal(priceOf(priced.id), "12.50");
+    assert.equal(priceOf(unpriced.id), "10.00");
+
+    // The product price is not accepted for a variant that has its own price.
+    const wrong = await postSale({
+      ...actor,
+      idempotencyKey: randomUUID(),
+      occurredOn: "2026-10-02",
+      lines: [{ productId: product.id, variantId: priced.id, quantity: "1", unitPrice: "10.00" }],
+      paymentAmount: "10.00",
+      paymentMethod: "CASH",
+    });
+    assert.equal(wrong.ok, false);
+  } finally {
+    await prisma.auditLog.deleteMany({ where: { organizationId: org.id } });
+    await prisma.idempotencyKey.deleteMany({ where: { organizationId: org.id } });
+    await prisma.stockLedger.deleteMany({ where: { organizationId: org.id } });
+    await prisma.stockBalance.deleteMany({ where: { organizationId: org.id } });
+    await prisma.openingStock.deleteMany({ where: { organizationId: org.id } });
+    await prisma.salePayment.deleteMany({ where: { organizationId: org.id } });
+    await prisma.saleItem.deleteMany({ where: { organizationId: org.id } });
+    await prisma.invoice.deleteMany({ where: { organizationId: org.id } });
+    await prisma.sale.deleteMany({ where: { organizationId: org.id } });
+    await prisma.customerLedger.deleteMany({ where: { organizationId: org.id } });
+    await prisma.journalLine.deleteMany({ where: { organizationId: org.id } });
+    await prisma.journal.deleteMany({ where: { organizationId: org.id } });
+    await prisma.productVariant.deleteMany({ where: { organizationId: org.id } });
+    await prisma.product.deleteMany({ where: { organizationId: org.id } });
+    await prisma.account.deleteMany({ where: { organizationId: org.id } });
+    await prisma.accountGroup.deleteMany({ where: { organizationId: org.id } });
+    await prisma.documentSequence.deleteMany({ where: { organizationId: org.id } });
+    await prisma.warehouse.deleteMany({ where: { organizationId: org.id } });
+    await prisma.user.deleteMany({ where: { organizationId: org.id } });
+    await prisma.branch.deleteMany({ where: { organizationId: org.id } });
+    await prisma.organization.deleteMany({ where: { id: org.id } });
+    await prisma.$disconnect();
+  }
+});

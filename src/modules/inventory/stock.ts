@@ -26,7 +26,160 @@ type MovementInput = {
   referenceId: string;
   userId: string;
   unitCost?: Prisma.Decimal | null;
+  /** For an OUT movement of an expiry-tracked product: take from this lot first. */
+  lot?: string | null;
+  /** If given, the lots an OUT movement used up are added here (a transfer moves them on). */
+  lotsOut?: ConsumedLot[];
+  /** The business date of the movement, used to tell whether a lot is in date. Defaults to today (UTC). */
+  occurredOn?: Date;
 };
+
+function startOfTodayUtc() {
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  return today;
+}
+
+export type ConsumedLot = { lot: string; expiresOn: Date; manufacturedOn: Date | null; quantity: Prisma.Decimal };
+
+// Stock leaving by anything except an expiry write-off (which names its own lot) uses up the
+// lots of an expiry-tracked product, earliest expiry first, so the lot list stays true.
+const consumesLots: ReadonlySet<StockMovementType> = new Set(["SALE", "ADJUSTMENT", "DAMAGE", "SUPPLIER_RETURN", "TRANSFER_OUT"]);
+
+async function consumeExpiryLots(tx: Prisma.TransactionClient, input: MovementInput, remainingOnHand: Prisma.Decimal) {
+  // A sale may only use lots that are still in date (the expiry day itself is the last day).
+  // Stock that is in no lot at all (older records) stays sellable.
+  const inDateOnly = input.movementType === "SALE";
+  const asOf = input.occurredOn ?? startOfTodayUtc();
+  if (inDateOnly) {
+    const [expired] = await tx.$queryRaw<Array<{ quantity: Prisma.Decimal | null }>>`
+      SELECT SUM(quantity) AS quantity FROM expiry_batches
+      WHERE organizationId = ${input.organizationId}
+        AND productId = ${input.productId}
+        AND branchId = ${input.branchId}
+        AND variantId <=> ${input.variantId ?? null}
+        AND quantity > 0
+        AND expiresOn < ${asOf}
+    `;
+    const expiredQuantity = new Prisma.Decimal(expired?.quantity ?? 0);
+    if (remainingOnHand.lt(expiredQuantity)) {
+      throw new StockRuleError(
+        `Not enough in-date stock: ${decimalString(expiredQuantity, 4)} are past their expiry date and cannot be sold.`,
+      );
+    }
+  }
+  const lots = await tx.$queryRaw<
+    Array<{ id: string; quantity: Prisma.Decimal; lot: string; expiresOn: Date; manufacturedOn: Date | null }>
+  >`
+    SELECT id, quantity, lot, expiresOn, manufacturedOn FROM expiry_batches
+    WHERE organizationId = ${input.organizationId}
+      AND productId = ${input.productId}
+      AND branchId = ${input.branchId}
+      AND variantId <=> ${input.variantId ?? null}
+      AND quantity > 0
+      AND (${inDateOnly ? 1 : 0} = 0 OR expiresOn >= ${asOf})
+    ORDER BY (lot = ${input.lot ?? ""}) DESC, expiresOn ASC, createdAt ASC
+    FOR UPDATE
+  `;
+  let remaining = input.quantity;
+  for (const lot of lots) {
+    if (remaining.lte(0)) {
+      break;
+    }
+    const available = new Prisma.Decimal(lot.quantity);
+    const take = Prisma.Decimal.min(available, remaining);
+    await tx.expiryBatch.updateMany({ where: { id: lot.id }, data: { quantity: available.minus(take) } });
+    input.lotsOut?.push({ lot: lot.lot, expiresOn: lot.expiresOn, manufacturedOn: lot.manufacturedOn, quantity: take });
+    remaining = remaining.minus(take);
+  }
+  // Anything left over came from stock that was never put into a lot (older records); the
+  // stock balance above has already confirmed it exists.
+}
+
+/** Adds stock to the lots of a branch: tops up the same lot and expiry date, or starts a new lot. */
+export async function addExpiryLots(
+  tx: Prisma.TransactionClient,
+  input: { organizationId: string; branchId: string; productId: string; variantId?: string | null; lots: ConsumedLot[] },
+) {
+  for (const lot of input.lots) {
+    const existing = await tx.expiryBatch.findFirst({
+      where: {
+        organizationId: input.organizationId,
+        branchId: input.branchId,
+        productId: input.productId,
+        variantId: input.variantId ?? null,
+        lot: lot.lot,
+        expiresOn: lot.expiresOn,
+      },
+      select: { id: true, quantity: true },
+    });
+    if (existing) {
+      await tx.expiryBatch.updateMany({ where: { id: existing.id }, data: { quantity: new Prisma.Decimal(existing.quantity).plus(lot.quantity) } });
+    } else {
+      await tx.expiryBatch.create({
+        data: {
+          organizationId: input.organizationId,
+          branchId: input.branchId,
+          productId: input.productId,
+          variantId: input.variantId ?? null,
+          lot: lot.lot,
+          manufacturedOn: lot.manufacturedOn,
+          expiresOn: lot.expiresOn,
+          quantity: lot.quantity,
+        },
+      });
+    }
+  }
+}
+
+/**
+ * Moving-average cost after a movement. Stock coming in with a cost blends into the average by
+ * quantity; stock going out leaves it alone; stock coming in with no cost keeps the average.
+ */
+export function nextAverageCost(input: {
+  onHand: Prisma.Decimal;
+  average: Prisma.Decimal | null;
+  direction: "IN" | "OUT";
+  quantity: Prisma.Decimal;
+  unitCost: Prisma.Decimal | null;
+}) {
+  if (input.direction === "OUT" || input.unitCost === null || input.quantity.lte(0)) {
+    return input.average;
+  }
+  if (input.onHand.lte(0) || input.average === null) {
+    return input.unitCost.toDecimalPlaces(4);
+  }
+  const value = input.onHand.mul(input.average).plus(input.quantity.mul(input.unitCost));
+  return value.div(input.onHand.plus(input.quantity)).toDecimalPlaces(4);
+}
+
+/**
+ * The cost of one unit leaving stock now: the moving average, or the product's purchase price when
+ * the stock never came in with a cost (an adjustment, say). A sale is never blocked for this.
+ */
+export async function currentUnitCost(
+  tx: Prisma.TransactionClient,
+  input: { organizationId: string; productId: string; variantId?: string | null; branchId: string; warehouseId: string },
+) {
+  const balance = await tx.stockBalance.findFirst({
+    where: {
+      organizationId: input.organizationId,
+      productId: input.productId,
+      variantScope: input.variantId ?? "",
+      branchId: input.branchId,
+      warehouseId: input.warehouseId,
+    },
+    select: { averageCost: true },
+  });
+  if (balance?.averageCost) {
+    return new Prisma.Decimal(balance.averageCost);
+  }
+  const product = await tx.product.findFirst({
+    where: { id: input.productId, organizationId: input.organizationId },
+    select: { purchasePrice: true },
+  });
+  return new Prisma.Decimal(product?.purchasePrice ?? 0).toDecimalPlaces(4);
+}
 
 export function alertStatus(quantity: Prisma.Decimal, reorderLevel: Prisma.Decimal) {
   if (quantity.eq(0)) {
@@ -44,7 +197,7 @@ export function alertStatus(quantity: Prisma.Decimal, reorderLevel: Prisma.Decim
 export async function applyMovement(tx: Prisma.TransactionClient, input: MovementInput) {
   const product = await tx.product.findFirst({
     where: { id: input.productId, organizationId: input.organizationId, deletedAt: null },
-    select: { id: true, trackStock: true },
+    select: { id: true, trackStock: true, trackExpiry: true },
   });
   if (!product) {
     throw new StockRuleError("That record was not found.", 404);
@@ -63,8 +216,8 @@ export async function applyMovement(tx: Prisma.TransactionClient, input: Movemen
   }
 
   const variantScope = input.variantId ?? "";
-  const locked = await tx.$queryRaw<Array<{ id: string; quantity: Prisma.Decimal }>>`
-    SELECT id, quantity FROM stock_balances
+  const locked = await tx.$queryRaw<Array<{ id: string; quantity: Prisma.Decimal; averageCost: Prisma.Decimal | null }>>`
+    SELECT id, quantity, averageCost FROM stock_balances
     WHERE organizationId = ${input.organizationId}
       AND productId = ${input.productId}
       AND variantScope = ${variantScope}
@@ -78,8 +231,16 @@ export async function applyMovement(tx: Prisma.TransactionClient, input: Movemen
     throw new StockRuleError("Insufficient stock.");
   }
 
+  const averageCost = nextAverageCost({
+    onHand: current,
+    average: locked[0]?.averageCost == null ? null : new Prisma.Decimal(locked[0].averageCost),
+    direction: input.direction,
+    quantity: input.quantity,
+    unitCost: input.unitCost ?? null,
+  });
+
   if (locked[0]) {
-    await tx.stockBalance.update({ where: { id: locked[0].id }, data: { quantity: next } });
+    await tx.stockBalance.updateMany({ where: { id: locked[0].id }, data: { quantity: next, averageCost } });
   } else {
     await tx.stockBalance.create({
       data: {
@@ -90,8 +251,13 @@ export async function applyMovement(tx: Prisma.TransactionClient, input: Movemen
         branchId: input.branchId,
         warehouseId: input.warehouseId,
         quantity: next,
+        averageCost,
       },
     });
+  }
+
+  if (input.direction === "OUT" && product.trackExpiry && consumesLots.has(input.movementType)) {
+    await consumeExpiryLots(tx, input, next);
   }
 
   await tx.stockLedger.create({

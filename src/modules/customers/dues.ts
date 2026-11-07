@@ -5,9 +5,10 @@ import { writeAudit } from "@/modules/auth/audit";
 import { PostingError, postBalancedJournal } from "@/modules/accounting/post";
 import { outstandingReceivable } from "@/modules/customers/customers";
 import { allocateNumber, documentYear } from "@/modules/documents/numbers";
-import { hashPayload, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
+import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
 import { decimalString, parseMoney } from "@/modules/inventory/money";
 import { StockRuleError } from "@/modules/inventory/stock";
+import { occurredDate } from "@/lib/format/date";
 
 type Failure = { ok: false; status: 404 | 409 | 422; code: "NOT_FOUND" | "CONFLICT" | "BUSINESS_RULE"; message: string };
 
@@ -19,10 +20,6 @@ type Actor = {
   ip: string;
   userAgent: string | null;
 };
-
-function occurredDate(value: string) {
-  return new Date(`${value}T00:00:00.000Z`);
-}
 
 function failure(error: unknown): Failure | null {
   if (error instanceof StockRuleError) {
@@ -62,7 +59,7 @@ export async function postCustomerPayment(
     method: input.method,
   });
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await idempotentTransaction(async (tx) => {
       const existing = await readIdempotency(tx, {
         organizationId: input.organizationId,
         key: input.idempotencyKey,

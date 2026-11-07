@@ -5,9 +5,10 @@ import { writeAudit } from "@/modules/auth/audit";
 import { PostingError, postBalancedJournal } from "@/modules/accounting/post";
 import { outstandingReceivable } from "@/modules/customers/customers";
 import { allocateNumber, documentYear } from "@/modules/documents/numbers";
-import { hashPayload, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
+import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
 import { decimalString, parseMoney, parseQuantity } from "@/modules/inventory/money";
-import { applyMovement, resolveWarehouse, StockRuleError } from "@/modules/inventory/stock";
+import { applyMovement, currentUnitCost, resolveWarehouse, StockRuleError } from "@/modules/inventory/stock";
+import { occurredDate } from "@/lib/format/date";
 
 type Failure = { ok: false; status: 404 | 409 | 422; code: "NOT_FOUND" | "CONFLICT" | "BUSINESS_RULE"; message: string };
 
@@ -56,41 +57,6 @@ function failure(error: unknown): Failure | null {
   return null;
 }
 
-function occurredDate(value: string) {
-  return new Date(`${value}T00:00:00.000Z`);
-}
-
-async function knownUnitCost(
-  tx: Prisma.TransactionClient,
-  input: { organizationId: string; productId: string; variantId?: string | null; branchId: string; warehouseId: string },
-) {
-  const rows = await tx.stockLedger.findMany({
-    where: {
-      organizationId: input.organizationId,
-      productId: input.productId,
-      variantId: input.variantId ?? null,
-      branchId: input.branchId,
-      warehouseId: input.warehouseId,
-      direction: "IN",
-    },
-    select: { unitCost: true, quantity: true },
-  });
-  if (rows.length === 0 || rows.some((row) => row.unitCost === null)) {
-    throw new StockRuleError("Cost of goods is not posted because a stock-in row has no unit cost.");
-  }
-  let quantity = new Prisma.Decimal(0);
-  let amount = new Prisma.Decimal(0);
-  for (const row of rows) {
-    const rowQuantity = new Prisma.Decimal(row.quantity);
-    quantity = quantity.plus(rowQuantity);
-    amount = amount.plus(rowQuantity.mul(row.unitCost ?? 0));
-  }
-  if (quantity.lte(0)) {
-    throw new StockRuleError("Cost of goods is not posted because this stock has no unit cost.");
-  }
-  return amount.div(quantity).toDecimalPlaces(4);
-}
-
 export async function postSale(
   input: Actor & {
     occurredOn: string;
@@ -101,6 +67,8 @@ export async function postSale(
     paymentAmount?: string;
     paymentMethod?: "CASH" | "BANK" | "CARD" | "WALLET" | "OTHER";
     allowPriceOverride?: boolean;
+    /** Runs inside the sale transaction, so extra writes commit or roll back with the sale. */
+    inTransaction?: (tx: Prisma.TransactionClient, sale: { id: string }) => Promise<void>;
   },
 ) {
   const requestHash = hashPayload({
@@ -114,7 +82,7 @@ export async function postSale(
     paymentMethod: input.paymentMethod ?? null,
   });
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await idempotentTransaction(async (tx) => {
       const existing = await readIdempotency(tx, {
         organizationId: input.organizationId,
         key: input.idempotencyKey,
@@ -185,7 +153,7 @@ export async function postSale(
         const inclusive = (resolved.vatType ?? "").toUpperCase() === "INCLUSIVE";
         const salesAmount = inclusive ? money(afterDiscount.minus(vat)) : afterDiscount;
         const payable = inclusive ? afterDiscount : money(afterDiscount.plus(vat));
-        const unitCost = await knownUnitCost(tx, {
+        const unitCost = await currentUnitCost(tx, {
           organizationId: input.organizationId,
           productId: resolved.productId,
           variantId: resolved.variantId,
@@ -295,6 +263,7 @@ export async function postSale(
           referenceId: sale.id,
           userId: input.userId,
           unitCost: line.unitCost,
+          occurredOn: occurredDate(input.occurredOn),
         });
       }
       const journalLines = [
@@ -384,6 +353,7 @@ export async function postSale(
       if (input.ticketId) {
         await tx.heldTicket.delete({ where: { id: input.ticketId } });
       }
+      await input.inTransaction?.(tx, { id: sale.id });
       await saveIdempotency(tx, {
         organizationId: input.organizationId,
         userId: input.userId,
@@ -445,19 +415,24 @@ async function resolveLineProduct(tx: Prisma.TransactionClient, organizationId: 
   if (!product) {
     throw new StockRuleError("That record was not found.", 404);
   }
+  // A variant with its own price sells at that price; otherwise it follows the product.
+  let sellingPrice = product.sellingPrice;
   if (variantId) {
     const variant = await tx.productVariant.findFirst({
       where: { id: variantId, productId: product.id, organizationId },
-      select: { id: true },
+      select: { id: true, price: true },
     });
     if (!variant) {
       throw new StockRuleError("That record was not found.", 404);
+    }
+    if (variant.price !== null) {
+      sellingPrice = variant.price;
     }
   }
   return {
     productId: product.id,
     variantId,
-    sellingPrice: product.sellingPrice,
+    sellingPrice,
     minimumPrice: product.minimumPrice,
     vatType: product.vatType,
     vatValue: product.vatValue,

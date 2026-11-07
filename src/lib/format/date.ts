@@ -1,3 +1,27 @@
+const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/** True for a real calendar day written as YYYY-MM-DD (rejects 2026-02-31). */
+export function isIsoDate(value: string) {
+  const match = ISO_DATE.exec(value);
+  if (!match) {
+    return false;
+  }
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+/**
+ * The one way to turn a business date (YYYY-MM-DD) into the Date stored in DATE columns:
+ * midnight UTC, so it never shifts with the server time zone. Throws on anything else.
+ */
+export function occurredDate(value: string) {
+  if (!isIsoDate(value)) {
+    throw new RangeError(`Not a calendar date (YYYY-MM-DD): ${value}`);
+  }
+  return new Date(`${value}T00:00:00.000Z`);
+}
+
 export function daysInMonth(year: number, month: number) {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }

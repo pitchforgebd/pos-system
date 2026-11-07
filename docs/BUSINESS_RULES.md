@@ -36,7 +36,7 @@ Opening
 
 Every change writes `stock_ledgers` and updates `stock_balances` in the same database transaction.
 
-Phase 05 rejects an outbound movement that would make `stock_balances.quantity` negative. No override setting is defined, so none is implemented. The generic filter reads category; no generic column was added. Opening-stock and own-stock lines are the ledger rows for that invoice. The blueprint's opening Value is stored as `stock_ledgers.unitCost` and is not posted to an inventory account. Rack is named on the opening-stock form and is not a column on `opening_stocks`, so it is not stored. CSV bulk opening stock remains the Phase 15 import flow. Transfers stay unimplemented until section 8 is approved.
+Phase 05 rejects an outbound movement that would make `stock_balances.quantity` negative. No override setting is defined, so none is implemented. The generic filter reads category; no generic column was added. Opening-stock and own-stock lines are the ledger rows for that invoice. The blueprint's opening Value is stored as `stock_ledgers.unitCost` and is not posted to an inventory account. Rack is named on the opening-stock form and is not a column on `opening_stocks`, so it is not stored. CSV bulk opening stock remains the Phase 15 import flow. Transfers follow section 8.
 
 | Event | Direction |
 | --- | --- |
@@ -94,13 +94,13 @@ POS input: product search, barcode, category filter, cart keyed by variant id, q
 
 Phase 07 calculates each line as quantity times the product selling price, rounded half-up to scale 2. The sale total is the sum of those line totals. A client unit price that differs from the selling price is rejected. `sales.price_override` stays unused until section 16 defines limits. Variant price, wholesale price, and `product_prices` rows are not selected. Header and line discount, VAT, and charges stay zero; a sale that needs a non-zero discount, VAT, or charge is rejected. `sales.discount` stays unused until stacking rules exist.
 
-The paid amount uses cash (account 1100), bank (account 1200), or card (account 1200) and cannot exceed the total. The unpaid amount is the due. Other tenders stay rejected because they have no chart account. A line discount cannot exceed the line. Product VAT is exclusive when `vatType` is EXCLUSIVE or PERCENT, and included in the price when `vatType` is INCLUSIVE. VAT credits 2300. Other charges credit 4200. A price below the minimum is rejected. A different unit price is accepted only when the account holds `sales.price_override`. Cost of goods uses the quantity-weighted average of stock-in unit costs. A stock-in row with no unit cost still rejects the sale. The sale journal is one posted journal: Dr 1100 Cash for the paid amount, Dr 1300 Accounts Receivable for the due, Cr 4100 Sales for the total, plus Dr 5100 COGS and Cr 1400 Inventory for the cost below. Lines of zero are omitted. A due amount requires an active customer. When that customer has a credit limit, the sale is rejected if outstanding after the due would exceed it.
+The paid amount uses cash (account 1100), bank (account 1200), or card (account 1200) and cannot exceed the total. The unpaid amount is the due. Other tenders stay rejected because they have no chart account. A line discount cannot exceed the line. Product VAT is exclusive when `vatType` is EXCLUSIVE or PERCENT, and included in the price when `vatType` is INCLUSIVE. VAT credits 2300. Other charges credit 4200. A price below the minimum is rejected. A different unit price is accepted only when the account holds `sales.price_override`. Cost of goods uses the moving-average unit cost of the stock on hand for that product, variant, branch, and warehouse (see the cost rule below). A sale is not rejected for a missing cost. The sale journal is one posted journal: Dr 1100 Cash for the paid amount, Dr 1300 Accounts Receivable for the due, Cr 4100 Sales for the total, plus Dr 5100 COGS and Cr 1400 Inventory for the cost below. Lines of zero are omitted. A due amount requires an active customer. When that customer has a credit limit, the sale is rejected if outstanding after the due would exceed it.
 
-COGS uses a unit cost only when every stock-in ledger row for that product, variant, branch, and warehouse has the same non-null unit cost. The cost amount is quantity times that unit cost, rounded half-up to scale 2. If those costs differ, any stock-in row has no unit cost, or there is no stock-in row, the sale is rejected. That gate does not choose FIFO, weighted average, or lot cost.
+**Cost rule (decided: moving average).** `stock_balances.averageCost` holds the moving-average unit cost. A stock-in that carries a unit cost (opening, own stock, purchase, transfer in, customer return) blends in: new average = (on hand × average + quantity × unit cost) ÷ (on hand + quantity), rounded to 4 decimals; when nothing is on hand the average is simply that unit cost. A stock-in with no unit cost (an adjustment, say) keeps the average. Stock going out never changes the average. A sale is costed at the average at the moment of sale; the cost amount is quantity times that unit cost, rounded half-up to scale 2. If no average exists yet (stock that never came in with a cost), the product's `purchasePrice` is used, so the sale still posts.
 
 The invoice number is `INV-YEAR-000001`. A held ticket stores cart lines and does not reserve stock, change stock, or post a journal. A posted sale is not edited. Cancel stays rejected.
 
-Phase 08 posts a customer return against a posted sale. Eligible quantity is the sale line quantity minus posted return quantities for that line. A return above that quantity is rejected, including a second return of the same units. The return line amount is the returned quantity times the sale unit price, rounded half-up to scale 2. When the return takes the remaining quantity, the line amount is the sale line total minus amounts already returned on that line. The return total is the sum of those line amounts. Cost of goods for the return uses the unit cost stored on that sale's stock-out row, with the same remaining-quantity rule. The stock movement is `CUSTOMER_RETURN` in. The original sale journal is not edited. The return journal debits 4100 Sales for the return total, credits 1300 Accounts Receivable for the part that reduces the customer's outstanding, and credits 1100 Cash for the remainder. It also debits 1400 Inventory and credits 5100 COGS for the returned cost. Zero lines are omitted. The receivable part is a customer ledger RETURN credit. A walk-in sale has no receivable, so the whole return is a cash refund. The document number is `RET-YEAR-000001`.
+Phase 08 posts a customer return against a posted sale. Eligible quantity is the sale line quantity minus posted return quantities for that line. A return above that quantity is rejected, including a second return of the same units. The return line amount is the returned quantity's share of what the customer paid for the line (the sale line total: after discount, VAT included), rounded half-up to scale 2; the line's VAT is split by the same share. When the return takes the remaining quantity, the line amount (and its VAT) is the sale line value minus what was already returned on that line, so the pieces always add up to the original. The return total is the sum of those line amounts. Cost of goods for the return uses the unit cost stored on that sale's stock-out row, with the same remaining-quantity rule. The stock movement is `CUSTOMER_RETURN` in. The original sale journal is not edited. The return journal debits 4100 Sales for the return total less its VAT, debits 2300 VAT Payable for the VAT share, credits 1300 Accounts Receivable for the part that reduces the customer's outstanding, and credits 1100 Cash for the remainder. It also debits 1400 Inventory and credits 5100 COGS for the returned cost. Zero lines are omitted. The receivable part is a customer ledger RETURN credit. A walk-in sale has no receivable, so the whole return is a cash refund. The document number is `RET-YEAR-000001`.
 
 ## 4. Purchases
 
@@ -212,7 +212,7 @@ Chart of accounts is configurable. The seed list is in `docs/DATABASE.md`.
 
 Phase 09 posts only through the central journal service. A manual journal is posted immediately when its lines balance; a line is a debit or a credit, and the journal total debit must equal the total credit. The number is `VCH-YEAR-000001`. A posted journal is not edited. A reversal is a new posted journal with the lines swapped, linked by `reversalOfId`. A journal that already has a reversal cannot be reversed again. A journal that belongs to a sale, purchase, return, or party payment cannot be reversed here, because that would leave the source document in place. An expense posts Dr an account in group 6000, Cr 1100 Cash or 1200 Bank, numbered `EXP-YEAR-000001`. A contra transfer posts Dr 1200 and Cr 1100, or the opposite, numbered on the `VCH` sequence. An account statement running balance is the opening debit-minus-credit plus each later debit minus credit for the session branch. Other income debits 1100 or a bank account and credits an income account other than 4100. Capital added debits cash or bank and credits 3100. Capital withdrawn debits 3200 and credits cash or bank. A loan received debits cash or bank and credits 2200. A loan paid debits 2200 and credits cash or bank. A payment voucher credits cash or bank. A receipt voucher debits cash or bank. Those vouchers do not post to 1300, 1400, 2100, 4100, or 5100. A new bank account uses the next free code from 1201 to 1299. Its opening balance debits that bank and credits 3100.
 
-## 8. Stock transfer — not frozen
+## 8. Stock transfer — Option A (decided)
 
 **Conflict.** Statuses:
 
@@ -228,7 +228,7 @@ The blueprint also says one transaction posts `TRANSFER_OUT` and `TRANSFER_IN` t
 
 Option B needs an in-transit location that the current movement list does not name. Option A drops the gap between Transferred and Received.
 
-Option A is the rule. A receive posts `TRANSFER_OUT` and `TRANSFER_IN` in one transaction. Stock does not sit in transit.
+Option A is the rule. A transfer is received the moment it is posted: `TRANSFER_OUT` and `TRANSFER_IN` post in one transaction, the transfer is saved as `RECEIVED`, and stock does not sit in transit. There is no draft, approval, or transferred step; the unused statuses stay in the schema. The transfer is numbered `TRF-YEAR-000001`, requires an idempotency key, accepts a variant per line, and may only leave a branch the user works in. The goods move at the source's moving-average cost (section 7), which the destination's average then blends in. For an expiry-tracked product the lots used up at the source (earliest expiry first) are recreated at the destination.
 
 ## 9. Shifts
 
@@ -259,7 +259,7 @@ Card: number, customer, type, tier, status, issued, expires.
 
 Ledger: `EARN`, `REDEEM`, `EXPIRE`, `ADJUST`, `REVERSAL`.
 
-Earn rate, redeem conversion, and expiry schedule are not specified.
+**Earning (decided).** A posted sale for a customer earns points automatically when the shop has a points-per-hundred rate: `EARN` = sale total × rate ÷ 100, in the same transaction as the sale, with `referenceType = sale`. A blank or zero rate earns nothing. Points are display-only for now: redeeming, expiring, and reversing the earned points when a sale is returned are not built (Phase 7 in `FIX_PLAN.md`), so no money depends on them yet. Redeem conversion and the expiry schedule are not specified.
 
 Phase 10 stores a tier and a card. The tier discount percent is stored and is not applied to a sale price. Earn, redeem, expiry, adjustment, and reversal rows are not posted.
 
@@ -331,7 +331,7 @@ Summary counts: total, success, failed, skipped. Failed rows are reportable. Eac
 
 Product CSV columns are `sku`, `name`, `purchasePrice`, `sellingPrice`, `wholesalePrice`, `minimumPrice`, and optional `reorderLevel` and `barcode`. A blank reorder level is `0`. Track stock is on. Track expiry, batch, serial, and warranty are off. Those match the product form. An existing SKU is skipped and is not updated. A second copy of that SKU in the same file is skipped. A bad header is rejected before any row is saved.
 
-Opening-stock CSV columns are `sku`, `quantity`, and optional `unitCost`, `lot`, `manufacturedOn`, `expiresOn`, and `rack`. Rack is accepted and not stored, because it is not a column. The warehouse is the session branch warehouse. Each row calls the existing opening-stock post, so unit cost is stored on the ledger and is not posted to accounting. A missing product fails that row only.
+Opening-stock CSV columns are `sku`, `quantity`, and optional `unitCost`, `lot`, `manufacturedOn`, `expiresOn`, and `rack`. Rack is accepted and not stored, because it is not a column. The warehouse is the session branch warehouse. Every valid row goes into one opening-stock document, posted in one transaction, so unit cost is stored on the ledger and is not posted to accounting. A row with an unknown product, a bad date, a bad number, or a missing lot or expiry for an expiry-tracked product fails that row only and is reported; the other rows still post. If the document itself cannot be posted, no row is posted and each says why.
 
 Export is CSV. Product export uses `products.export`. Report export uses `reports.export`. No spreadsheet template is named, so XLSX is not generated.
 
@@ -371,8 +371,6 @@ Do not implement these by assumption.
 
 | Topic | Why it is open |
 | --- | --- |
-| Transfer timing | Section 8 conflict |
-| COGS method | FIFO, weighted average, or lot-specific cost is not named. Phase 07 posts Dr COGS, Cr Inventory only when every stock-in row for that product, variant, branch, and warehouse shares one non-null unit cost. Mixed or missing costs are rejected |
 | VAT | `vatType` and `vatValue` exist. Inclusive versus exclusive math is not defined |
 | Negative stock | Phase 05 requires an insufficient-stock test, which implies rejection, but an override setting is not defined |
 | Discount stacking | Line discount versus invoice discount and maximums are not defined |

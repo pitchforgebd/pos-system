@@ -40,7 +40,9 @@ export async function allocateNumber(
     throw new Error("Document sequence was not locked.");
   }
   const next = Number(row.lastValue) + 1;
-  await tx.documentSequence.update({ where: { id: row.id }, data: { lastValue: next } });
+  // updateMany, not update: update re-reads the row from this transaction's snapshot, which cannot
+  // see a sequence another request created and committed a moment ago (first number of the year).
+  await tx.documentSequence.updateMany({ where: { id: row.id }, data: { lastValue: next } });
   return `${input.documentType}-${input.year}-${String(next).padStart(6, "0")}`;
 }
 

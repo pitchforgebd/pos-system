@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { jsonError, jsonOk, rejectCrossSite } from "@/lib/api/http";
 import { requirePermission, requireSession } from "@/modules/access/guard";
-import { stockActor } from "@/modules/inventory/actor";
+import { idempotencyKey, stockActor } from "@/modules/inventory/actor";
 import { postDamage } from "@/modules/inventory/documents";
 
 const bodySchema = z.object({
@@ -33,13 +33,14 @@ export async function POST(request: Request) {
     return denied;
   }
   const actor = stockActor(auth.session, request);
+  const key = idempotencyKey(request);
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
-  if (!actor || !parsed.success) {
-    return jsonError("VALIDATION_ERROR", "Validation failed", 400);
+  if (!actor || !key || !parsed.success) {
+    return jsonError("VALIDATION_ERROR", "A branch, an Idempotency-Key, and a damage record are required.", 400);
   }
-  const result = await postDamage({ ...actor, idempotencyKey: "", ...parsed.data });
+  const result = await postDamage({ ...actor, idempotencyKey: key, ...parsed.data });
   if (!result.ok) {
     return jsonError(result.code, result.message, result.status);
   }
-  return jsonOk({ id: result.id }, "Operation completed", 201);
+  return jsonOk({ id: result.id, replayed: result.replayed }, "Operation completed", result.replayed ? 200 : 201);
 }

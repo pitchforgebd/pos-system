@@ -177,8 +177,8 @@ Still absent: many bank accounts with number, type, and branch; bank opening bal
 | Opening stock | One posting form | Invoice lists and a branch file picker, plus own-stock CSV |
 | Banks | Chart account 1200 only | Many bank accounts with number, type, branch, and ledger |
 | Due collection | A payment form | Searchable due list and payment vouchers |
-| Loyalty | Points exist; earning and redeeming are rejected | Cards, tiers, minimum spend, discount percent, auto-upgrade |
-| Quotations | Header and note; conversion is rejected | Line builder with discount, VAT, and validity |
+| Loyalty | Sales earn points when the shop sets a rate; redeeming is not built | Cards, tiers, minimum spend, discount percent, auto-upgrade |
+| Quotations | Header, note, and lines; conversion creates one sale in a single transaction | Line builder with discount, VAT, and validity |
 | SMS | Tabs, taka balance, character count, and histories. No provider means the message fails | The same send screen, plus a live provider balance |
 | Shifts | Active, close, and history filters, plus the statement link | A separate handover screen and handover report |
 | Language | English only | English and বাংলা |
