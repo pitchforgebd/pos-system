@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db/client";
 import { businessDate, dateOnly } from "@/core/time/business-date";
-import { decimalString } from "@/modules/inventory/money";
+import { decimalString } from "@/core/money";
 
 export async function listIncomeRows(organizationId: string, branchId: string) {
   const rows = await prisma.income.findMany({

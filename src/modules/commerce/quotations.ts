@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
 import { allocateNumber, documentYear } from "@/modules/documents/numbers";
 import { hashPayload, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
-import { decimalString, parseMoney, parseQuantity } from "@/modules/inventory/money";
+import { decimalString, parseMoney, parseQuantity } from "@/core/money";
 import { StockRuleError } from "@/modules/inventory/stock";
 import { postSale } from "@/modules/sales/sales";
 import { occurredDate } from "@/lib/format/date";

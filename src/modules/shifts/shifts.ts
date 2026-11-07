@@ -4,7 +4,7 @@ import { RuleError } from "@/core/errors/rule-error";
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
 import { hashPayload, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
-import { decimalString, parseMoney } from "@/modules/inventory/money";
+import { decimalString, money, parseMoney, zero } from "@/core/money";
 import { StockRuleError } from "@/modules/inventory/stock";
 
 type Failure = { ok: false; status: 404 | 409 | 422; code: "NOT_FOUND" | "CONFLICT" | "BUSINESS_RULE"; message: string };
@@ -19,14 +19,6 @@ type Actor = {
 };
 
 type ShiftStatus = "OPEN" | "ACTIVE" | "CLOSING" | "CLOSED";
-
-function money(value: Prisma.Decimal) {
-  return value.toDecimalPlaces(2);
-}
-
-function zero() {
-  return new Prisma.Decimal(0);
-}
 
 function failure(error: unknown): Failure | null {
   if (error instanceof RuleError) {

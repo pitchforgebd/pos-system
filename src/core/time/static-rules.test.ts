@@ -31,6 +31,11 @@ test("the source is found", () => {
 
 test("no source file builds a date string from toISOString().slice(0, 10)", () => {
   assert.deepEqual(offenders(/toISOString\(\)\s*\.slice\(\s*0\s*,\s*10\s*\)/), []);
+  // The seed scripts are outside src but run the same posting code.
+  const seedFiles = ["seed.ts", "demo.ts"].filter((name) =>
+    /toISOString\(\)\s*\.slice\(\s*0\s*,\s*10\s*\)/.test(readFileSync(join(srcRoot, "..", "prisma", name), "utf8")),
+  );
+  assert.deepEqual(seedFiles, []);
 });
 
 test("no API route validates a date with a hand-written regex", () => {

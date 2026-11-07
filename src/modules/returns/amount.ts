@@ -1,10 +1,7 @@
 import { Prisma } from "@prisma/client";
+import { money } from "@/core/money";
 
 import { StockRuleError } from "@/modules/inventory/stock";
-
-function money(value: Prisma.Decimal) {
-  return value.toDecimalPlaces(2);
-}
 
 export function returnLineAmount(input: {
   sourceQuantity: Prisma.Decimal;

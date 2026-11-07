@@ -8,7 +8,7 @@ import { postBalancedJournal } from "@/modules/accounting/post";
 import { outstandingReceivable } from "@/modules/customers/customers";
 import { allocateNumber, documentYear } from "@/modules/documents/numbers";
 import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
-import { decimalString, parseMoney } from "@/modules/inventory/money";
+import { decimalString, parseMoney } from "@/core/money";
 import { StockRuleError } from "@/modules/inventory/stock";
 import { occurredDate } from "@/lib/format/date";
 

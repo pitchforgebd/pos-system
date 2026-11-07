@@ -5,7 +5,7 @@ import { dateOnly } from "@/core/time/business-date";
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
 import { hashPayload, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
-import { decimalString, parseMoney, parseQuantity } from "@/modules/inventory/money";
+import { decimalString, money, parseMoney, parseQuantity } from "@/core/money";
 import { StockRuleError } from "@/modules/inventory/stock";
 import { deliverSms } from "@/modules/sms/provider";
 import { renderTemplate, validateTemplateBody } from "@/modules/sms/templates";
@@ -15,10 +15,6 @@ type Failure = { ok: false; status: 404 | 409 | 422; code: "NOT_FOUND" | "CONFLI
 const senderKey = "sms.sender";
 const providerKey = "sms.provider";
 const priceKey = "sms.unitPrice";
-
-function money(value: Prisma.Decimal) {
-  return value.toDecimalPlaces(2);
-}
 
 function failure(error: unknown): Failure | null {
   if (error instanceof RuleError) {

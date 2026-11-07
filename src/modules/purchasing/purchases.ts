@@ -7,7 +7,7 @@ import { writeAudit } from "@/modules/auth/audit";
 import { postBalancedJournal } from "@/modules/accounting/post";
 import { allocateNumber, documentYear } from "@/modules/documents/numbers";
 import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
-import { decimalString, parseMoney, parseQuantity } from "@/modules/inventory/money";
+import { decimalString, money, parseMoney, parseQuantity } from "@/core/money";
 import { addExpiryLots, applyMovement, resolveWarehouse, StockRuleError } from "@/modules/inventory/stock";
 import { outstandingPayable } from "@/modules/purchasing/suppliers";
 import { isIsoDate, occurredDate } from "@/lib/format/date";
@@ -34,10 +34,6 @@ type Actor = {
   ip: string;
   userAgent: string | null;
 };
-
-function money(value: Prisma.Decimal) {
-  return value.toDecimalPlaces(2);
-}
 
 function failure(error: unknown): Failure | null {
   if (error instanceof RuleError) {

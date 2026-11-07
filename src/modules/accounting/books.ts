@@ -7,7 +7,7 @@ import { writeAudit } from "@/modules/auth/audit";
 import { PostingError, postBalancedJournal } from "@/modules/accounting/post";
 import { allocateNumber, documentYear } from "@/modules/documents/numbers";
 import { hashPayload, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
-import { decimalString, parseMoney } from "@/modules/inventory/money";
+import { decimalString, money, parseMoney, zero } from "@/core/money";
 import { isIsoDate, occurredDate } from "@/lib/format/date";
 
 type Failure = { ok: false; status: 404 | 409 | 422; code: "NOT_FOUND" | "CONFLICT" | "BUSINESS_RULE"; message: string };
@@ -22,14 +22,6 @@ type Actor = {
 };
 
 export type JournalLineInput = { accountCode: string; debit: string; credit: string };
-
-function money(value: Prisma.Decimal) {
-  return value.toDecimalPlaces(2);
-}
-
-function zero() {
-  return new Prisma.Decimal(0);
-}
 
 function failure(error: unknown): Failure | null {
   if (error instanceof RuleError) {

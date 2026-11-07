@@ -4,7 +4,7 @@ import { createProduct } from "@/modules/catalog/products";
 import { headerMap, parseCsv, toCsv } from "@/modules/imports/csv";
 import { safeImportName } from "@/modules/imports/files";
 import { hashPayload, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
-import { decimalString } from "@/modules/inventory/money";
+import { decimalString } from "@/core/money";
 import { StockRuleError } from "@/modules/inventory/stock";
 
 const required = ["sku", "name", "purchasePrice", "sellingPrice", "wholesalePrice", "minimumPrice"];

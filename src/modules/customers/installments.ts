@@ -4,7 +4,7 @@ import { businessDate, dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
-import { decimalString, parseMoney } from "@/modules/inventory/money";
+import { decimalString, parseMoney } from "@/core/money";
 import { StockRuleError } from "@/modules/inventory/stock";
 import { occurredDate } from "@/lib/format/date";
 

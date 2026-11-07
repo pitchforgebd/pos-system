@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
-import { decimalString } from "@/modules/inventory/money";
+import { decimalString, moneyText } from "@/core/money";
 import { alertStatus } from "@/modules/inventory/stock";
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
@@ -17,10 +17,6 @@ export type ReportScope = {
 
 function dec(value: Prisma.Decimal | string | number | null | undefined) {
   return new Prisma.Decimal(value ?? 0);
-}
-
-function money(value: Prisma.Decimal) {
-  return decimalString(value, 2);
 }
 
 export function reportWindow(scope: Pick<ReportScope, "from" | "to">) {
@@ -66,14 +62,14 @@ export async function salesReport(scope: ReportScope) {
     }),
   ]);
   return {
-    total: money(dec(sum._sum.total)),
+    total: moneyText(dec(sum._sum.total)),
     count: sum._count,
     rows: rows.map((row) => ({
       id: row.id,
       businessDate: dateOnly(row.businessDate),
       number: row.invoice?.number ?? "Sale",
       party: row.customer?.name ?? "Walk-in",
-      total: money(row.total),
+      total: moneyText(row.total),
     })),
   };
 }
@@ -95,14 +91,14 @@ export async function purchaseReport(scope: ReportScope) {
     }),
   ]);
   return {
-    total: money(dec(sum._sum.total)),
+    total: moneyText(dec(sum._sum.total)),
     count: sum._count,
     rows: rows.map((row) => ({
       id: row.id,
       businessDate: dateOnly(row.businessDate),
       number: row.number ?? "Purchase",
       party: row.supplier.name,
-      total: money(row.total),
+      total: moneyText(row.total),
     })),
   };
 }
@@ -157,7 +153,7 @@ export async function customerReport(organizationId: string) {
     rows: customers.map((row) => ({
       id: row.id,
       name: row.name,
-      due: money(dueById.get(row.id) ?? new Prisma.Decimal(0)),
+      due: moneyText(dueById.get(row.id) ?? new Prisma.Decimal(0)),
     })),
   };
 }
@@ -183,7 +179,7 @@ export async function supplierReport(organizationId: string) {
     rows: suppliers.map((row) => ({
       id: row.id,
       name: row.name,
-      payable: money(dueById.get(row.id) ?? new Prisma.Decimal(0)),
+      payable: moneyText(dueById.get(row.id) ?? new Prisma.Decimal(0)),
     })),
   };
 }
@@ -212,15 +208,15 @@ async function accountMovement(scope: ReportScope, code: string) {
   ]);
   return {
     code: account.code,
-    debit: money(dec(sum._sum.debit)),
-    credit: money(dec(sum._sum.credit)),
+    debit: moneyText(dec(sum._sum.debit)),
+    credit: moneyText(dec(sum._sum.credit)),
     count: sum._count,
     rows: rows.map((row) => ({
       id: row.id,
       businessDate: dateOnly(row.journal.businessDate),
       reference: row.journal.number ?? row.journal.description ?? "Journal",
-      debit: money(row.debit),
-      credit: money(row.credit),
+      debit: moneyText(row.debit),
+      credit: moneyText(row.credit),
     })),
   };
 }
@@ -257,12 +253,12 @@ export async function trialBalance(scope: ReportScope) {
         id: row.accountId,
         code: account?.code ?? "",
         name: account?.name ?? "Account",
-        debit: money(lineDebit),
-        credit: money(lineCredit),
+        debit: moneyText(lineDebit),
+        credit: moneyText(lineCredit),
       };
     })
     .sort((left, right) => left.code.localeCompare(right.code));
-  return { debit: money(debit), credit: money(credit), balanced: debit.eq(credit), rows };
+  return { debit: moneyText(debit), credit: moneyText(credit), balanced: debit.eq(credit), rows };
 }
 
 export async function dayBook(scope: ReportScope) {
@@ -285,8 +281,8 @@ export async function dayBook(scope: ReportScope) {
   const debit = dec(sum._sum.debit);
   const credit = dec(sum._sum.credit);
   return {
-    debit: money(debit),
-    credit: money(credit),
+    debit: moneyText(debit),
+    credit: moneyText(credit),
     balanced: debit.eq(credit),
     count: sum._count,
     rows: rows.map((row) => ({
@@ -294,8 +290,8 @@ export async function dayBook(scope: ReportScope) {
       businessDate: dateOnly(row.journal.businessDate),
       reference: row.journal.number ?? row.journal.description ?? "Journal",
       account: `${row.account.code} ${row.account.name}`,
-      debit: money(row.debit),
-      credit: money(row.credit),
+      debit: moneyText(row.debit),
+      credit: moneyText(row.credit),
     })),
   };
 }
@@ -328,16 +324,16 @@ export async function profitAndLoss(scope: ReportScope) {
     } else {
       continue;
     }
-    rows.push({ id: row.accountId, code: account?.code ?? "", name: account?.name ?? "Account", group, amount: money(amount) });
+    rows.push({ id: row.accountId, code: account?.code ?? "", name: account?.name ?? "Account", group, amount: moneyText(amount) });
   }
   rows.sort((left, right) => left.code.localeCompare(right.code));
   const gross = revenue.minus(cost);
   return {
-    revenue: money(revenue),
-    cost: money(cost),
-    gross: money(gross),
-    expenses: money(expenses),
-    net: money(gross.minus(expenses)),
+    revenue: moneyText(revenue),
+    cost: moneyText(cost),
+    gross: moneyText(gross),
+    expenses: moneyText(expenses),
+    net: moneyText(gross.minus(expenses)),
     rows,
   };
 }
@@ -397,7 +393,7 @@ export async function salesByProduct(scope: ReportScope) {
     })
     .sort((left, right) => right.total.comparedTo(left.total))
     .slice(0, listLimit)
-    .map((row) => ({ ...row, total: money(row.total) }));
+    .map((row) => ({ ...row, total: moneyText(row.total) }));
   return { count: grouped.length, rows };
 }
 
@@ -421,7 +417,7 @@ export async function paymentMethodReport(scope: ReportScope) {
       id: row.method,
       method: row.method,
       count: row._count,
-      amount: money(dec(row._sum.amount)),
+      amount: moneyText(dec(row._sum.amount)),
     })),
   };
 }
@@ -458,9 +454,9 @@ export async function dueSaleReport(scope: ReportScope) {
       businessDate: dateOnly(row.businessDate),
       number: row.invoice?.number ?? "Sale",
       party: row.customer?.name ?? "Walk-in",
-      total: money(dec(row.total)),
-      cash: money(paid),
-      due: money(due),
+      total: moneyText(dec(row.total)),
+      cash: moneyText(paid),
+      due: moneyText(due),
     }];
   });
   return { shown: rows.length, rows: dueRows };

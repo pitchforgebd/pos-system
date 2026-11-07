@@ -5,7 +5,7 @@ import { headerMap, parseCsv } from "@/modules/imports/csv";
 import { safeImportName } from "@/modules/imports/files";
 import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
 import { postOpeningStock, type StockLine } from "@/modules/inventory/documents";
-import { parseMoney, parseQuantity } from "@/modules/inventory/money";
+import { parseMoney, parseQuantity } from "@/core/money";
 import { StockRuleError } from "@/modules/inventory/stock";
 
 const required = ["sku", "quantity"];

@@ -1,3 +1,4 @@
+import { businessDate } from "../src/core/time/business-date.ts";
 import { prisma } from "../src/lib/db/client.ts";
 import { createProduct } from "../src/modules/catalog/products.ts";
 import { createBrand, createCategory, createUnit } from "../src/modules/catalog/references.ts";
@@ -152,7 +153,7 @@ export async function seedDemoContent() {
       userId: user.id,
       warehouseId: warehouse.id,
       idempotencyKey: "demo-opening-stock",
-      businessDate: new Date().toISOString().slice(0, 10),
+      businessDate: businessDate(),
       lines: catalog.map((item) => ({
         productId: productIds.get(item.sku) ?? "",
         quantity: item.qty,
@@ -230,7 +231,7 @@ export async function seedDemoContent() {
     }
   }
 
-  const day = new Date().toISOString().slice(0, 10);
+  const day = businessDate();
   const rice = productIds.get("DEMO-RICE");
   const oil = productIds.get("DEMO-OIL");
   const sugar = productIds.get("DEMO-SUGAR");

@@ -8,7 +8,7 @@ import { postBalancedJournal } from "@/modules/accounting/post";
 import { outstandingReceivable } from "@/modules/customers/customers";
 import { allocateNumber, documentYear } from "@/modules/documents/numbers";
 import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
-import { decimalString, parseMoney, parseQuantity } from "@/modules/inventory/money";
+import { decimalString, money, parseMoney, parseQuantity, zero } from "@/core/money";
 import { applyMovement, currentUnitCost, resolveWarehouse, StockRuleError } from "@/modules/inventory/stock";
 import { occurredDate } from "@/lib/format/date";
 
@@ -34,14 +34,6 @@ type Actor = {
   ip: string;
   userAgent: string | null;
 };
-
-function money(value: Prisma.Decimal) {
-  return value.toDecimalPlaces(2);
-}
-
-function zero() {
-  return new Prisma.Decimal(0);
-}
 
 function failure(error: unknown): Failure | null {
   if (error instanceof RuleError) {

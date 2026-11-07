@@ -6,7 +6,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
 import { postBalancedJournal } from "@/modules/accounting/post";
-import { decimalString, parseQuantity } from "@/modules/inventory/money";
+import { decimalString, parseQuantity } from "@/core/money";
 import { applyMovement, resolveWarehouse, StockRuleError } from "@/modules/inventory/stock";
 
 type Actor = {

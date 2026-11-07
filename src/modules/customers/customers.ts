@@ -5,7 +5,7 @@ import { businessDate, dateOnly } from "@/core/time/business-date";
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
 import { postBalancedJournal } from "@/modules/accounting/post";
-import { decimalString, parseMoney } from "@/modules/inventory/money";
+import { decimalString, parseMoney } from "@/core/money";
 
 type Failure = { ok: false; status: 404 | 409 | 422; code: "NOT_FOUND" | "CONFLICT" | "BUSINESS_RULE"; message: string };
 

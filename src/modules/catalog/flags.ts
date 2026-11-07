@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db/client";
-import { decimalString } from "@/modules/inventory/money";
+import { decimalString } from "@/core/money";
 
 const productSelect = { id: true, sku: true, name: true, vatType: true, vatValue: true } as const;
 

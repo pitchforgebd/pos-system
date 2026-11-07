@@ -25,7 +25,7 @@ test("phase 18 checks money, numbers, permissions, and the sale path", async () 
   const { allocateNumber, documentYear } = await import("../documents/numbers.ts");
   const { createProduct } = await import("../catalog/products.ts");
   const { postOpeningStock } = await import("../inventory/documents.ts");
-  const { decimalString, parseMoney, parseQuantity } = await import("../inventory/money.ts");
+  const { decimalString, parseMoney, parseQuantity } = await import("../../core/money/index.ts");
   const { ledgerMatchesBalance } = await import("../inventory/stock.ts");
   const { postSale } = await import("../sales/sales.ts");
 

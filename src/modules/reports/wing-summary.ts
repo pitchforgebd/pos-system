@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
-import { decimalString } from "@/modules/inventory/money";
+import { moneyText } from "@/core/money";
 
 export type WingSummary = {
   totalSales: string;
@@ -30,10 +30,6 @@ export type WingSummary = {
 
 export type ReportTiles = Record<string, string>;
 
-function money(value: Prisma.Decimal | number | null | undefined) {
-  return decimalString(value ?? 0, 2);
-}
-
 function branchFilter(branchId: string | null, branchIds: string[]) {
   if (branchId) {
     return { branchId };
@@ -51,7 +47,7 @@ async function netProfit(organizationId: string, branchId: string | null, branch
     _sum: { debit: true, credit: true },
   });
   if (sums.length === 0) {
-    return money(0);
+    return moneyText(0);
   }
   const accounts = await prisma.account.findMany({
     where: { id: { in: sums.map((row) => row.accountId) } },
@@ -73,7 +69,7 @@ async function netProfit(organizationId: string, branchId: string | null, branch
       expenses = expenses.plus(debit.minus(credit));
     }
   }
-  return money(revenue.minus(cost).minus(expenses));
+  return moneyText(revenue.minus(cost).minus(expenses));
 }
 
 async function stockAlertCount(organizationId: string, branchId: string | null, branchIds: string[]) {
@@ -215,22 +211,22 @@ export async function wingSummary(
   const cashTotal = new Prisma.Decimal(cash._sum.amount ?? 0);
   const dueSale = salesTotal.minus(cashTotal);
   return {
-    totalSales: money(salesTotal),
-    instantPaid: money(cashTotal),
-    totalDueSale: money(dueSale.lt(0) ? new Prisma.Decimal(0) : dueSale),
-    dueReceived: money(duePayments._sum.amount),
-    totalReturn: money(returns._sum.total),
-    totalExpense: money(expenses._sum.amount),
-    previousReturn: money(previous._sum.total),
+    totalSales: moneyText(salesTotal),
+    instantPaid: moneyText(cashTotal),
+    totalDueSale: moneyText(dueSale.lt(0) ? new Prisma.Decimal(0) : dueSale),
+    dueReceived: moneyText(duePayments._sum.amount),
+    totalReturn: moneyText(returns._sum.total),
+    totalExpense: moneyText(expenses._sum.amount),
+    previousReturn: moneyText(previous._sum.total),
     stockAlertQty: String(alerts),
-    totalPayment: money(supplierPayments._sum.amount),
+    totalPayment: moneyText(supplierPayments._sum.amount),
     dueReceivedAlert: String(dueAlerts),
     netProfit: net,
-    totalPurchases: money(purchases._sum.total),
-    walletUsedBalance: money(wallet._sum.amount),
+    totalPurchases: moneyText(purchases._sum.total),
+    walletUsedBalance: moneyText(wallet._sum.amount),
     supplierAdvanceBalance: boards.supplierAdvance,
-    customerAdvanceBalance: money(advances._sum.amount),
-    weekSales: money(week._sum.total),
+    customerAdvanceBalance: moneyText(advances._sum.amount),
+    weekSales: moneyText(week._sum.total),
     weekDays: weekList(weekStart, businessDate, weekRows),
     sell: boards.sell,
     products: boards.products,
@@ -248,7 +244,7 @@ function weekList(
   const days: { date: string; total: string }[] = [];
   for (let cursor = new Date(end); cursor >= start; cursor = new Date(cursor.getTime() - 86_400_000)) {
     const key = dateOnly(cursor);
-    days.push({ date: dayLabel(key), total: money(totals.get(key) ?? 0) });
+    days.push({ date: dayLabel(key), total: moneyText(totals.get(key) ?? 0) });
   }
   return days;
 }
@@ -373,38 +369,38 @@ async function reportBoards(organizationId: string, branchId: string | null, bra
   }
   const openingDue = new Prisma.Decimal(openingLines._sum.debit ?? 0).minus(openingLines._sum.credit ?? 0);
   return {
-    supplierAdvance: money(supplierAdvance),
+    supplierAdvance: moneyText(supplierAdvance),
     sell: {
-      totalSales: money(sales._sum.total),
-      totalCollections: money(new Prisma.Decimal(collections._sum.amount ?? 0).plus(dueCollections._sum.amount ?? 0)),
-      salesDue: money(customersDue),
-      monthSales: money(monthSales._sum.total),
-      yearSales: money(yearSales._sum.total),
-      totalReturn: money(returns._sum.total),
-      monthReturn: money(monthReturns._sum.total),
-      yearReturn: money(yearReturns._sum.total),
+      totalSales: moneyText(sales._sum.total),
+      totalCollections: moneyText(new Prisma.Decimal(collections._sum.amount ?? 0).plus(dueCollections._sum.amount ?? 0)),
+      salesDue: moneyText(customersDue),
+      monthSales: moneyText(monthSales._sum.total),
+      yearSales: moneyText(yearSales._sum.total),
+      totalReturn: moneyText(returns._sum.total),
+      monthReturn: moneyText(monthReturns._sum.total),
+      yearReturn: moneyText(yearReturns._sum.total),
       totalCustomers: String(customerCount),
       dueCustomers: String(dueCustomers),
-      customersDue: money(customersDue),
-      openingDue: money(openingDue),
+      customersDue: moneyText(customersDue),
+      openingDue: moneyText(openingDue),
     },
     products: {
       totalProducts: String(productCount),
       godownProducts: String(Number(stock[0]?.godown ?? 0)),
-      stockValue: money(stock[0]?.stockValue),
-      openingStockValue: money(openingStock[0]?.value),
-      cashInHand: money(cash),
-      cashAtBank: money(bank),
+      stockValue: moneyText(stock[0]?.stockValue),
+      openingStockValue: moneyText(openingStock[0]?.value),
+      cashInHand: moneyText(cash),
+      cashAtBank: moneyText(bank),
     },
     suppliers: {
       totalSuppliers: String(supplierCount),
       dueSuppliers: String(dueSuppliers),
-      suppliersDue: money(suppliersDue),
+      suppliersDue: moneyText(suppliersDue),
     },
     dealers: {
       totalDealers: String(dealers.length),
       dueDealers: String(dueDealers),
-      dealersDue: money(dealersDue),
+      dealersDue: moneyText(dealersDue),
     },
   };
 }

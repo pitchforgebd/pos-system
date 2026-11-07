@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db/client";
 import { businessDate } from "@/core/time/business-date";
 import { writeAudit } from "@/modules/auth/audit";
-import { decimalString } from "@/modules/inventory/money";
+import { decimalString } from "@/core/money";
 
 export async function listBarcodes(organizationId: string) {
   const rows = await prisma.productBarcode.findMany({

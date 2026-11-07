@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db/client";
 import { businessDate } from "@/core/time/business-date";
-import { decimalString } from "@/modules/inventory/money";
+import { decimalString } from "@/core/money";
 
 export async function listHandovers(organizationId: string, branchId: string) {
   const rows = await prisma.cashHandover.findMany({

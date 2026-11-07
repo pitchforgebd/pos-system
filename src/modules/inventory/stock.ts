@@ -3,7 +3,7 @@ import { Prisma, type StockMovementType } from "@prisma/client";
 import { RuleError, type RuleStatus } from "@/core/errors/rule-error";
 
 import { prisma } from "@/lib/db/client";
-import { decimalString } from "@/modules/inventory/money";
+import { decimalString } from "@/core/money";
 
 export class StockRuleError extends RuleError {
   constructor(message: string, status: RuleStatus = 422) {

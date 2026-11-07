@@ -8,7 +8,7 @@ import { occurredDate } from "@/lib/format/date";
 import { allocateNumber } from "@/modules/documents/numbers";
 import { writeAudit } from "@/modules/auth/audit";
 import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
-import { decimalString, parseMoney, parseQuantity } from "@/modules/inventory/money";
+import { decimalString, parseMoney, parseQuantity } from "@/core/money";
 import { addExpiryLots, applyMovement, currentUnitCost, resolveWarehouse, StockRuleError, type ConsumedLot } from "@/modules/inventory/stock";
 
 type Failure = { ok: false; status: 404 | 409 | 422; code: "NOT_FOUND" | "CONFLICT" | "BUSINESS_RULE"; message: string };

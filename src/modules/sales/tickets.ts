@@ -4,7 +4,7 @@ import { businessDate } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { hashPayload, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
-import { decimalString, parseQuantity } from "@/modules/inventory/money";
+import { decimalString, parseQuantity } from "@/core/money";
 import { StockRuleError } from "@/modules/inventory/stock";
 
 type Actor = {
