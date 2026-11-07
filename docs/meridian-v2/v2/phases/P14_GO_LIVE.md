@@ -19,9 +19,9 @@
 
 1. লাইভ DB-র শেষ ব্যাকআপ নেওয়া ও আলাদা রাখা।
 2. cPanel-এ নতুন DB + নতুন শক্ত পাসওয়ার্ডের DB ইউজার; পুরনো DB ইউজারের পাসওয়ার্ড বদল।
-3. `.env`: নতুন `DATABASE_URL`, নতুন `AUTH_SECRET`, `TRUST_PROXY=1`, `SEED_DEMO` নেই।
+3. `.env`: নতুন `DATABASE_URL`, নতুন `AUTH_SECRET`, `TRUST_PROXY=1`, `SEED_DEMO` নেই। **`APP_URL=https://…` বিল্ডের সময়ও পরিবেশে থাকতে হবে** (সার্ভারের `.env` ফাইলে রাখলে `build:cpanel` সেটা পড়ে): নিরাপত্তা হেডার (HSTS সহ) বিল্ডের সময়ই `routes-manifest.json`-এ স্থির হয়; রানটাইমে `APP_URL` বদলালে HSTS আসে না (লোকালে যাচাই করা)।
 4. `git pull` (main) → `npm install --include=dev` → `npx prisma migrate deploy` → `npx prisma db seed` (শক্ত owner পাসওয়ার্ড) → `build:cpanel` → Restart।
-5. `/api/health`, `/login` যাচাই।
+5. `/api/health`, `/login` যাচাই; `curl -I https://…/api/health`-এ `Strict-Transport-Security` আছে ও `x-powered-by` নেই।
 6. **সেটআপ উইজার্ড** (মালিক): দোকানের তথ্য, ব্রাঞ্চ/গুদাম, ব্যাংক ও মোবাইল অ্যাকাউন্ট (opening ব্যালান্স), ক্যাশ opening, ব্যবহারকারী ও রোল, প্রাইস লেভেল, কুরিয়ার, খরচের খাত।
 7. **opening ডাটা ইমপোর্ট:** পণ্য CSV → opening স্টক CSV (avg cost) → কাস্টমার বাকি → Vendor বাকি → স্থায়ী সম্পদ। প্রতিটির পরে রিকনসিলিয়েশন পেজ ✔ ও মালিকের খাতার সাথে মোট মিলানো।
 8. পুরনো অ্যাডমিন অ্যাকাউন্ট ও দুর্বল পাসওয়ার্ড যেন না থাকে — যাচাই।
@@ -30,7 +30,7 @@
 ## DoD
 
 - [ ] e2e সবুজ; ব্যাকআপ রিস্টোর ড্রিল সফল (আলাদা DB-তে)
-- [ ] লাইভে নতুন DB, কোনো DEMO ডাটা নেই, শক্ত পাসওয়ার্ড
+- [ ] লাইভে নতুন DB, কোনো DEMO ডাটা নেই, শক্ত পাসওয়ার্ড; `/api/health`-এ HSTS আছে
 - [ ] opening ডাটার পর রিকনসিলিয়েশন সব ✔
 - [ ] `08_AUDIT_TRACEABILITY.md`-এর সব আইটেম ✔ বা কারণসহ "পরে"
 - [ ] কমিট `v2(P14)`, `main`-এ মার্জ, ট্যাগ `v2.0.0`
