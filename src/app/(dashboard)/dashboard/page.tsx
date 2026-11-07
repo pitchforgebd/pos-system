@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { businessDate } from "@/core/time/business-date";
 
 import { DashboardView } from "@/components/dashboard/dashboard-view";
 import { getSession } from "@/modules/auth/current-session";
@@ -40,7 +41,7 @@ function previewView(value: string | undefined): "ready" | "loading" | "error" |
 }
 
 function today() {
-  return new Date().toISOString().slice(0, 10);
+  return businessDate();
 }
 
 export default async function DashboardPage({

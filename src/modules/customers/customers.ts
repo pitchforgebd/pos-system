@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { businessDate, dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
@@ -22,11 +23,11 @@ const customerSelect = {
 } as const;
 
 function dateString(value: Date) {
-  return value.toISOString().slice(0, 10);
+  return dateOnly(value);
 }
 
 function today() {
-  return new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`);
+  return new Date(`${businessDate()}T00:00:00.000Z`);
 }
 
 export async function outstandingReceivable(

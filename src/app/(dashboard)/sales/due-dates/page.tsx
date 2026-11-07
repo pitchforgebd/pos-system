@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { dateOnly } from "@/core/time/business-date";
 import { redirect } from "next/navigation";
 
 import { DataTable } from "@/components/ui/data-table";
@@ -17,7 +18,7 @@ const buckets = [
 ] as const;
 
 function iso(date: Date) {
-  return date.toISOString().slice(0, 10);
+  return dateOnly(date);
 }
 
 function windowFor(bucket: string) {

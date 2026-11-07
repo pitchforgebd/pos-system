@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { dateOnly } from "@/core/time/business-date";
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/client";
@@ -213,7 +214,7 @@ export async function listDirectReturns(organizationId: string, branchId: string
     quantity: decimalString(row.quantity, 4),
     refundAmount: decimalString(row.refundAmount, 2),
     method: row.method,
-    occurredOn: row.occurredOn.toISOString().slice(0, 10),
+    occurredOn: dateOnly(row.occurredOn),
   }));
 }
 

@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { businessDate, dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
@@ -9,7 +10,7 @@ import { occurredDate } from "@/lib/format/date";
 type Failure = { ok: false; status: 404 | 422; code: "NOT_FOUND" | "BUSINESS_RULE"; message: string };
 
 function dateString(value: Date) {
-  return value.toISOString().slice(0, 10);
+  return dateOnly(value);
 }
 
 function failure(error: unknown): Failure | null {
@@ -157,7 +158,7 @@ export async function listInstallments(organizationId: string) {
       invoice: { select: { number: true } },
     },
   });
-  const today = new Date().toISOString().slice(0, 10);
+  const today = businessDate();
   return rows.map((row) => {
     const dueOn = dateString(row.dueOn);
     const displayStatus = row.status === "PAID" ? "PAID" : dueOn < today ? "OVERDUE" : "OPEN";

@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { decimalString } from "@/modules/inventory/money";
@@ -69,7 +70,7 @@ export async function salesReport(scope: ReportScope) {
     count: sum._count,
     rows: rows.map((row) => ({
       id: row.id,
-      occurredOn: row.occurredOn.toISOString().slice(0, 10),
+      occurredOn: dateOnly(row.occurredOn),
       number: row.invoice?.number ?? "Sale",
       party: row.customer?.name ?? "Walk-in",
       total: money(row.total),
@@ -98,7 +99,7 @@ export async function purchaseReport(scope: ReportScope) {
     count: sum._count,
     rows: rows.map((row) => ({
       id: row.id,
-      occurredOn: row.occurredOn.toISOString().slice(0, 10),
+      occurredOn: dateOnly(row.occurredOn),
       number: row.number ?? "Purchase",
       party: row.supplier.name,
       total: money(row.total),
@@ -216,7 +217,7 @@ async function accountMovement(scope: ReportScope, code: string) {
     count: sum._count,
     rows: rows.map((row) => ({
       id: row.id,
-      occurredOn: row.journal.occurredOn.toISOString().slice(0, 10),
+      occurredOn: dateOnly(row.journal.occurredOn),
       reference: row.journal.number ?? row.journal.description ?? "Journal",
       debit: money(row.debit),
       credit: money(row.credit),
@@ -290,7 +291,7 @@ export async function dayBook(scope: ReportScope) {
     count: sum._count,
     rows: rows.map((row) => ({
       id: row.id,
-      occurredOn: row.journal.occurredOn.toISOString().slice(0, 10),
+      occurredOn: dateOnly(row.journal.occurredOn),
       reference: row.journal.number ?? row.journal.description ?? "Journal",
       account: `${row.account.code} ${row.account.name}`,
       debit: money(row.debit),
@@ -454,7 +455,7 @@ export async function dueSaleReport(scope: ReportScope) {
     }
     return [{
       id: row.id,
-      occurredOn: row.occurredOn.toISOString().slice(0, 10),
+      occurredOn: dateOnly(row.occurredOn),
       number: row.invoice?.number ?? "Sale",
       party: row.customer?.name ?? "Walk-in",
       total: money(dec(row.total)),

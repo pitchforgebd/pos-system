@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { businessDate, dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
@@ -440,7 +441,7 @@ export async function listJournals(organizationId: string, branchId: string) {
       number: row.number,
       description: row.description,
       status: row.status,
-      occurredOn: row.occurredOn.toISOString().slice(0, 10),
+      occurredOn: dateOnly(row.occurredOn),
       debit: decimalString(debit, 2),
       credit: decimalString(credit, 2),
       balanced: debit.eq(credit),
@@ -474,7 +475,7 @@ export async function getJournal(organizationId: string, branchId: string, id: s
     number: row.number,
     description: row.description,
     status: row.status,
-    occurredOn: row.occurredOn.toISOString().slice(0, 10),
+    occurredOn: dateOnly(row.occurredOn),
     balanced: debit.eq(credit),
     reversible: row.status === "POSTED" && row.reversals.length === 0 && !source,
     reversals: row.reversals.map((reversal) => ({ id: reversal.id, number: reversal.number })),
@@ -499,7 +500,7 @@ export async function listExpenses(organizationId: string, branchId: string) {
     id: row.id,
     number: row.number,
     amount: decimalString(row.amount, 2),
-    occurredOn: row.occurredOn.toISOString().slice(0, 10),
+    occurredOn: dateOnly(row.occurredOn),
     accountCode: row.account.code,
     accountName: row.account.name,
     note: row.note,
@@ -519,7 +520,7 @@ export async function listVouchers(organizationId: string, branchId: string) {
     number: row.number,
     voucherType: row.voucherType,
     amount: decimalString(row.amount, 2),
-    occurredOn: row.occurredOn.toISOString().slice(0, 10),
+    occurredOn: dateOnly(row.occurredOn),
     status: row.status,
     journalId: row.journalId,
   }));
@@ -561,7 +562,7 @@ export async function accountStatement(input: { organizationId: string; branchId
     running = running.plus(row.debit).minus(row.credit);
     return {
       id: row.id,
-      occurredOn: row.journal.occurredOn.toISOString().slice(0, 10),
+      occurredOn: dateOnly(row.journal.occurredOn),
       reference: row.journal.number ?? row.journal.description ?? "Journal",
       debit: decimalString(row.debit, 2),
       credit: decimalString(row.credit, 2),
@@ -612,7 +613,7 @@ export async function listCashBankLines(organizationId: string, branchId: string
   });
   return rows.map((row) => ({
     id: row.id,
-    occurredOn: row.journal.occurredOn.toISOString().slice(0, 10),
+    occurredOn: dateOnly(row.journal.occurredOn),
     reference: row.journal.number ?? row.journal.description ?? "Journal",
     description: row.journal.description,
     accountCode: row.account.code,
@@ -1076,11 +1077,11 @@ export async function createBankAccount(
       });
       let number: string | null = null;
       if (opening.gt(0)) {
-        number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", year: documentYear(new Date().toISOString().slice(0, 10)) });
+        number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", year: documentYear(businessDate()) });
         await postBalancedJournal(tx, {
           organizationId: input.organizationId,
           branchId: input.branchId,
-          occurredOn: occurredDate(new Date().toISOString().slice(0, 10)),
+          occurredOn: occurredDate(businessDate()),
           description: `Bank opening ${name} ${number}`,
           createdById: input.userId,
           lines: [

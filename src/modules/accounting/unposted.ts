@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/client";
+import { businessDate, dateOnly } from "@/core/time/business-date";
 import { decimalString } from "@/modules/inventory/money";
 
 export async function listIncomeRows(organizationId: string, branchId: string) {
@@ -12,7 +13,7 @@ export async function listIncomeRows(organizationId: string, branchId: string) {
     id: row.id,
     category: row.category ?? "",
     amount: decimalString(row.amount, 2),
-    occurredOn: row.occurredOn.toISOString().slice(0, 10),
+    occurredOn: dateOnly(row.occurredOn),
     posted: row.journalId ? "Posted" : "Not posted",
   }));
 }
@@ -26,7 +27,7 @@ export async function listLoanMovements(organizationId: string, branchId: string
   });
   return rows.map((row) => ({
     id: row.id,
-    occurredOn: row.journal.occurredOn.toISOString().slice(0, 10),
+    occurredOn: dateOnly(row.journal.occurredOn),
     number: row.journal.number ?? "",
     description: row.journal.description ?? "",
     debit: decimalString(row.debit, 2),
@@ -44,7 +45,7 @@ export async function listLoanRows(organizationId: string) {
   return rows.map((row) => ({
     id: row.id,
     lender: row.lender,
-    createdOn: row.createdAt.toISOString().slice(0, 10),
+    createdOn: businessDate(row.createdAt),
   }));
 }
 
@@ -60,7 +61,7 @@ export async function listCapitalRows(organizationId: string, branchId: string) 
     capitalType: row.capitalType,
     ownerName: row.ownerName,
     amount: decimalString(row.amount, 2),
-    occurredOn: row.occurredOn.toISOString().slice(0, 10),
+    occurredOn: dateOnly(row.occurredOn),
     posted: row.journalId ? "Posted" : "Not posted",
   }));
 }

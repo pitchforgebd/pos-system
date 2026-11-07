@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isoDate } from "@/core/time/iso-date";
 
 import { clientIp, jsonError, jsonOk, rejectCrossSite } from "@/lib/api/http";
 import { requirePermission, requireSession } from "@/modules/access/guard";
@@ -6,7 +7,7 @@ import { createCrmActivity } from "@/modules/customers/crm";
 
 const bodySchema = z.object({
   contactId: z.string().uuid(),
-  occurredOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  occurredOn: isoDate,
   note: z.string().trim().min(1).max(255),
 });
 

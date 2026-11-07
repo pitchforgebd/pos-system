@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
@@ -229,7 +230,7 @@ export async function listPurchaseReturns(organizationId: string, branchId: stri
     number: row.number,
     status: row.status,
     total: decimalString(row.total, 2),
-    occurredOn: row.occurredOn.toISOString().slice(0, 10),
+    occurredOn: dateOnly(row.occurredOn),
     source: row.purchase.number,
     supplierName: row.purchase.supplier.name,
   }));

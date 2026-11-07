@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { businessDate } from "@/core/time/business-date";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +9,7 @@ import { Input } from "@/components/ui/input";
 type Party = { id: string; name: string; phone: string | null; outstanding: string };
 
 function today() {
-  return new Date().toISOString().slice(0, 10);
+  return businessDate();
 }
 
 function hasDue(value: string) {

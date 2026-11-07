@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isoDate } from "@/core/time/iso-date";
 
 import { clientIp, jsonError, jsonOk, rejectCrossSite } from "@/lib/api/http";
 import { requirePermission, requireSession } from "@/modules/access/guard";
@@ -8,7 +9,7 @@ const bodySchema = z.object({
   customerId: z.string().uuid(),
   invoiceId: z.string().uuid(),
   amount: z.string(),
-  dueOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  dueOn: isoDate,
   interestPercent: z.string().optional(),
 });
 

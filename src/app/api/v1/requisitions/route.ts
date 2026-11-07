@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isoDate } from "@/core/time/iso-date";
 
 import { jsonError, jsonOk, rejectCrossSite } from "@/lib/api/http";
 import { requirePermission, requireSession } from "@/modules/access/guard";
@@ -6,7 +7,7 @@ import { createRequisition, listRequisitions } from "@/modules/commerce/requisit
 import { idempotencyKey, stockActor } from "@/modules/inventory/actor";
 
 const bodySchema = z.object({
-  occurredOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  occurredOn: isoDate,
   note: z.string().trim().min(1).max(255),
 });
 

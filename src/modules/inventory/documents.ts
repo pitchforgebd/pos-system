@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { occurredDate } from "@/lib/format/date";
@@ -428,8 +429,8 @@ export async function listExpiry(input: {
     category: row.product.category?.name ?? "",
     lot: row.lot,
     quantity: decimalString(row.quantity, 4),
-    manufacturedOn: row.manufacturedOn?.toISOString().slice(0, 10) ?? null,
-    expiresOn: row.expiresOn.toISOString().slice(0, 10),
+    manufacturedOn: row.manufacturedOn ? dateOnly(row.manufacturedOn) : null,
+    expiresOn: dateOnly(row.expiresOn),
     status: row.expiresOn < today ? "EXPIRED" : "IN_DATE",
   }));
 }
@@ -512,7 +513,7 @@ export async function writeOffExpiry(input: Actor & { batchId: string; quantity:
 }
 
 function day(value: Date) {
-  return value.toISOString().slice(0, 10);
+  return dateOnly(value);
 }
 
 export async function listDamageRecords(organizationId: string, branchId: string) {

@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { businessDate } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { hashPayload, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
@@ -104,7 +105,7 @@ export async function listHeldTickets(organizationId: string, branchId: string) 
   });
   return rows.map((row) => ({
     id: row.id,
-    createdOn: row.createdAt.toISOString().slice(0, 10),
+    createdOn: businessDate(row.createdAt),
     customerName: row.customer?.name ?? "Walk-in",
     lines: row.items.length,
     previewTotal: decimalString(

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isoDate } from "@/core/time/iso-date";
 
 import { jsonError, jsonOk, rejectCrossSite } from "@/lib/api/http";
 import { requirePermission, requireSession } from "@/modules/access/guard";
@@ -7,7 +8,7 @@ import { listPurchases, postPurchase } from "@/modules/purchasing/purchases";
 
 const bodySchema = z.object({
   supplierId: z.string().uuid(),
-  occurredOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  occurredOn: isoDate,
   warehouseId: z.string().uuid().optional(),
   paymentAmount: z.string().optional(),
   paymentMethod: z.enum(["CASH", "BANK"]).optional(),
@@ -19,8 +20,8 @@ const bodySchema = z.object({
         quantity: z.string(),
         unitCost: z.string(),
         lot: z.string().trim().min(1).max(64).optional(),
-        manufacturedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-        expiresOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        manufacturedOn: isoDate.optional(),
+        expiresOn: isoDate.optional(),
       }),
     )
     .min(1)

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isoDate } from "@/core/time/iso-date";
 
 import { jsonError, jsonOk, rejectCrossSite } from "@/lib/api/http";
 import { requirePermission, requireSession } from "@/modules/access/guard";
@@ -10,7 +11,7 @@ const bodySchema = z.object({
   quantity: z.string(),
   refundAmount: z.string(),
   method: z.enum(["CASH", "BANK"]),
-  occurredOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  occurredOn: isoDate,
 });
 
 export async function POST(request: Request) {

@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
@@ -439,7 +440,7 @@ export async function listRecharges(organizationId: string) {
     quantity: decimalString(row.quantity, 4),
     amount: decimalString(row.amount, 2),
     status: row.status,
-    requestedOn: row.requestedOn.toISOString().slice(0, 10),
+    requestedOn: dateOnly(row.requestedOn),
   }));
 }
 

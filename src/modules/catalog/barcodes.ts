@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/client";
+import { businessDate } from "@/core/time/business-date";
 import { writeAudit } from "@/modules/auth/audit";
 import { decimalString } from "@/modules/inventory/money";
 
@@ -68,7 +69,7 @@ export async function listBarcodePrints(organizationId: string) {
     const record = after as { barcode?: string; product?: string; copies?: number };
     return {
       id: row.id,
-      occurredOn: row.createdAt.toISOString().slice(0, 10),
+      occurredOn: businessDate(row.createdAt),
       barcode: record.barcode ?? "",
       product: record.product ?? "",
       copies: String(record.copies ?? ""),

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isoDate } from "@/core/time/iso-date";
 
 import { jsonError, jsonOk, rejectCrossSite } from "@/lib/api/http";
 import { postCapital } from "@/modules/accounting/books";
@@ -6,7 +7,7 @@ import { requirePermission, requireSession } from "@/modules/access/guard";
 import { idempotencyKey, stockActor } from "@/modules/inventory/actor";
 
 const bodySchema = z.object({
-  occurredOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  occurredOn: isoDate,
   capitalType: z.enum(["ADDED", "WITHDRAW"]),
   ownerName: z.string().trim().min(1).max(191),
   amount: z.string(),

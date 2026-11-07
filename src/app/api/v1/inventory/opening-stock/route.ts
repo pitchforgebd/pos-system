@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isoDate } from "@/core/time/iso-date";
 
 import { jsonError, jsonOk, rejectCrossSite } from "@/lib/api/http";
 import { requirePermission, requireSession } from "@/modules/access/guard";
@@ -11,12 +12,12 @@ const lineSchema = z.object({
   quantity: z.string(),
   unitCost: z.string().optional(),
   lot: z.string().trim().max(64).optional(),
-  manufacturedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  expiresOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  manufacturedOn: isoDate.optional(),
+  expiresOn: isoDate.optional(),
 });
 
 const bodySchema = z.object({
-  occurredOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  occurredOn: isoDate,
   warehouseId: z.string().uuid().optional(),
   lines: z.array(lineSchema).min(1).max(100),
 });

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isoDate } from "@/core/time/iso-date";
 
 import { jsonError, jsonOk, rejectCrossSite } from "@/lib/api/http";
 import { requirePermission, requireSession } from "@/modules/access/guard";
@@ -8,7 +9,7 @@ import { redeemLoyalty } from "@/modules/reference/extras";
 const bodySchema = z.object({
   customerId: z.string().uuid(),
   points: z.string(),
-  occurredOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  occurredOn: isoDate,
 });
 
 export async function POST(request: Request) {

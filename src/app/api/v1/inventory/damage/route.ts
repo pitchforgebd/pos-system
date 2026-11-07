@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isoDate } from "@/core/time/iso-date";
 
 import { jsonError, jsonOk, rejectCrossSite } from "@/lib/api/http";
 import { requirePermission, requireSession } from "@/modules/access/guard";
@@ -7,7 +8,7 @@ import { postDamage } from "@/modules/inventory/documents";
 
 const bodySchema = z.object({
   productId: z.string().uuid(),
-  occurredOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  occurredOn: isoDate,
   place: z.string().trim().min(1).max(191),
   lot: z.string().trim().max(64).optional(),
   purchasePrice: z.string(),

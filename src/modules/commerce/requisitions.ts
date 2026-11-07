@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
@@ -19,7 +20,7 @@ type Actor = {
 };
 
 function dateString(value: Date) {
-  return value.toISOString().slice(0, 10);
+  return dateOnly(value);
 }
 
 function failure(error: unknown): Failure | null {

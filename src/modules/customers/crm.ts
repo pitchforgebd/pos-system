@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/client";
+import { dateOnly } from "@/core/time/business-date";
 import { writeAudit } from "@/modules/auth/audit";
 
 export async function listAssignableUsers(organizationId: string) {
@@ -50,7 +51,7 @@ export async function listCrmActivities(organizationId: string) {
   });
   return rows.map((row) => ({
     id: row.id,
-    occurredOn: row.occurredOn.toISOString().slice(0, 10),
+    occurredOn: dateOnly(row.occurredOn),
     note: row.note,
     contactName: row.contact.name,
   }));

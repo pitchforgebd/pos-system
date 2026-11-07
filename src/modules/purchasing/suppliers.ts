@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
@@ -81,7 +82,7 @@ export async function getSupplier(organizationId: string, id: string) {
     ...present(row, await outstandingPayable(organizationId, id)),
     ledger: ledger.map((entry) => ({
       id: entry.id,
-      occurredOn: entry.occurredOn.toISOString().slice(0, 10),
+      occurredOn: dateOnly(entry.occurredOn),
       entryType: entry.entryType,
       debit: decimalString(entry.debit, 2),
       credit: decimalString(entry.credit, 2),

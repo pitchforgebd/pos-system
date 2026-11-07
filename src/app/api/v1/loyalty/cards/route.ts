@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isoDate } from "@/core/time/iso-date";
 
 import { clientIp, jsonError, jsonOk, rejectCrossSite } from "@/lib/api/http";
 import { requirePermission, requireSession } from "@/modules/access/guard";
@@ -9,8 +10,8 @@ const bodySchema = z.object({
   tierId: z.string().uuid().nullable().optional(),
   number: z.string().trim().min(1).max(64),
   cardType: z.string().trim().min(1).max(32),
-  issuedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  expiresOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  issuedOn: isoDate,
+  expiresOn: isoDate.nullable().optional(),
 });
 
 export async function GET(request: Request) {

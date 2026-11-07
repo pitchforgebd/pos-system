@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { decimalString } from "@/modules/inventory/money";
@@ -243,10 +244,10 @@ function weekList(
   end: Date,
   rows: Array<{ occurredOn: Date; _sum: { total: Prisma.Decimal | null } }>,
 ) {
-  const totals = new Map(rows.map((row) => [row.occurredOn.toISOString().slice(0, 10), new Prisma.Decimal(row._sum.total ?? 0)]));
+  const totals = new Map(rows.map((row) => [dateOnly(row.occurredOn), new Prisma.Decimal(row._sum.total ?? 0)]));
   const days: { date: string; total: string }[] = [];
   for (let cursor = new Date(end); cursor >= start; cursor = new Date(cursor.getTime() - 86_400_000)) {
-    const key = cursor.toISOString().slice(0, 10);
+    const key = dateOnly(cursor);
     days.push({ date: dayLabel(key), total: money(totals.get(key) ?? 0) });
   }
   return days;

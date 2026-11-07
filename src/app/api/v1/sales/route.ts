@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isoDate } from "@/core/time/iso-date";
 
 import { jsonError, jsonOk, rejectCrossSite } from "@/lib/api/http";
 import { requirePermission, requireSession } from "@/modules/access/guard";
@@ -17,7 +18,7 @@ const lineSchema = z.object({
 });
 
 const bodySchema = z.object({
-  occurredOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  occurredOn: isoDate,
   customerId: z.string().uuid().optional(),
   ticketId: z.string().uuid().optional(),
   warehouseId: z.string().uuid().optional(),

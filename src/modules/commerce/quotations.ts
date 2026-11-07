@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
@@ -21,7 +22,7 @@ type Actor = {
 };
 
 function dateString(value: Date) {
-  return value.toISOString().slice(0, 10);
+  return dateOnly(value);
 }
 
 function failure(error: unknown): Failure | null {
@@ -321,7 +322,7 @@ export async function convertQuotation(input: {
     idempotencyKey: input.idempotencyKey,
     ip: input.ip ?? "127.0.0.1",
     userAgent: input.userAgent ?? null,
-    occurredOn: current.occurredOn.toISOString().slice(0, 10),
+    occurredOn: dateOnly(current.occurredOn),
     customerId: current.customerId,
     paymentAmount: "0.00",
     allowPriceOverride: true,

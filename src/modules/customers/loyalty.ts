@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
@@ -90,8 +91,8 @@ export async function listLoyaltyCards(organizationId: string) {
     number: row.number,
     cardType: row.cardType,
     status: row.status,
-    issuedOn: row.issuedOn.toISOString().slice(0, 10),
-    expiresOn: row.expiresOn ? row.expiresOn.toISOString().slice(0, 10) : null,
+    issuedOn: dateOnly(row.issuedOn),
+    expiresOn: row.expiresOn ? dateOnly(row.expiresOn) : null,
     customerName: row.customer.name,
     tierName: row.tier?.name ?? null,
   }));
@@ -181,7 +182,7 @@ export async function listLoyaltyTransactions(organizationId: string) {
   });
   return rows.map((row) => ({
     id: row.id,
-    occurredOn: row.occurredOn.toISOString().slice(0, 10),
+    occurredOn: dateOnly(row.occurredOn),
     customerName: row.customer.name,
     entryType: row.entryType,
     points: decimalString(row.points, 4),

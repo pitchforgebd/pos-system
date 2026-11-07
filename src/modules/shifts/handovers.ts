@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/client";
+import { businessDate } from "@/core/time/business-date";
 import { decimalString } from "@/modules/inventory/money";
 
 export async function listHandovers(organizationId: string, branchId: string) {
@@ -20,7 +21,7 @@ export async function listHandovers(organizationId: string, branchId: string) {
     fromName: row.fromUser.name,
     toName: row.toUser.name,
     amount: decimalString(row.amount, 2),
-    createdOn: row.createdAt.toISOString().slice(0, 10),
+    createdOn: businessDate(row.createdAt),
     shiftId: row.shift.id,
     status: row.shift.status,
   }));

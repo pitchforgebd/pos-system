@@ -1,15 +1,6 @@
-const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+import { isIsoDate } from "@/core/time/business-date";
 
-/** True for a real calendar day written as YYYY-MM-DD (rejects 2026-02-31). */
-export function isIsoDate(value: string) {
-  const match = ISO_DATE.exec(value);
-  if (!match) {
-    return false;
-  }
-  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
-}
+export { isIsoDate };
 
 /**
  * The one way to turn a business date (YYYY-MM-DD) into the Date stored in DATE columns:

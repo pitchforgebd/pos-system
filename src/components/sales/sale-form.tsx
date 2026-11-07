@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { businessDate } from "@/core/time/business-date";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -42,7 +43,7 @@ type CartLine = {
 };
 
 function today() {
-  return new Date().toISOString().slice(0, 10);
+  return businessDate();
 }
 
 const zero = BigInt(0);
