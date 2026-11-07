@@ -13,7 +13,7 @@
     "start:cpanel": "node server.js",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "node --experimental-strip-types --import ./src/test/register.mjs --test \"src/**/*.test.ts\""
+    "test": "node --experimental-strip-types --import ./src/test/register.mjs --test --test-concurrency=1 \"src/**/*.test.ts\""
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

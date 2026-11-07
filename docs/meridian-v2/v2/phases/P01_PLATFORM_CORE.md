@@ -21,12 +21,13 @@
    - স্ট্যাটিক টেস্ট: কোনো কম্পোনেন্টে সরাসরি `crypto.randomUUID()` বা idempotency হেডার হাতে বসানো নেই।
 9. **শেয়ার্ড পেজিনেশন** (B11, LV-3): `listQuery({ page, pageSize, sort })` + `Pagination` কম্পোনেন্ট; ডিফল্ট সাজানো `businessDate desc, number desc`।
 10. **ডকুমেন্ট নম্বর** (D10, I12): ধরন + অর্থবছর; বিদ্যমান allocator বজায়, ফরম্যাট বদল।
-11. **N21 — নতুন stock row-এর deadlock ঠিক করা ও টেস্টের সমান্তরালতা ফিরিয়ে আনা** (task 5-এর `runTx` তৈরির পরে করবে)
-    - **পটভূমি:** P00-এ `npm test` সাময়িকভাবে `--test-concurrency=1`-এ চলছে, কারণ `inventory.test.ts`-এর `phase 05 stock and products` সমান্তরাল রানে মাঝে মাঝে `applyMovement` → `stockBalance.create`-এ "write conflict or a deadlock" (Prisma P2034) দিয়ে ব্যর্থ হয় (P00-এ ৪ রানে ১ বার)। এটা আসল বাগ: প্রোডাকশনেও দুজন একসাথে নতুন (পণ্য, গুদাম) stock row বানালে ঘটতে পারে। `--test-concurrency=1` শুধু লক্ষণ ঢাকে।
-    - **ধাপ ১ — আগে ব্যর্থ টেস্ট:** P00 হারনেসের `concurrently(10, …)` দিয়ে একই নতুন (পণ্য, গুদাম) key-তে ১০টি সমান্তরাল stock-in; সাথে `--test-concurrency=1` ছাড়া পূর্ণ স্যুট বারবার চালিয়ে ব্যর্থতা দেখাও। ব্যর্থ হতে **দেখিয়ে** তারপর ফিক্স।
-    - **ধাপ ২ — ফিক্স:** `applyMovement`-এ নতুন row `INSERT … ON DUPLICATE KEY UPDATE` (no-op আপডেট), তারপর `SELECT … FOR UPDATE` (`01_ARCHITECTURE.md` §৪); পুরো পোস্টিং `runTx`-এর ভেতরে, যাতে deadlock (1213)/P2034-এ backoff-সহ রিট্রাই হয়; লক-ক্রম (productId, warehouseId) অনুযায়ী।
+11. **N21 — stock row ও টেস্টের deadlock ঠিক করা এবং টেস্টের সমান্তরালতা ফিরিয়ে আনা** (task 5-এর `runTx` তৈরির পরে করবে)
+    - **পটভূমি:** P00-এ `npm test` সাময়িকভাবে `--test-concurrency=1`-এ চলছে, কারণ সমান্তরাল রানে মাঝে মাঝে "write conflict or a deadlock" (Prisma P2034) ব্যর্থতা আসে: `stockBalance.create`-এ (`inventory.test.ts`, import ও damage-expiry টেস্টে) এবং ক্লিনআপের `journalLine.deleteMany`-এ। খালি DB-তে ১৬টি সমান্তরাল রানের ৫টিতে, প্রতিবার ভিন্ন টেস্টে। InnoDB-র deadlock রেকর্ডে ধরা পড়া দুই পক্ষ: এক টেস্টের ক্লিনআপ `DELETE FROM journal_lines WHERE organizationId=…` বনাম অন্য টেস্টের `INSERT INTO journal_lines` (`REPEATABLE-READ`, ছোট টেবিলে `PRIMARY` স্ক্যান)। **অপ্রমাণিত:** `stock_balances`-এর deadlock প্রোডাক্ট কোডের নিজস্ব race (দুজন একসাথে নতুন (পণ্য, গুদাম) row বানানো) নাকি টেস্ট-বনাম-টেস্ট সংঘর্ষ; ওটার দুই পক্ষ ধরা যায়নি। ধাপ ১ এটা নির্ধারণ করবে। `--test-concurrency=1` শুধু লক্ষণ ঢাকে।
+    - **ধাপ ১ — আগে ব্যর্থ টেস্ট, দুই ভাগে:** (ক) একটিমাত্র টেস্ট ফাইলের ভেতরে P00 হারনেসের `concurrently(10, …)` দিয়ে একই নতুন (পণ্য, গুদাম) key-তে ১০টি সমান্তরাল stock-in; অন্য ফাইলের ক্লিনআপ নেই, তাই এটা শুধু প্রোডাক্ট race দেখায়। (খ) `--test-concurrency=1` ছাড়া পূর্ণ স্যুট বারবার (ফাইলে-ফাইলে সংঘর্ষ)। কোনটা ব্যর্থ হয় তা **দেখিয়ে** নির্ধারণ করো: (ক) ব্যর্থ হলে প্রোডাক্ট বাগ (ধাপ ২); শুধু (খ) ব্যর্থ হলে টেস্ট-পরিবেশের সমস্যা (ধাপ ৪ক)।
+    - **ধাপ ২ — ফিক্স (শুধু (ক) ব্যর্থ হলে):** `applyMovement`-এ নতুন row `INSERT … ON DUPLICATE KEY UPDATE` (no-op আপডেট), তারপর `SELECT … FOR UPDATE` (`01_ARCHITECTURE.md` §৪); পুরো পোস্টিং `runTx`-এর ভেতরে, যাতে deadlock (1213)/P2034-এ backoff-সহ রিট্রাই হয়; লক-ক্রম (productId, warehouseId) অনুযায়ী।
     - **ধাপ ৩ — যাচাই:** ১০টি সমান্তরাল নতুন-row সবগুলো সফল; `stock_balances.quantity` = Σ `stock_ledgers`; ডুপ্লিকেট row বা ব্যর্থতা নেই।
-    - **ধাপ ৪ — concurrency ফেরানো:** `package.json`-এর `test` স্ক্রিপ্ট থেকে `--test-concurrency=1` সরাও; পূর্ণ স্যুট সমান্তরালে টানা ২০ বার সবুজ — ২০ রানের ফল দেখাও।
+    - **ধাপ ৪ক — টেস্ট-পরিবেশ:** হারনেসের ক্লিনআপ deadlock-মুক্ত করো (যেমন org-ভিত্তিক মোছা ইন্ডেক্স ধরে ছোট ব্যাচে, বা টেস্ট সেশনে `READ COMMITTED`); নইলে সমান্তরালতা ফেরালে (খ) আবার ব্যর্থ হবে।
+    - **ধাপ ৪ — concurrency ফেরানো:** `package.json`-এর `test` স্ক্রিপ্ট থেকে `--test-concurrency=1` সরাও; খালি DB-তে (শুধু migrate, সিড নয়) পূর্ণ স্যুট সমান্তরালে টানা ২০ বার সবুজ — ২০ রানের ফল দেখাও।
 
 ## টেস্ট (বাধ্যতামূলক)
 
@@ -42,6 +43,6 @@
 - [ ] সব টাকা/স্টকের ফর্ম `useSubmit`-এ; স্ট্যাটিক টেস্ট সবুজ
 - [ ] কোডে `toISOString().slice(0, 10)` শূন্য (grep প্রমাণ)
 - [ ] idempotency বাস্তবায়ন একটিই (grep প্রমাণ)
-- [ ] N21: নতুন stock row-এর race ঠিক (টাস্ক ১১-র ধাপ ১–৪ প্রমাণসহ); `--test-concurrency=1` সরানো; পূর্ণ স্যুট সমান্তরালে টানা ২০ বার সবুজ
+- [ ] N21: কারণ নির্ধারিত (টাস্ক ১১-র ধাপ ১) ও ঠিক (ধাপ ২ বা ৪ক) প্রমাণসহ; `--test-concurrency=1` সরানো; খালি DB-তে পূর্ণ স্যুট সমান্তরালে টানা ২০ বার সবুজ
 - [ ] staging-এ ব্রাউজারে: নেট বন্ধ করে POS সাবমিট → বার্তা আসে → নেট চালু করে আবার → একটিই সেল
 - [ ] typecheck, lint, test সবুজ; কমিট `v2(P01)`

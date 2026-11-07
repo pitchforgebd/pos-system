@@ -37,8 +37,18 @@ test("phase 04 access controls", async () => {
   const branchA = await prisma.branch.create({ data: { organizationId: orgA.id, name: "Granted" } });
   const branchDenied = await prisma.branch.create({ data: { organizationId: orgA.id, name: "Ungranted" } });
   const branchB = await prisma.branch.create({ data: { organizationId: orgB.id, name: "Other" } });
-  const sales = await prisma.permission.findUniqueOrThrow({ where: { code: "sales.view" } });
-  const usersView = await prisma.permission.findUniqueOrThrow({ where: { code: "users.view" } });
+  // The permission catalog is global and only `prisma db seed` fills it. Create what this test
+  // needs so it also runs on an empty database (CI runs migrations only, no seed).
+  const sales = await prisma.permission.upsert({
+    where: { code: "sales.view" },
+    update: {},
+    create: { code: "sales.view", module: "sales" },
+  });
+  const usersView = await prisma.permission.upsert({
+    where: { code: "users.view" },
+    update: {},
+    create: { code: "users.view", module: "users" },
+  });
   const roleA = await prisma.role.create({ data: { organizationId: orgA.id, name: "Cashier" } });
   await prisma.rolePermission.create({ data: { organizationId: orgA.id, roleId: roleA.id, permissionId: sales.id } });
   const ownerRole = await prisma.role.create({ data: { organizationId: orgA.id, name: "Owner test" } });
