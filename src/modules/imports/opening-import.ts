@@ -3,7 +3,7 @@ import { isIsoDate } from "@/lib/format/date";
 import { writeAudit } from "@/modules/auth/audit";
 import { headerMap, parseCsv } from "@/modules/imports/csv";
 import { safeImportName } from "@/modules/imports/files";
-import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
+import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { postOpeningStock, type StockLine } from "@/modules/inventory/documents";
 import { parseMoney, parseQuantity } from "@/core/money";
 import { StockRuleError } from "@/modules/inventory/stock";

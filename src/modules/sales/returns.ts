@@ -7,7 +7,7 @@ import { writeAudit } from "@/modules/auth/audit";
 import { postBalancedJournal } from "@/modules/accounting/post";
 import { outstandingReceivable } from "@/modules/customers/customers";
 import { allocateNumber, documentYear } from "@/modules/documents/numbers";
-import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
+import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { decimalString, money, parseQuantity, zero } from "@/core/money";
 import { applyMovement, StockRuleError } from "@/modules/inventory/stock";
 import { returnLineAmount } from "@/modules/returns/amount";

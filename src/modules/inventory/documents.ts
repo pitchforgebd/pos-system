@@ -7,7 +7,7 @@ import { prisma } from "@/lib/db/client";
 import { occurredDate } from "@/lib/format/date";
 import { allocateNumber } from "@/modules/documents/numbers";
 import { writeAudit } from "@/modules/auth/audit";
-import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
+import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { decimalString, parseMoney, parseQuantity } from "@/core/money";
 import { addExpiryLots, applyMovement, currentUnitCost, resolveWarehouse, StockRuleError, type ConsumedLot } from "@/modules/inventory/stock";
 

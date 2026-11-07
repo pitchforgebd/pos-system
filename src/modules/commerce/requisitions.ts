@@ -6,7 +6,7 @@ import { dateOnly } from "@/core/time/business-date";
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
 import { allocateNumber, documentYear } from "@/modules/documents/numbers";
-import { hashPayload, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
+import { hashPayload, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { StockRuleError } from "@/modules/inventory/stock";
 import { occurredDate } from "@/lib/format/date";
 

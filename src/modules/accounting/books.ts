@@ -7,7 +7,7 @@ import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
 import { PostingError, postBalancedJournal } from "@/modules/accounting/post";
 import { allocateNumber, documentYear } from "@/modules/documents/numbers";
-import { hashPayload, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
+import { hashPayload, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { decimalString, money, parseMoney, zero } from "@/core/money";
 import { isIsoDate, occurredDate } from "@/lib/format/date";
 

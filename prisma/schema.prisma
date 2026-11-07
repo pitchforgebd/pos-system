@@ -2269,6 +2269,8 @@ model IdempotencyKey {
   requestHash    String   @db.VarChar(64)
   entityType     String   @db.VarChar(64)
   entityId       String   @db.Char(36)
+  /// The answer the first request got. A repeated request is answered with exactly this (N24).
+  response       Json?
   createdAt      DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)

@@ -4,7 +4,7 @@ import { RuleError } from "@/core/errors/rule-error";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
-import { hashPayload, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
+import { hashPayload, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { decimalString, money, parseMoney, zero } from "@/core/money";
 import { StockRuleError } from "@/modules/inventory/stock";
 

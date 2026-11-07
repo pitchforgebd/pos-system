@@ -4,7 +4,7 @@ import { writeAudit } from "@/modules/auth/audit";
 import { createProduct } from "@/modules/catalog/products";
 import { headerMap, parseCsv, toCsv } from "@/modules/imports/csv";
 import { safeImportName } from "@/modules/imports/files";
-import { hashPayload, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
+import { hashPayload, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { decimalString } from "@/core/money";
 import { StockRuleError } from "@/modules/inventory/stock";
 
