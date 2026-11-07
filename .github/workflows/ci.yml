@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-password
+          MYSQL_DATABASE: meridian_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci-root-password"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      DATABASE_URL: mysql://root:ci-root-password@127.0.0.1:3306/meridian_ci
+      AUTH_SECRET: ci-only-secret-0123456789abcdef0123456789abcdef
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Most integration tests read DATABASE_URL from a .env file. Do not set NODE_ENV or an
+      # https APP_URL here: the test runner refuses to run against a production configuration.
+      - name: Write test .env
+        run: |
+          {
+            echo "DATABASE_URL=\"$DATABASE_URL\""
+            echo "AUTH_SECRET=\"$AUTH_SECRET\""
+            echo "APP_URL=\"http://localhost:3000\""
+          } > .env
+
+      - run: npx prisma generate
+
+      - run: npx prisma migrate deploy
+
+      - run: npm run typecheck
+
+      - run: npm run lint
+
+      - run: npm test
+
+      # Production builds with webpack (see docs/CPANEL.md).
+      - run: npm run build:cpanel

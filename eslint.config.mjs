@@ -10,8 +10,16 @@ const eslintConfig = defineConfig([
     files: ["server.js"],
     rules: { "@typescript-eslint/no-require-imports": "off" },
   },
+  {
+    // Product photos and the shop logo come from authenticated API routes. The next/image
+    // optimizer fetches on the server without the session cookie, so plain <img> is intended.
+    rules: { "@next/next/no-img-element": "off" },
+  },
   globalIgnores([
     ".next/**",
+    "coverage/**",
+    "storage/**",
+    "meridian-backups/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

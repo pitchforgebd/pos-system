@@ -13,7 +13,7 @@
     "start:cpanel": "node server.js",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "node --experimental-strip-types --import ./src/test/register.mjs --test src/lib/format/date.test.ts src/lib/format/money.test.ts src/lib/screens/registry.test.ts src/lib/db/schema.test.ts src/modules/auth/auth.test.ts src/modules/inventory/inventory.test.ts src/modules/purchasing/purchase.test.ts src/modules/sales/sale.test.ts src/modules/returns/return.test.ts src/modules/accounting/accounting.test.ts src/modules/customers/customer.test.ts src/modules/commerce/commerce.test.ts src/modules/shifts/shift.test.ts src/modules/sms/sms.test.ts src/modules/reports/report.test.ts src/modules/imports/import.test.ts src/modules/auth/security.test.ts src/modules/performance/performance.test.ts src/modules/qa/qa.test.ts"
+    "test": "node --experimental-strip-types --import ./src/test/register.mjs --test \"src/**/*.test.ts\""
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

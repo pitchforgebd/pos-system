@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -169,7 +169,9 @@ export function SaleForm({
   const productsRef = useRef(products);
   const extraRef = useRef<RegisterProduct[]>([]);
   const scanRef = useRef({ buffer: "", last: 0 });
-  productsRef.current = products;
+  useEffect(() => {
+    productsRef.current = products;
+  }, [products]);
 
   const grosses = cart.map((line) => lineCents(line.unitPrice, line.quantity));
   const gross = grosses.reduce((sum, line) => sum + line, zero);
@@ -224,7 +226,7 @@ export function SaleForm({
       .slice(0, 8);
   }, [customerQuery, customers]);
 
-  function addProduct(product: RegisterProduct) {
+  const addProduct = useCallback((product: RegisterProduct) => {
     setCart((current) => {
       const existing = current.find((line) => line.productId === product.id);
       if (!existing) {
@@ -252,9 +254,9 @@ export function SaleForm({
     });
     setBarcode("");
     setMessage("");
-  }
+  }, []);
 
-  function productForCode(code: string) {
+  const productForCode = useCallback((code: string) => {
     const needle = code.trim().toLowerCase();
     if (!needle) {
       return null;
@@ -262,7 +264,7 @@ export function SaleForm({
     return [...productsRef.current, ...extraRef.current].find(
       (item) => item.sku.toLowerCase() === needle || item.barcodes.some((value) => value.toLowerCase() === needle) || item.barcode.toLowerCase() === needle,
     ) ?? null;
-  }
+  }, []);
 
   function addBarcode() {
     const product = productForCode(barcode);
@@ -277,7 +279,7 @@ export function SaleForm({
     barcodeRef.current?.focus();
   }
 
-  async function lookupBarcode(code: string) {
+  const lookupBarcode = useCallback(async (code: string) => {
     const response = await fetch(`/api/v1/pos/barcode?code=${encodeURIComponent(code)}`);
     const body = (await response.json().catch(() => null)) as { data?: RegisterProduct } | null;
     if (!response.ok || !body?.data) {
@@ -289,11 +291,10 @@ export function SaleForm({
     extraRef.current = [body.data, ...extraRef.current.filter((item) => item.id !== body.data?.id)];
     addProduct(body.data);
     barcodeRef.current?.focus();
-  }
+  }, [addProduct]);
 
   useEffect(() => {
     barcodeRef.current?.focus();
-    const applyRef = { current: (code: string) => void lookupBarcode(code) };
     function onKey(event: KeyboardEvent) {
       if (event.ctrlKey || event.metaKey || event.altKey || event.key.length !== 1 && event.key !== "Enter" && event.key !== "Tab") {
         return;
@@ -322,7 +323,7 @@ export function SaleForm({
           barcodeRef.current?.focus();
           return;
         }
-        applyRef.current(code);
+        void lookupBarcode(code);
         return;
       }
       if (now - scan.last > 80) {
@@ -336,7 +337,7 @@ export function SaleForm({
     }
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, []);
+  }, [addProduct, lookupBarcode, productForCode]);
 
   function clearSale() {
     setCart([]);
@@ -423,7 +424,9 @@ export function SaleForm({
   }
 
   const submitRef = useRef(submit);
-  submitRef.current = submit;
+  useEffect(() => {
+    submitRef.current = submit;
+  });
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (event.key === "F9") {

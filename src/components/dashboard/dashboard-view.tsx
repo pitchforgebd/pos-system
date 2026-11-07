@@ -144,7 +144,9 @@ export function DashboardView({
                   body: JSON.stringify({ branchId: value }),
                 }).then((response) => {
                   if (response.ok) {
-                    window.location.assign(`/dashboard?date=${day}`);
+                    router.push(`/dashboard?date=${day}`);
+                    // The header and layout read the session branch, so reload their server data too.
+                    router.refresh();
                   }
                 });
               }}

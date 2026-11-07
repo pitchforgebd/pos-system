@@ -102,6 +102,12 @@ const required = [
   "requisitions",
   "document_sequences",
   "idempotency_keys",
+  "quotation_items",
+  "product_serials",
+  "warranty_claims",
+  "couriers",
+  "shipments",
+  "direct_returns",
 ];
 
 const frozenPermissions = [
