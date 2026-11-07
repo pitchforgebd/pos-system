@@ -1,5 +1,7 @@
 # Architecture
 
+> v2 কাজের জন্য `docs/meridian-v2/v2/` দেখুন; সংঘাতে v2 জিতবে। (For v2 work see `docs/meridian-v2/v2/`; where they conflict, v2 wins.)
+
 **Status:** Frozen  
 **Source:** `advanced_pos_erp_master_blueprint.md`  
 **Phase:** 00 — Architecture Freeze

@@ -1,5 +1,7 @@
 # Business Rules
 
+> v2 কাজের জন্য `docs/meridian-v2/v2/` দেখুন; সংঘাতে v2 জিতবে। (For v2 work see `docs/meridian-v2/v2/`; where they conflict, v2 wins.)
+
 **Status:** Frozen where the blueprint states a rule. Open where it does not.  
 **Phase:** 00 — Architecture Freeze
 
