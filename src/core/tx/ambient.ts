@@ -1,0 +1,25 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
+import type { Prisma } from "@prisma/client";
+
+// The "ambient" transaction: while runTx runs a function, the transaction is stored here for everything that function
+// awaits. The shared `prisma` client (src/lib/db/client.ts) then talks to that transaction, so a route can open one
+// transaction and every service it calls, and the audit row, join it (a nested runTx joins instead of opening another). This file imports nothing from the database
+// layer, so the client can import it without a cycle.
+export type Ambient = {
+  tx: Prisma.TransactionClient;
+};
+
+const storage = new AsyncLocalStorage<Ambient>();
+
+export function currentAmbient(): Ambient | undefined {
+  return storage.getStore();
+}
+
+export function currentTx(): Prisma.TransactionClient | undefined {
+  return storage.getStore()?.tx;
+}
+
+export function runInAmbient<T>(tx: Prisma.TransactionClient, fn: () => Promise<T>): Promise<T> {
+  return storage.run({ tx }, fn);
+}

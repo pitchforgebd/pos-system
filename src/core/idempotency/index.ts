@@ -76,6 +76,11 @@ export async function saveIdempotency(
   }
 }
 
+/** True for the error raised when another request with the same key committed first: run the whole request again. */
+export function isKeyRace(error: unknown): boolean {
+  return typeof error === "object" && error !== null && keyRaces.has(error);
+}
+
 function isReplay(result: unknown): result is { replayed: true } {
   return typeof result === "object" && result !== null && (result as { replayed?: unknown }).replayed === true;
 }
@@ -104,6 +109,6 @@ export async function idempotentTransaction<T>(run: (tx: Prisma.TransactionClien
       }
       return result;
     },
-    { retryIf: (error) => typeof error === "object" && error !== null && keyRaces.has(error) },
+    { retryIf: isKeyRace },
   );
 }

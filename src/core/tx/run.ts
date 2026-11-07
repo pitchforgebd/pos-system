@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 
-import { prisma } from "@/lib/db/client";
+import { currentAmbient, runInAmbient, type Ambient } from "@/core/tx/ambient";
+import { basePrisma } from "@/lib/db/client";
 
 export const TX_DEFAULTS = {
   /** A transaction may run this long. Prisma's own default is 5 seconds, too short for a big invoice or import. */
@@ -43,20 +44,32 @@ export function isDeadlock(error: unknown): boolean {
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+function pause(backoffMs: number, attempt: number) {
+  return sleep(backoffMs * 2 ** attempt + Math.floor(Math.random() * backoffMs));
+}
+
 /**
  * Runs `fn` in a database transaction with the application's limits (20 s, 5 s wait) and runs it again,
  * from the start, when the database picks it as the victim of a deadlock. Because `fn` can run more than
- * once, it must only touch the database through `tx` and must not send anything out (mail, SMS) itself.
+ * once, it must only touch the database and must not send anything out (mail, SMS) itself.
  * Every other error, including every business rule (RuleError), is thrown at once.
+ *
+ * While `fn` runs, the shared `prisma` client is this transaction (see ambient.ts). A runTx called inside another
+ * runTx does not open a second transaction: it joins the running one (and ignores its own options). Only the
+ * outermost runTx retries, and it retries the whole function.
  *
  * Take locks in one order everywhere (see lock-order.ts); that makes deadlocks rare, retries make them harmless.
  */
 export async function runTx<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>, options: TxOptions = {}): Promise<T> {
+  const ambient = currentAmbient();
+  if (ambient) {
+    return runNested(ambient, fn);
+  }
   const retries = options.retries ?? TX_DEFAULTS.retries;
   const backoffMs = options.backoffMs ?? TX_DEFAULTS.backoffMs;
   for (let attempt = 0; ; attempt += 1) {
     try {
-      return await prisma.$transaction(fn, {
+      return await basePrisma.$transaction((tx) => runInAmbient(tx, () => fn(tx)), {
         timeout: options.timeoutMs ?? TX_DEFAULTS.timeoutMs,
         maxWait: options.maxWaitMs ?? TX_DEFAULTS.maxWaitMs,
         ...(options.isolationLevel ? { isolationLevel: options.isolationLevel } : {}),
@@ -67,7 +80,16 @@ export async function runTx<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>,
         throw error;
       }
       options.onRetry?.(error, attempt + 1);
-      await sleep(backoffMs * 2 ** attempt + Math.floor(Math.random() * backoffMs));
+      await pause(backoffMs, attempt);
     }
   }
+}
+
+// A runTx inside a running transaction joins it. MySQL cannot take SAVEPOINT through Prisma (prepared statements), so
+// there is no partial undo: when the caller catches an error from the inner call and carries on, the inner writes stay.
+// What protects the data is the outer layer: a route that ends in an error answer, or throws, rolls everything back
+// (defineRoute), and a flow whose steps must succeed or fail on their own (an import, row by row) runs without a
+// route transaction so that each step gets a real transaction of its own.
+async function runNested<T>(ambient: Ambient, fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+  return fn(ambient.tx);
 }
