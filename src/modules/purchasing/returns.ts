@@ -1,9 +1,10 @@
 import { Prisma } from "@prisma/client";
+import { RuleError } from "@/core/errors/rule-error";
 import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
-import { PostingError, postBalancedJournal } from "@/modules/accounting/post";
+import { postBalancedJournal } from "@/modules/accounting/post";
 import { allocateNumber, documentYear } from "@/modules/documents/numbers";
 import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
 import { decimalString, parseQuantity } from "@/modules/inventory/money";
@@ -32,8 +33,8 @@ function zero() {
 }
 
 function failure(error: unknown): Failure | null {
-  if (error instanceof StockRuleError || error instanceof PostingError) {
-    const status = error instanceof StockRuleError ? error.status : 422;
+  if (error instanceof RuleError) {
+    const status = error instanceof RuleError ? error.status : 422;
     return {
       ok: false,
       status,

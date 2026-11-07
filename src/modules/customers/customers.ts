@@ -1,9 +1,10 @@
 import { Prisma } from "@prisma/client";
+import { RuleError } from "@/core/errors/rule-error";
 import { businessDate, dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
-import { PostingError, postBalancedJournal } from "@/modules/accounting/post";
+import { postBalancedJournal } from "@/modules/accounting/post";
 import { decimalString, parseMoney } from "@/modules/inventory/money";
 
 type Failure = { ok: false; status: 404 | 409 | 422; code: "NOT_FOUND" | "CONFLICT" | "BUSINESS_RULE"; message: string };
@@ -322,7 +323,7 @@ export async function createCustomer(input: {
     return created;
   });
   } catch (error) {
-    if (error instanceof PostingError) {
+    if (error instanceof RuleError) {
       return { ok: false as const, status: 422 as const, code: "BUSINESS_RULE" as const, message: error.message };
     }
     throw error;

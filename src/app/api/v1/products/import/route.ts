@@ -1,10 +1,10 @@
 import { z } from "zod";
+import { RuleError } from "@/core/errors/rule-error";
 
 import { clientIp, jsonError, jsonOk, rejectCrossSite } from "@/lib/api/http";
 import { requirePermission, requireSession } from "@/modules/access/guard";
 import { confirmProductImport, latestProductImport } from "@/modules/imports/product-import";
 import { idempotencyKey } from "@/modules/inventory/actor";
-import { StockRuleError } from "@/modules/inventory/stock";
 
 const bodySchema = z.object({
   fileName: z.string().trim().max(255).optional(),
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     }
     return jsonOk(result, "Operation completed", result.replayed ? 200 : 201);
   } catch (error) {
-    if (error instanceof StockRuleError) {
+    if (error instanceof RuleError) {
       return jsonError(error.status === 409 ? "CONFLICT" : "BUSINESS_RULE", error.message, error.status);
     }
     throw error;

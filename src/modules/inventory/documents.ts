@@ -1,5 +1,7 @@
 import { Prisma } from "@prisma/client";
-import { dateOnly } from "@/core/time/business-date";
+import { RuleError } from "@/core/errors/rule-error";
+import { businessDate, dateOnly } from "@/core/time/business-date";
+import { assertPostable } from "@/core/time/period";
 
 import { prisma } from "@/lib/db/client";
 import { occurredDate } from "@/lib/format/date";
@@ -32,7 +34,7 @@ type Actor = {
 };
 
 function failure(error: unknown): Failure | null {
-  if (error instanceof StockRuleError) {
+  if (error instanceof RuleError) {
     return {
       ok: false,
       status: error.status,
@@ -84,6 +86,7 @@ async function postInbound(
       if (existing) {
         return { id: existing.entityId, replayed: true };
       }
+      await assertPostable(tx, { organizationId: input.organizationId }, input.businessDate);
       const warehouse = await warehouseOrThrow(input.organizationId, input.branchId, input.warehouseId);
       const header =
         kind === "OPENING"
@@ -170,7 +173,7 @@ async function postInbound(
     }
     return { ok: true as const, id: data.id, replayed: data.replayed };
   } catch (error) {
-    if (error instanceof StockRuleError && error.status === 409) {
+    if (error instanceof RuleError && error.status === 409) {
       return { ok: false as const, status: 409 as const, code: "CONFLICT" as const, message: error.message };
     }
     const mapped = failure(error);
@@ -213,6 +216,7 @@ export async function postAdjustment(
       if (existing) {
         return { id: existing.entityId, replayed: true };
       }
+      await assertPostable(tx, { organizationId: input.organizationId }, businessDate());
       const warehouse = await warehouseOrThrow(input.organizationId, input.branchId, input.warehouseId);
       const parsed = lineQuantity({ productId: input.productId, quantity: input.quantity });
       const row = await tx.stockAdjustment.create({
@@ -266,7 +270,7 @@ export async function postAdjustment(
     }
     return { ok: true as const, id: data.id, replayed: data.replayed };
   } catch (error) {
-    if (error instanceof StockRuleError && error.status === 409) {
+    if (error instanceof RuleError && error.status === 409) {
       return { ok: false as const, status: 409 as const, code: "CONFLICT" as const, message: error.message };
     }
     const mapped = failure(error);
@@ -325,6 +329,7 @@ export async function postDamage(
       if (existing) {
         return { id: existing.entityId, replayed: true };
       }
+      await assertPostable(tx, { organizationId: input.organizationId }, input.businessDate);
       const warehouse = await warehouseOrThrow(input.organizationId, input.branchId, input.warehouseId);
       const row = await tx.damageRecord.create({
         data: {
@@ -460,6 +465,7 @@ export async function writeOffExpiry(input: Actor & { batchId: string; quantity:
       if (existing) {
         return { id: batch.id, quantity: decimalString(batch.quantity, 4), replayed: true };
       }
+      await assertPostable(tx, { organizationId: input.organizationId }, businessDate());
       if (quantity.gt(batch.quantity)) {
         throw new StockRuleError("The write-off quantity is greater than the lot quantity.");
       }
@@ -615,6 +621,7 @@ export async function postTransfer(
         });
         return { id: existing.entityId, number: stored?.number ?? null, replayed: true };
       }
+      await assertPostable(tx, { organizationId: input.organizationId }, businessDate());
       const fromWarehouse = await tx.warehouse.findFirst({
         where: { id: input.fromWarehouseId, organizationId: input.organizationId, branchId: input.fromBranchId, status: "ACTIVE" },
         select: { id: true },

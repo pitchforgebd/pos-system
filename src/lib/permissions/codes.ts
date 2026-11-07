@@ -56,6 +56,7 @@ export const permissionCodes = [
   "settings.manage",
   "branches.manage",
   "audit.view",
+  "posting.backdate",
 ] as const;
 
 export type PermissionCode = (typeof permissionCodes)[number];

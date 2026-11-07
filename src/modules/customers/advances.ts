@@ -1,9 +1,10 @@
 import { Prisma } from "@prisma/client";
+import { RuleError } from "@/core/errors/rule-error";
 import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
-import { PostingError, postBalancedJournal } from "@/modules/accounting/post";
+import { postBalancedJournal } from "@/modules/accounting/post";
 import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } from "@/modules/inventory/idempotency";
 import { decimalString, parseMoney } from "@/modules/inventory/money";
 import { StockRuleError } from "@/modules/inventory/stock";
@@ -21,11 +22,11 @@ type Actor = {
 };
 
 function failure(error: unknown): Failure | null {
-  if (error instanceof StockRuleError) {
+  if (error instanceof RuleError) {
     const code = error.status === 404 ? "NOT_FOUND" : error.status === 409 ? "CONFLICT" : "BUSINESS_RULE";
     return { ok: false, status: error.status, code, message: error.message };
   }
-  if (error instanceof PostingError) {
+  if (error instanceof RuleError) {
     return { ok: false, status: 422, code: "BUSINESS_RULE", message: error.message };
   }
   return null;

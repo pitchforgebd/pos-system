@@ -1,15 +1,14 @@
 import { Prisma, type StockMovementType } from "@prisma/client";
 
+import { RuleError, type RuleStatus } from "@/core/errors/rule-error";
+
 import { prisma } from "@/lib/db/client";
 import { decimalString } from "@/modules/inventory/money";
 
-export class StockRuleError extends Error {
-  status: 404 | 409 | 422;
-
-  constructor(message: string, status: 404 | 409 | 422 = 422) {
-    super(message);
+export class StockRuleError extends RuleError {
+  constructor(message: string, status: RuleStatus = 422) {
+    super(message, status);
     this.name = "StockRuleError";
-    this.status = status;
   }
 }
 

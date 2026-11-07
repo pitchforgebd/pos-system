@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { RuleError } from "@/core/errors/rule-error";
 import { businessDate } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
@@ -81,7 +82,7 @@ export async function holdTicket(
     });
     return { ok: true as const, ...data };
   } catch (error) {
-    if (error instanceof StockRuleError) {
+    if (error instanceof RuleError) {
       return {
         ok: false as const,
         status: error.status,

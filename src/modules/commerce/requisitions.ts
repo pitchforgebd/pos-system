@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { RuleError } from "@/core/errors/rule-error";
 import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
@@ -24,7 +25,7 @@ function dateString(value: Date) {
 }
 
 function failure(error: unknown): Failure | null {
-  if (error instanceof StockRuleError) {
+  if (error instanceof RuleError) {
     const code = error.status === 404 ? "NOT_FOUND" : error.status === 409 ? "CONFLICT" : "BUSINESS_RULE";
     return { ok: false, status: error.status, code, message: error.message };
   }

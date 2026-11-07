@@ -1,12 +1,13 @@
 import { Prisma } from "@prisma/client";
 
-export class PostingError extends Error {
-  status: 404 | 409 | 422;
+import { RuleError, type RuleStatus } from "@/core/errors/rule-error";
+import { dateOnly } from "@/core/time/business-date";
+import { assertPostable } from "@/core/time/period";
 
-  constructor(message: string, status: 404 | 409 | 422 = 422) {
-    super(message);
+export class PostingError extends RuleError {
+  constructor(message: string, status: RuleStatus = 422) {
+    super(message, status);
     this.name = "PostingError";
-    this.status = status;
   }
 }
 
@@ -41,6 +42,8 @@ export async function postBalancedJournal(
   if (!debit.eq(credit)) {
     throw new PostingError("The journal is not balanced.");
   }
+  // The period rules apply to every posting: not in the future, not in a locked period (invariant I11).
+  await assertPostable(tx, { organizationId: input.organizationId }, dateOnly(input.businessDate));
   const codes = [...new Set(input.lines.map((line) => line.accountCode))];
   const accounts = await tx.account.findMany({
     where: { organizationId: input.organizationId, code: { in: codes }, status: "ACTIVE" },

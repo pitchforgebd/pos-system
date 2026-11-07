@@ -164,6 +164,7 @@ const frozenPermissions = [
   "settings.manage",
   "branches.manage",
   "audit.view",
+  "posting.backdate",
 ];
 
 test("schema maps every frozen table and the required companions", () => {

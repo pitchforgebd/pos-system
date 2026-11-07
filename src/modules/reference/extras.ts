@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
+import { RuleError } from "@/core/errors/rule-error";
 import { dateOnly } from "@/core/time/business-date";
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
-import { PostingError, postBalancedJournal } from "@/modules/accounting/post";
+import { postBalancedJournal } from "@/modules/accounting/post";
 import { decimalString, parseQuantity } from "@/modules/inventory/money";
 import { applyMovement, resolveWarehouse, StockRuleError } from "@/modules/inventory/stock";
 
@@ -17,8 +18,8 @@ type Actor = {
 };
 
 function failure(error: unknown) {
-  if (error instanceof StockRuleError || error instanceof PostingError) {
-    const status = error instanceof PostingError ? error.status : error.status === 404 ? 404 : 422;
+  if (error instanceof RuleError) {
+    const status = error.status;
     return { ok: false as const, status: status as 404 | 409 | 422, code: "BUSINESS_RULE" as const, message: error.message };
   }
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {

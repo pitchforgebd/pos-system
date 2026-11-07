@@ -91,9 +91,10 @@ roles.manage
 settings.manage
 branches.manage
 audit.view
+posting.backdate
 ```
 
-`roles.manage` covers create, edit, and permission assignment for roles. `settings.manage` covers settings reads and writes. `users.disable` is the supported way to revoke access. Hard delete of users is not in this catalog.
+`posting.backdate` lets a user post a document dated further back than the organization back-date window (3 days unless the organization changes it). Nobody can post a future date or a date inside a locked period, whatever they hold. `roles.manage` covers create, edit, and permission assignment for roles. `settings.manage` covers settings reads and writes. `users.disable` is the supported way to revoke access. Hard delete of users is not in this catalog.
 
 `branches.manage` opens `/branches`. Super Admin holds it and can create a branch. Admin holds `roles.manage` and the working permissions, and does not hold `branches.manage`. An Admin cannot change a role that holds `branches.manage`, assign that role, or disable that account. Initial branch grants on user create use `users.create`. Later branch-grant changes use `users.edit`. The signed-in user can select only a branch already in `user_branch_access`. POS uses `sales.view` because there is no separate POS code. Warehouses, racks, and API logs stay closed. There is one company. A second organization is not created from the app.
 
