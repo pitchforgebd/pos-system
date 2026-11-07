@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:cpanel": "next build --webpack",
     "start": "next start",
     "start:cpanel": "node server.js",
     "lint": "eslint .",

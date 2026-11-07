@@ -178,6 +178,16 @@ test("schema does not add deferred or rejected structures", () => {
   assert.equal(schema.includes("Decimal(18, 4)"), true);
 });
 
+test("seed adds demo data only when SEED_DEMO is 1 and never removes Super Admin grants", () => {
+  const seed = readFileSync(new URL("../../../prisma/seed.ts", import.meta.url), "utf8");
+  const demoCall = seed.indexOf("await seedDemoContent()");
+  assert.notEqual(demoCall, -1);
+  const guard = seed.lastIndexOf('process.env.SEED_DEMO === "1"', demoCall);
+  assert.notEqual(guard, -1);
+  assert.equal(seed.slice(guard, demoCall).includes("}"), false, "the demo call must sit directly inside the guard");
+  assert.equal(seed.includes("rolePermission.deleteMany"), false);
+});
+
 test("seed permission codes match the frozen catalog", () => {
   assert.deepEqual([...permissionCodes], frozenPermissions);
 });

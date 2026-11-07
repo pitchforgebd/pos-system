@@ -87,13 +87,14 @@ async function main() {
       },
     });
     const permissions = await prisma.permission.findMany({ select: { id: true, code: true } });
-    await prisma.rolePermission.deleteMany({ where: { roleId: role.id } });
+    // Super Admin holds every permission. Missing grants are added; nothing is removed.
     await prisma.rolePermission.createMany({
       data: permissions.map((permission) => ({
         organizationId: organization.id,
         roleId: role.id,
         permissionId: permission.id,
       })),
+      skipDuplicates: true,
     });
     const adminPermissions = permissions.filter((permission) => permission.code !== "branches.manage");
     const adminAlreadyGranted = await prisma.rolePermission.count({ where: { roleId: adminRole.id } });
@@ -132,7 +133,10 @@ async function main() {
     });
   }
 
-  await seedDemoContent();
+  // Demo products, customers, and posted sales are for local development only.
+  if (process.env.SEED_DEMO === "1") {
+    await seedDemoContent();
+  }
 }
 
 main()

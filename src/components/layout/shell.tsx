@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 
 import { Header } from "@/components/layout/header";
@@ -29,19 +29,17 @@ export function AppShell({
 }) {
   const [menuPath, setMenuPath] = useState<string | null>(null);
   const [pinnedClosed, setPinnedClosed] = useState(false);
-  const [sellMenuOpen, setSellMenuOpen] = useState(false);
+  // The sell-page menu stays open only for the path where it was opened, so a route change closes it.
+  const [sellMenuPath, setSellMenuPath] = useState<string | null>(null);
   const pathname = usePathname();
   const menuOpen = menuPath === pathname;
   const sellPage = pathname === "/pos" || pathname === "/sales/new";
+  const sellMenuOpen = sellMenuPath === pathname;
   const menuCollapsed = sellPage ? !sellMenuOpen : pinnedClosed;
-
-  useEffect(() => {
-    setSellMenuOpen(false);
-  }, [pathname]);
 
   function toggleMenu() {
     if (sellPage) {
-      setSellMenuOpen((open) => !open);
+      setSellMenuPath(sellMenuOpen ? null : pathname);
       return;
     }
     setPinnedClosed((closed) => !closed);
