@@ -7,6 +7,7 @@ import { securityHeaders } from "./src/lib/security/headers";
 const buildCpus = Number(process.env.NEXT_BUILD_CPUS);
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
   ...(Number.isInteger(buildCpus) && buildCpus > 0 ? { experimental: { cpus: buildCpus } } : {}),
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders(process.env.APP_URL) }];
