@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { runTx } from "@/core/tx/run";
 import { RuleError } from "@/core/errors/rule-error";
 import { businessDate, dateOnly } from "@/core/time/business-date";
 
@@ -79,7 +80,7 @@ async function begin(tx: Prisma.TransactionClient, organizationId: string, key: 
 export async function postJournal(input: Actor & { businessDate: string; description: string; lines: JournalLineInput[] }) {
   const requestHash = hashPayload({ businessDate: input.businessDate, description: input.description, lines: input.lines });
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await runTx(async (tx) => {
       const existing = await begin(tx, input.organizationId, input.idempotencyKey, requestHash);
       if (existing) {
         return { id: existing.entityId, replayed: true, number: null as string | null };
@@ -137,7 +138,7 @@ export async function postJournal(input: Actor & { businessDate: string; descrip
 export async function reverseJournal(input: Actor & { journalId: string; businessDate: string }) {
   const requestHash = hashPayload({ journalId: input.journalId, businessDate: input.businessDate });
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await runTx(async (tx) => {
       const existing = await begin(tx, input.organizationId, input.idempotencyKey, requestHash);
       if (existing) {
         return { id: existing.entityId, replayed: true, number: null as string | null };
@@ -231,7 +232,7 @@ export async function postExpense(
     note: input.note ?? null,
   });
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await runTx(async (tx) => {
       const existing = await begin(tx, input.organizationId, input.idempotencyKey, requestHash);
       if (existing) {
         return { id: existing.entityId, replayed: true, number: null as string | null };
@@ -304,7 +305,7 @@ export async function postExpense(
 export async function postContra(input: Actor & { businessDate: string; direction: "CASH_TO_BANK" | "BANK_TO_CASH"; amount: string }) {
   const requestHash = hashPayload({ businessDate: input.businessDate, direction: input.direction, amount: input.amount });
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await runTx(async (tx) => {
       const existing = await begin(tx, input.organizationId, input.idempotencyKey, requestHash);
       if (existing) {
         return { id: existing.entityId, replayed: true, number: null as string | null };
@@ -765,7 +766,7 @@ export async function postIncome(
     note: input.note ?? null,
   });
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await runTx(async (tx) => {
       const existing = await begin(tx, input.organizationId, input.idempotencyKey, requestHash);
       if (existing) {
         return { id: existing.entityId, replayed: true, number: null as string | null };
@@ -833,7 +834,7 @@ export async function postCapital(
     bankCode: input.bankCode ?? null,
   });
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await runTx(async (tx) => {
       const existing = await begin(tx, input.organizationId, input.idempotencyKey, requestHash);
       if (existing) {
         return { id: existing.entityId, replayed: true, number: null as string | null };
@@ -901,7 +902,7 @@ export async function postLoan(
     bankCode: input.bankCode ?? null,
   });
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await runTx(async (tx) => {
       const existing = await begin(tx, input.organizationId, input.idempotencyKey, requestHash);
       if (existing) {
         return { id: existing.entityId, replayed: true, number: null as string | null };
@@ -966,7 +967,7 @@ export async function postCashVoucher(
     bankCode: input.bankCode ?? null,
   });
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await runTx(async (tx) => {
       const existing = await begin(tx, input.organizationId, input.idempotencyKey, requestHash);
       if (existing) {
         return { id: existing.entityId, replayed: true, number: null as string | null };
@@ -1032,7 +1033,7 @@ export async function createBankAccount(
 ) {
   const requestHash = hashPayload({ name: input.name, openingAmount: input.openingAmount ?? "0.00" });
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await runTx(async (tx) => {
       const existing = await begin(tx, input.organizationId, input.idempotencyKey, requestHash);
       if (existing) {
         return { id: existing.entityId, replayed: true, number: null as string | null };

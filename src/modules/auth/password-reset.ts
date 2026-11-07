@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/client";
+import { runTx } from "@/core/tx/run";
 import { writeAudit } from "@/modules/auth/audit";
 import { RESET_LIMIT, RESET_TOKEN_SECONDS, RESET_WINDOW_MS } from "@/modules/auth/constants";
 import { hashPassword } from "@/modules/auth/password";
@@ -54,11 +55,11 @@ export async function resetPassword(input: { token: string; password: string; ip
     return { ok: false as const, message: "This reset link is invalid or expired." };
   }
   const passwordHash = await hashPassword(input.password);
-  await prisma.$transaction([
-    prisma.user.update({ where: { id: row.userId }, data: { passwordHash } }),
-    prisma.passwordReset.update({ where: { id: row.id }, data: { usedAt: new Date() } }),
-    prisma.session.updateMany({ where: { userId: row.userId, revokedAt: null }, data: { revokedAt: new Date() } }),
-  ]);
+  await runTx(async (tx) => {
+    await tx.user.update({ where: { id: row.userId }, data: { passwordHash } });
+    await tx.passwordReset.update({ where: { id: row.id }, data: { usedAt: new Date() } });
+    await tx.session.updateMany({ where: { userId: row.userId, revokedAt: null }, data: { revokedAt: new Date() } });
+  });
   await revokeUserSessions(row.userId);
   await writeAudit({
     organizationId: row.organizationId,

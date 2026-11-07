@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { runTx } from "@/core/tx/run";
 import { RuleError } from "@/core/errors/rule-error";
 import { dateOnly } from "@/core/time/business-date";
 
@@ -91,7 +92,7 @@ export async function createRequisition(input: Actor & { businessDate: string; n
   }
   const requestHash = hashPayload({ businessDate: input.businessDate, note });
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await runTx(async (tx) => {
       const existing = await readIdempotency(tx, {
         organizationId: input.organizationId,
         key: input.idempotencyKey,
@@ -170,7 +171,7 @@ async function moveRequisition(input: {
   userAgent: string | null;
 }) {
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await runTx(async (tx) => {
       const rows = await tx.$queryRaw<Array<{ id: string; status: string }>>`
         SELECT id, status FROM requisitions
         WHERE id = ${input.requisitionId} AND organizationId = ${input.organizationId} AND branchId = ${input.branchId}

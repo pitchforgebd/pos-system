@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { runTx } from "@/core/tx/run";
 import { RuleError } from "@/core/errors/rule-error";
 
 import { prisma } from "@/lib/db/client";
@@ -179,7 +180,7 @@ export async function openShift(input: Actor & { openingCash: string }) {
   }
   const requestHash = hashPayload({ openingCash: input.openingCash });
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await runTx(async (tx) => {
       const existing = await replay(tx, { ...input, requestHash });
       if (existing) {
         return { id: existing.entityId, replayed: true };
@@ -230,7 +231,7 @@ export async function openShift(input: Actor & { openingCash: string }) {
 export async function activateShift(input: Actor & { shiftId: string }) {
   const requestHash = hashPayload({ shiftId: input.shiftId, action: "activate" });
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await runTx(async (tx) => {
       const existing = await replay(tx, { ...input, requestHash });
       if (existing) {
         return { id: existing.entityId, replayed: true };
@@ -264,7 +265,7 @@ export async function postCashMovement(input: Actor & { shiftId: string; directi
   }
   const requestHash = hashPayload({ shiftId: input.shiftId, direction: input.direction, amount: input.amount, reason });
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await runTx(async (tx) => {
       const existing = await replay(tx, { ...input, requestHash });
       if (existing) {
         return { id: existing.entityId, replayed: true };
@@ -348,7 +349,7 @@ export async function countShift(input: Actor & { shiftId: string; actualCash: s
   }
   const requestHash = hashPayload({ shiftId: input.shiftId, actualCash: input.actualCash });
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await runTx(async (tx) => {
       const existing = await replay(tx, { ...input, requestHash });
       if (existing) {
         return { id: existing.entityId, replayed: true };
@@ -388,7 +389,7 @@ export async function countShift(input: Actor & { shiftId: string; actualCash: s
 export async function closeShift(input: Actor & { shiftId: string }) {
   const requestHash = hashPayload({ shiftId: input.shiftId, action: "close" });
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await runTx(async (tx) => {
       const existing = await replay(tx, { ...input, requestHash });
       if (existing) {
         return { id: existing.entityId, replayed: true };
@@ -434,7 +435,7 @@ export async function handOverShift(input: Actor & { shiftId: string; toUserId: 
   }
   const requestHash = hashPayload({ shiftId: input.shiftId, toUserId: input.toUserId, amount: input.amount });
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await runTx(async (tx) => {
       const existing = await replay(tx, { ...input, requestHash });
       if (existing) {
         return { id: existing.entityId, replayed: true };

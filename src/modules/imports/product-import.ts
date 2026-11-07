@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/client";
+import { runTx } from "@/core/tx/run";
 import { writeAudit } from "@/modules/auth/audit";
 import { createProduct } from "@/modules/catalog/products";
 import { headerMap, parseCsv, toCsv } from "@/modules/imports/csv";
@@ -73,7 +74,7 @@ export async function confirmProductImport(input: Actor & { idempotencyKey: stri
     return preview;
   }
   const requestHash = hashPayload({ kind: "products", csv: input.csv });
-  const started = await prisma.$transaction(async (tx) => {
+  const started = await runTx(async (tx) => {
     const existing = await readIdempotency(tx, { organizationId: input.organizationId, key: input.idempotencyKey, requestHash });
     if (existing === "mismatch") {
       throw new StockRuleError("This idempotency key was already used for a different request.", 409);

@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { runTx } from "@/core/tx/run";
 import { RuleError } from "@/core/errors/rule-error";
 import { dateOnly } from "@/core/time/business-date";
 
@@ -124,7 +125,7 @@ export async function createQuotation(input: Actor & { customerId: string; busin
   const lines = input.lines ?? [];
   const requestHash = hashPayload({ customerId: input.customerId, businessDate: input.businessDate, note, lines });
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await runTx(async (tx) => {
       const existing = await readIdempotency(tx, {
         organizationId: input.organizationId,
         key: input.idempotencyKey,
@@ -233,7 +234,7 @@ async function moveQuotation(input: {
   userAgent: string | null;
 }) {
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await runTx(async (tx) => {
       const current = await lockQuotation(tx, input.organizationId, input.branchId, input.quotationId);
       if (current.status !== input.from) {
         throw new StockRuleError(input.from === "DRAFT" ? "Only a draft quotation can be sent." : "Only a sent quotation can be accepted.");

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/client";
+import { runTx } from "@/core/tx/run";
 import { writeAudit } from "@/modules/auth/audit";
 
 export async function listCompanyBranches(organizationId: string) {
@@ -44,7 +45,7 @@ export async function createBranch(input: {
   if (duplicate) {
     return { ok: false as const, status: 409 as const, message: "A branch with that name already exists." };
   }
-  const branch = await prisma.$transaction(async (tx) => {
+  const branch = await runTx(async (tx) => {
     const created = await tx.branch.create({
       data: { organizationId: input.organizationId, name, phone, address },
       select: { id: true, name: true },

@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { runTx } from "@/core/tx/run";
 import { RuleError } from "@/core/errors/rule-error";
 import { dateOnly } from "@/core/time/business-date";
 
@@ -78,28 +79,22 @@ export async function saveSmsSettings(input: {
       unitPrice = decimalString(parsed, 2);
     }
   }
-  const writes = [
-    prisma.setting.upsert({
-      where: { organizationId_key: { organizationId: input.organizationId, key: senderKey } },
-      update: { value: sender },
-      create: { organizationId: input.organizationId, key: senderKey, value: sender },
-    }),
-    prisma.setting.upsert({
-      where: { organizationId_key: { organizationId: input.organizationId, key: providerKey } },
-      update: { value: provider },
-      create: { organizationId: input.organizationId, key: providerKey, value: provider },
-    }),
+  const settings: { key: string; value: string | null }[] = [
+    { key: senderKey, value: sender },
+    { key: providerKey, value: provider },
   ];
   if (unitPrice !== undefined) {
-    writes.push(
-      prisma.setting.upsert({
-        where: { organizationId_key: { organizationId: input.organizationId, key: priceKey } },
-        update: { value: unitPrice },
-        create: { organizationId: input.organizationId, key: priceKey, value: unitPrice },
-      }),
-    );
+    settings.push({ key: priceKey, value: unitPrice });
   }
-  await prisma.$transaction(writes);
+  await runTx(async (tx) => {
+    for (const setting of settings) {
+      await tx.setting.upsert({
+        where: { organizationId_key: { organizationId: input.organizationId, key: setting.key } },
+        update: { value: setting.value },
+        create: { organizationId: input.organizationId, key: setting.key, value: setting.value },
+      });
+    }
+  });
   await writeAudit({
     organizationId: input.organizationId,
     userId: input.actorId,
@@ -196,7 +191,7 @@ export async function sendSms(input: {
     variables,
   });
   try {
-    const prepared = await prisma.$transaction(async (tx) => {
+    const prepared = await runTx(async (tx) => {
       const existing = await readIdempotency(tx, { organizationId: input.organizationId, key: input.idempotencyKey, requestHash });
       if (existing === "mismatch") {
         throw new StockRuleError("This idempotency key was already used for a different request.", 409);
@@ -270,7 +265,7 @@ export async function sendSms(input: {
 export async function retrySms(input: { organizationId: string; userId: string; messageId: string; idempotencyKey: string }) {
   const requestHash = hashPayload({ messageId: input.messageId });
   try {
-    const prepared = await prisma.$transaction(async (tx) => {
+    const prepared = await runTx(async (tx) => {
       const existing = await readIdempotency(tx, { organizationId: input.organizationId, key: input.idempotencyKey, requestHash });
       if (existing === "mismatch") {
         throw new StockRuleError("This idempotency key was already used for a different request.", 409);
@@ -375,7 +370,7 @@ export async function requestRecharge(input: {
   const amount = money(quantity.times(price));
   const requestHash = hashPayload({ quantity: decimalString(quantity, 4), businessDate: input.businessDate });
   try {
-    const created = await prisma.$transaction(async (tx) => {
+    const created = await runTx(async (tx) => {
       const existing = await readIdempotency(tx, { organizationId: input.organizationId, key: input.idempotencyKey, requestHash });
       if (existing === "mismatch") {
         throw new StockRuleError("This idempotency key was already used for a different request.", 409);

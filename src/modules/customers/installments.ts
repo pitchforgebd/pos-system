@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { runTx } from "@/core/tx/run";
 import { RuleError } from "@/core/errors/rule-error";
 import { businessDate, dateOnly } from "@/core/time/business-date";
 
@@ -48,7 +49,7 @@ export async function createInstallment(input: {
     return { ok: false as const, status: 422 as const, code: "BUSINESS_RULE" as const, message: "Enter an interest percent from 0 to 100, or leave it blank." };
   }
   try {
-    const installment = await prisma.$transaction(async (tx) => {
+    const installment = await runTx(async (tx) => {
       const locked = await tx.$queryRaw<Array<{ id: string }>>`
         SELECT id FROM invoices WHERE id = ${input.invoiceId} AND organizationId = ${input.organizationId} AND branchId = ${input.branchId} FOR UPDATE
       `;

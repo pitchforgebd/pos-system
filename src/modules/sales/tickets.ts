@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { runTx } from "@/core/tx/run";
 import { RuleError } from "@/core/errors/rule-error";
 import { businessDate } from "@/core/time/business-date";
 
@@ -19,7 +20,7 @@ export async function holdTicket(
 ) {
   const requestHash = hashPayload({ customerId: input.customerId ?? null, lines: input.lines });
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await runTx(async (tx) => {
       const existing = await readIdempotency(tx, {
         organizationId: input.organizationId,
         key: input.idempotencyKey,

@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { runTx } from "@/core/tx/run";
 import { RuleError } from "@/core/errors/rule-error";
 import { businessDate, dateOnly } from "@/core/time/business-date";
 
@@ -277,7 +278,7 @@ export async function createCustomer(input: {
   }
   let customer: { id: string; name: string };
   try {
-    customer = await prisma.$transaction(async (tx) => {
+    customer = await runTx(async (tx) => {
     const created = await tx.customer.create({
       data: {
         organizationId: input.organizationId,

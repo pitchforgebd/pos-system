@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/client";
+import { runTx } from "@/core/tx/run";
 import { writeAudit } from "@/modules/auth/audit";
 import { hashPassword } from "@/modules/auth/password";
 import { revokeUserSessions } from "@/modules/auth/session";
@@ -191,7 +192,7 @@ export async function updateUser(input: {
       return { ok: false as const, status: 404 as const, message: "That record was not found." };
     }
   }
-  await prisma.$transaction(async (tx) => {
+  await runTx(async (tx) => {
     await tx.user.update({
       where: { id: current.id },
       data: {
@@ -294,7 +295,7 @@ export async function replaceUserRoles(input: {
   if (!roles) {
     return { ok: false as const, status: 404 as const, message: "That record was not found." };
   }
-  await prisma.$transaction(async (tx) => {
+  await runTx(async (tx) => {
     await tx.userRole.deleteMany({ where: { userId: current.id } });
     if (input.roleIds.length > 0) {
       await tx.userRole.createMany({

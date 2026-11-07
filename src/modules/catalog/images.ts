@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { runTx } from "@/core/tx/run";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -55,7 +56,7 @@ export async function saveProductImage(input: {
   await mkdir(root, { recursive: true });
   await writeFile(path.join(root, storageKey), input.bytes);
   try {
-    const previous = await prisma.$transaction(async (tx) => {
+    const previous = await runTx(async (tx) => {
       const old = await tx.productImage.findMany({
         where: { organizationId: input.organizationId, productId: product.id },
         select: { id: true, fileAssetId: true, fileAsset: { select: { storageKey: true } } },

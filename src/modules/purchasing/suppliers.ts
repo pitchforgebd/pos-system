@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { runTx } from "@/core/tx/run";
 import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
@@ -110,7 +111,7 @@ export async function createSupplier(input: {
   if (!opening || (input.creditLimit && !creditLimit)) {
     return { ok: false as const, status: 422 as const, code: "BUSINESS_RULE" as const, message: "Enter money amounts with up to two decimals." };
   }
-  const supplier = await prisma.$transaction(async (tx) => {
+  const supplier = await runTx(async (tx) => {
     const created = await tx.supplier.create({
     data: {
       organizationId: input.organizationId,

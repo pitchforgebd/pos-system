@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/client";
+import { runTx } from "@/core/tx/run";
 import { permissionCodes, type PermissionCode } from "@/lib/permissions/codes";
 import { writeAudit } from "@/modules/auth/audit";
 
@@ -95,7 +96,7 @@ export async function setRolePermissions(input: {
   if (permissions.length !== unique.length) {
     return { ok: false as const, status: 400 as const, message: "Unknown permission code." };
   }
-  await prisma.$transaction(async (tx) => {
+  await runTx(async (tx) => {
     await tx.rolePermission.deleteMany({ where: { roleId: role.id } });
     if (permissions.length > 0) {
       await tx.rolePermission.createMany({

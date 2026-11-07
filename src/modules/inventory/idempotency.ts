@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
+import { runTx } from "@/core/tx/run";
 
 import { Prisma } from "@prisma/client";
 
-import { prisma } from "@/lib/db/client";
 
 function stable(value: unknown): unknown {
   if (Array.isArray(value)) {
@@ -61,12 +61,5 @@ export async function saveIdempotency(
  * replays that result instead of failing.
  */
 export async function idempotentTransaction<T>(run: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
-  try {
-    return await prisma.$transaction(run);
-  } catch (error) {
-    if (typeof error === "object" && error !== null && keyRaces.has(error)) {
-      return prisma.$transaction(run);
-    }
-    throw error;
-  }
+  return runTx(run, { retryIf: (error) => typeof error === "object" && error !== null && keyRaces.has(error) });
 }

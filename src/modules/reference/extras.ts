@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { runTx } from "@/core/tx/run";
 import { RuleError } from "@/core/errors/rule-error";
 import { dateOnly } from "@/core/time/business-date";
 import { Prisma } from "@prisma/client";
@@ -221,7 +222,7 @@ export async function listDirectReturns(organizationId: string, branchId: string
 
 export async function postDirectReturn(input: Actor & { productId: string; quantity: string; refundAmount: string; method: "CASH" | "BANK"; businessDate: string }) {
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await runTx(async (tx) => {
       const quantity = parseQuantity(input.quantity);
       const warehouse = await resolveWarehouse(input.organizationId, input.branchId);
       if (!warehouse) {
@@ -347,7 +348,7 @@ export async function redeemLoyalty(input: Actor & { customerId: string; points:
     return { ok: false as const, status: 422 as const, code: "BUSINESS_RULE" as const, message: "Set taka per point on shop settings before redeeming." };
   }
   try {
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await runTx(async (tx) => {
       const sums = await tx.loyaltyTransaction.groupBy({
         by: ["entryType"],
         where: { organizationId: input.organizationId, customerId: input.customerId },
