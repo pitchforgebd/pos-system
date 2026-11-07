@@ -45,3 +45,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local-only documents: never pushed (the repo is public)
+/docs/reference/
+/docs/AUDIT_REPORT.md
+/docs/FIX_PLAN.md
+/docs/Meridian_Technical_Audit_2026-11-07.pdf
+/docs/meridian-v2/v2/08_AUDIT_TRACEABILITY.md
+/docs/meridian-v2/v2/phases/P12_SECURITY.md
