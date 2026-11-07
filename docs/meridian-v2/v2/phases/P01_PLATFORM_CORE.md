@@ -1,0 +1,47 @@
+# P01 — প্ল্যাটফর্ম কোর
+
+**লক্ষ্য:** যে ভিত্তির উপর প্রতিটি ফিচার দাঁড়াবে: ব্যবসায়িক তারিখ, রুট র‍্যাপার, একক idempotency, transaction runner, পিরিয়ড লক, নির্ভরযোগ্য ফর্ম সাবমিট। ব্যবসার নিয়ম এই ফেজে বদলাবে না — শুধু বিদ্যমান রুট/ফর্ম নতুন ভিত্তিতে আনা।
+**পূর্বশর্ত:** P00। **সিদ্ধান্ত লাগবে:** D9, D10, D18। **পড়ুন:** `01_ARCHITECTURE.md` §৪–৬।
+
+## টাস্ক
+
+1. **`src/core/time`** (N17, U6, B4, B4b)
+   - `businessDate(now?, tz="Asia/Dhaka")` → `YYYY-MM-DD`; `fiscalYear(date)` (D9); `isoDate` zod স্কিমা (বৈধ ক্যালেন্ডার তারিখ, `2026-02-31` বাতিল → 400, 500 নয়)।
+   - ইউনিট টেস্ট: ঢাকা রাত ০০:৩০ = নতুন দিন; UTC ১৮:৩০ = পরের দিন; লিপ ইয়ার।
+2. **মাইগ্রেশন:** `03_DATA_MODEL.md` §১–২ (`occurredOn` → `businessDate` নাম বদল, org-এ timezone/fiscal/lock কলাম, ইন্ডেক্স)। কোডে সব `occurredOn` রেফারেন্স একসাথে বদল।
+3. **পিরিয়ড লক** (N9, I11): `assertPostable(ctx, date)` — `lockedThrough`-এর পরে, আজকের (ঢাকা) পরে নয়, পেছনে `backdateDays`-এর বেশি হলে `posting.backdate` পারমিশন। নতুন পারমিশন সিড।
+4. **`src/core/money`:** Decimal হেল্পার, half-up রাউন্ড, `allocate(total, weights)` (largest-remainder), `parseMoney` স্ট্রিং-only। সব মডিউলের কপি (`money()`, `zero()`) এখানে আনা।
+5. **`src/core/tx/run.ts`** (N6, N21): timeout ২০s, maxWait ৫s, deadlock/P2034/P2002-idempotency-তে ৩ বার রিট্রাই, লক-ক্রম হেল্পার। টেস্ট: কৃত্রিম deadlock-এ রিট্রাই সফল।
+6. **`src/core/idempotency`** (H3, B3, N24): একটিমাত্র বাস্তবায়ন — key + payload hash; replay পূর্ণ মূল রেসপন্স (নম্বর, মোট সহ) ফেরত; ভিন্ন payload 409। `books.ts`, `shifts.ts`, `extras.ts` সহ সব কপি মুছে এটায় আনা।
+7. **`src/core/http/define-route.ts`** (S8, N22, I17): CSRF → সেশন → পারমিশন → branch → zod → idempotency → `runTx` → audit (একই tx) → envelope। সেশন request-এ একবার লোড (N20 আংশিক)।
+   - ১১০টি রুট ধাপে ধাপে `defineRoute`-এ আনা (মডিউল অনুযায়ী ব্যাচে, প্রতি ব্যাচে টেস্ট)।
+   - `route-guard.test.ts` হালনাগাদ: প্রতিটি `route.ts` `defineRoute` বা পাবলিক-তালিকায়।
+8. **`useSubmit` হুক** (N1, N23, U7, U8, L13): প্রচেষ্টা-প্রতি স্থির key, UUID fallback, নেটওয়ার্ক এরর বাংলা বার্তা, ডাবল-ক্লিক লক, সাফল্যের টোস্ট, সফলে router refresh (পুরো পেজ রিলোড নয়)। ফর্ম প্যাটার্ন: react-hook-form + zod (একই স্কিমা সার্ভার-ক্লায়েন্ট)।
+   - ৭টি ফর্ম আগে (POS, রিটার্ন, ক্রয়, ডিউ কালেকশন, শিফট, অ্যাকাউন্টিং, ইমপোর্ট), তারপর বাকি সব।
+   - স্ট্যাটিক টেস্ট: কোনো কম্পোনেন্টে সরাসরি `crypto.randomUUID()` বা idempotency হেডার হাতে বসানো নেই।
+9. **শেয়ার্ড পেজিনেশন** (B11, LV-3): `listQuery({ page, pageSize, sort })` + `Pagination` কম্পোনেন্ট; ডিফল্ট সাজানো `businessDate desc, number desc`।
+10. **ডকুমেন্ট নম্বর** (D10, I12): ধরন + অর্থবছর; বিদ্যমান allocator বজায়, ফরম্যাট বদল।
+11. **N21 — নতুন stock row-এর deadlock ঠিক করা ও টেস্টের সমান্তরালতা ফিরিয়ে আনা** (task 5-এর `runTx` তৈরির পরে করবে)
+    - **পটভূমি:** P00-এ `npm test` সাময়িকভাবে `--test-concurrency=1`-এ চলছে, কারণ `inventory.test.ts`-এর `phase 05 stock and products` সমান্তরাল রানে মাঝে মাঝে `applyMovement` → `stockBalance.create`-এ "write conflict or a deadlock" (Prisma P2034) দিয়ে ব্যর্থ হয় (P00-এ ৪ রানে ১ বার)। এটা আসল বাগ: প্রোডাকশনেও দুজন একসাথে নতুন (পণ্য, গুদাম) stock row বানালে ঘটতে পারে। `--test-concurrency=1` শুধু লক্ষণ ঢাকে।
+    - **ধাপ ১ — আগে ব্যর্থ টেস্ট:** P00 হারনেসের `concurrently(10, …)` দিয়ে একই নতুন (পণ্য, গুদাম) key-তে ১০টি সমান্তরাল stock-in; সাথে `--test-concurrency=1` ছাড়া পূর্ণ স্যুট বারবার চালিয়ে ব্যর্থতা দেখাও। ব্যর্থ হতে **দেখিয়ে** তারপর ফিক্স।
+    - **ধাপ ২ — ফিক্স:** `applyMovement`-এ নতুন row `INSERT … ON DUPLICATE KEY UPDATE` (no-op আপডেট), তারপর `SELECT … FOR UPDATE` (`01_ARCHITECTURE.md` §৪); পুরো পোস্টিং `runTx`-এর ভেতরে, যাতে deadlock (1213)/P2034-এ backoff-সহ রিট্রাই হয়; লক-ক্রম (productId, warehouseId) অনুযায়ী।
+    - **ধাপ ৩ — যাচাই:** ১০টি সমান্তরাল নতুন-row সবগুলো সফল; `stock_balances.quantity` = Σ `stock_ledgers`; ডুপ্লিকেট row বা ব্যর্থতা নেই।
+    - **ধাপ ৪ — concurrency ফেরানো:** `package.json`-এর `test` স্ক্রিপ্ট থেকে `--test-concurrency=1` সরাও; পূর্ণ স্যুট সমান্তরালে টানা ২০ বার সবুজ — ২০ রানের ফল দেখাও।
+
+## টেস্ট (বাধ্যতামূলক)
+
+- একই key দুইবার POST → একটি সেল, দ্বিতীয় রেসপন্সে একই নম্বর
+- একই key ভিন্ন body → 409
+- ১০টি সমান্তরাল একই-key → একটি সেল
+- অবৈধ তারিখ → 400; লকড তারিখ → 422; ভবিষ্যৎ তারিখ → 422
+- audit সারি ও ডকুমেন্ট একই tx-এ (audit ব্যর্থ হলে পুরো rollback)
+
+## DoD
+
+- [ ] সব mutating রুট `defineRoute`-এ; route-guard টেস্ট সবুজ
+- [ ] সব টাকা/স্টকের ফর্ম `useSubmit`-এ; স্ট্যাটিক টেস্ট সবুজ
+- [ ] কোডে `toISOString().slice(0, 10)` শূন্য (grep প্রমাণ)
+- [ ] idempotency বাস্তবায়ন একটিই (grep প্রমাণ)
+- [ ] N21: নতুন stock row-এর race ঠিক (টাস্ক ১১-র ধাপ ১–৪ প্রমাণসহ); `--test-concurrency=1` সরানো; পূর্ণ স্যুট সমান্তরালে টানা ২০ বার সবুজ
+- [ ] staging-এ ব্রাউজারে: নেট বন্ধ করে POS সাবমিট → বার্তা আসে → নেট চালু করে আবার → একটিই সেল
+- [ ] typecheck, lint, test সবুজ; কমিট `v2(P01)`
