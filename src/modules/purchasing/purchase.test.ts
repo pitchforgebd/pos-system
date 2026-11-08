@@ -108,7 +108,7 @@ test("phase 06 purchases and supplier balances", async () => {
     if (!bought.ok) {
       return;
     }
-    assert.match(bought.number ?? "", /^PUR-2026-\d{6}$/);
+    assert.match(bought.number ?? "", /^PUR-2627-\d{6}$/);
     const replay = await postPurchase({
       ...actor,
       idempotencyKey: key,

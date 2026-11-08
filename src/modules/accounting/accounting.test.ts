@@ -68,7 +68,7 @@ test("phase 09 journals balance and reversals do not edit the original", async (
     });
     assert.equal(posted.ok, true);
     if (posted.ok) {
-      assert.match(posted.number ?? "", /^VCH-2026-\d{6}$/);
+      assert.match(posted.number ?? "", /^VCH-2627-\d{6}$/);
     }
     const replay = await postJournal({
       ...actor,
@@ -119,7 +119,7 @@ test("phase 09 journals balance and reversals do not edit the original", async (
     });
     assert.equal(rent.ok, true);
     if (rent.ok) {
-      assert.match(rent.number ?? "", /^EXP-2026-\d{6}$/);
+      assert.match(rent.number ?? "", /^EXP-2627-\d{6}$/);
     }
     const contra = await postContra({
       ...actor,

@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
 import { postBalancedJournal } from "@/modules/accounting/post";
 import { outstandingReceivable } from "@/modules/customers/customers";
-import { allocateNumber, documentYear } from "@/modules/documents/numbers";
+import { allocateNumber } from "@/modules/documents/numbers";
 import { hashPayload, idempotentTransaction, isKeyRace, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { decimalString, parseMoney } from "@/core/money";
 import { StockRuleError } from "@/modules/inventory/stock";
@@ -92,7 +92,7 @@ export async function postCustomerPayment(
       const number = await allocateNumber(tx, {
         organizationId: input.organizationId,
         documentType: "PAY",
-        year: documentYear(input.businessDate),
+        businessDate: input.businessDate,
       });
       const journalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,

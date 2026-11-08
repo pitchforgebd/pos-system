@@ -6,7 +6,7 @@ import { businessDate, dateOnly } from "@/core/time/business-date";
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
 import { PostingError, postBalancedJournal } from "@/modules/accounting/post";
-import { allocateNumber, documentYear } from "@/modules/documents/numbers";
+import { allocateNumber } from "@/modules/documents/numbers";
 import { hashPayload, isKeyRace, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { decimalString, money, parseMoney, zero } from "@/core/money";
 import { isIsoDate, occurredDate } from "@/lib/format/date";
@@ -89,7 +89,7 @@ export async function postJournal(input: Actor & { businessDate: string; descrip
         return { id: existing.entityId, replayed: true, number: null as string | null };
       }
       const parsed = parseLines(input.lines);
-      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", year: documentYear(input.businessDate) });
+      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: input.businessDate });
       const journalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
@@ -170,7 +170,7 @@ export async function reverseJournal(input: Actor & { journalId: string; busines
       if (journal.sale || journal.purchase || journal.saleReturn || journal.purchaseReturn || journal.customerPayment || journal.supplierPayment || journal.customerAdvance) {
         throw new PostingError("Correct the source document. This journal is not reversed on its own.");
       }
-      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", year: documentYear(input.businessDate) });
+      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: input.businessDate });
       const lines = journal.lines
         .filter((line) => new Prisma.Decimal(line.debit).gt(0) || new Prisma.Decimal(line.credit).gt(0))
         .map((line) => ({ accountCode: line.account.code, debit: new Prisma.Decimal(line.credit), credit: new Prisma.Decimal(line.debit) }));
@@ -251,7 +251,7 @@ export async function postExpense(
       if (!account || account.group.code !== "6000") {
         throw new PostingError("Choose an active expense account.");
       }
-      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "EXP", year: documentYear(input.businessDate) });
+      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "EXP", businessDate: input.businessDate });
       const cashCode = input.method === "BANK" ? "1200" : "1100";
       const journalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
@@ -317,7 +317,7 @@ export async function postContra(input: Actor & { businessDate: string; directio
       if (!amount || amount.lte(0)) {
         throw new PostingError("Enter an amount greater than zero.");
       }
-      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", year: documentYear(input.businessDate) });
+      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: input.businessDate });
       const debitCode = input.direction === "CASH_TO_BANK" ? "1200" : "1100";
       const creditCode = input.direction === "CASH_TO_BANK" ? "1100" : "1200";
       const journalId = await postBalancedJournal(tx, {
@@ -786,7 +786,7 @@ export async function postIncome(
         throw new PostingError("Choose an income account other than sales.");
       }
       const moneyAccount = await resolveMoneyAccount(tx, input.organizationId, input.method, input.bankCode);
-      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", year: documentYear(input.businessDate) });
+      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: input.businessDate });
       const journalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
@@ -849,7 +849,7 @@ export async function postCapital(
       }
       const moneyAccount = await resolveMoneyAccount(tx, input.organizationId, input.method, input.bankCode);
       const equityCode = input.capitalType === "ADDED" ? "3100" : "3200";
-      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", year: documentYear(input.businessDate) });
+      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: input.businessDate });
       const journalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
@@ -916,7 +916,7 @@ export async function postLoan(
         throw new PostingError("Enter a lender and an amount greater than zero.");
       }
       const moneyAccount = await resolveMoneyAccount(tx, input.organizationId, input.method, input.bankCode);
-      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", year: documentYear(input.businessDate) });
+      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: input.businessDate });
       const journalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
@@ -987,7 +987,7 @@ export async function postCashVoucher(
         throw new PostingError("Choose an expense, income, loan, or equity account. Sales, stock, and party balances use their own screens.");
       }
       const moneyAccount = await resolveMoneyAccount(tx, input.organizationId, input.method, input.bankCode);
-      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", year: documentYear(input.businessDate) });
+      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: input.businessDate });
       const journalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
@@ -1074,7 +1074,7 @@ export async function createBankAccount(
       });
       let number: string | null = null;
       if (opening.gt(0)) {
-        number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", year: documentYear(businessDate()) });
+        number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: businessDate() });
         await postBalancedJournal(tx, {
           organizationId: input.organizationId,
           branchId: input.branchId,

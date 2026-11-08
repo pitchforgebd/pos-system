@@ -2252,12 +2252,13 @@ model DocumentSequence {
   id             String       @id @default(uuid()) @db.Char(36)
   organizationId String       @db.Char(36)
   documentType   DocumentType
-  year           Int
+  /// The fiscal-year label as a number: 2627 is July 2026 to June 2027 (D10).
+  fiscalYear     Int
   lastValue      Int          @default(0)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
-  @@unique([organizationId, documentType, year])
+  @@unique([organizationId, documentType, fiscalYear])
   @@map("document_sequences")
 }
 

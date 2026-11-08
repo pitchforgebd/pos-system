@@ -5,7 +5,7 @@ import { dateOnly } from "@/core/time/business-date";
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
 import { postBalancedJournal } from "@/modules/accounting/post";
-import { allocateNumber, documentYear } from "@/modules/documents/numbers";
+import { allocateNumber } from "@/modules/documents/numbers";
 import { hashPayload, idempotentTransaction, isKeyRace, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { decimalString, money, parseQuantity, zero } from "@/core/money";
 import { applyMovement, StockRuleError } from "@/modules/inventory/stock";
@@ -119,7 +119,7 @@ export async function postPurchaseReturn(
       if (refund.eq(0) && input.refundMethod) {
         throw new StockRuleError("A refund method is only used when the return exceeds the outstanding payable.");
       }
-      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "RET", year: documentYear(input.businessDate) });
+      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "RET", businessDate: input.businessDate });
       const purchaseReturn = await tx.purchaseReturn.create({
         data: {
           organizationId: input.organizationId,

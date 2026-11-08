@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
 import { postBalancedJournal } from "@/modules/accounting/post";
 import { outstandingReceivable } from "@/modules/customers/customers";
-import { allocateNumber, documentYear } from "@/modules/documents/numbers";
+import { allocateNumber } from "@/modules/documents/numbers";
 import { hashPayload, idempotentTransaction, isKeyRace, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { decimalString, money, parseQuantity, zero } from "@/core/money";
 import { applyMovement, StockRuleError } from "@/modules/inventory/stock";
@@ -123,7 +123,7 @@ export async function postSaleReturn(
       const salesTotal = money(total.minus(vatTotal));
       const cost = money(priced.reduce((sum, line) => sum.plus(line.cost), zero()));
       const split = await receivableSplit(tx, input.organizationId, sale.customerId, total);
-      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "RET", year: documentYear(input.businessDate) });
+      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "RET", businessDate: input.businessDate });
       const saleReturn = await tx.saleReturn.create({
         data: {
           organizationId: input.organizationId,

@@ -5,7 +5,7 @@ import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
-import { allocateNumber, documentYear } from "@/modules/documents/numbers";
+import { allocateNumber } from "@/modules/documents/numbers";
 import { hashPayload, isKeyRace, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { decimalString, parseMoney, parseQuantity } from "@/core/money";
 import { StockRuleError } from "@/modules/inventory/stock";
@@ -154,7 +154,7 @@ export async function createQuotation(input: Actor & { customerId: string; busin
       const number = await allocateNumber(tx, {
         organizationId: input.organizationId,
         documentType: "QUO",
-        year: documentYear(input.businessDate),
+        businessDate: input.businessDate,
       });
       const priced = [];
       for (const line of lines) {

@@ -129,7 +129,7 @@ test("phase 08 returns cannot exceed the eligible quantity", async () => {
     });
     assert.equal(returned.ok, true);
     if (returned.ok) {
-      assert.match(returned.number ?? "", /^RET-2026-\d{6}$/);
+      assert.match(returned.number ?? "", /^RET-2627-\d{6}$/);
       assert.equal(returned.total, "12.00");
     }
     const replay = await postSaleReturn({
@@ -231,7 +231,7 @@ test("phase 08 returns cannot exceed the eligible quantity", async () => {
     });
     assert.equal(supplierReturn.ok, true);
     if (supplierReturn.ok) {
-      assert.match(supplierReturn.number ?? "", /^RET-2026-\d{6}$/);
+      assert.match(supplierReturn.number ?? "", /^RET-2627-\d{6}$/);
     }
     const duplicate = await postPurchaseReturn({
       ...actor,

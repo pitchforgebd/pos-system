@@ -32,7 +32,7 @@ test("phase 11 quotations and requisitions do not post money or stock", async ()
     if (!created.ok) {
       return;
     }
-    assert.equal(created.number?.startsWith("QUO-2026-"), true);
+    assert.equal(created.number?.startsWith("QUO-2627-"), true);
     const replay = await createQuotation({ ...actor, idempotencyKey: key, customerId: customer.id, businessDate: "2026-10-01", note: "Window quote" });
     assert.equal(replay.ok && replay.replayed, true);
     const skipped = await acceptQuotation({ ...actor, quotationId: created.id });
@@ -56,7 +56,7 @@ test("phase 11 quotations and requisitions do not post money or stock", async ()
     if (!request.ok) {
       return;
     }
-    assert.equal(request.number?.startsWith("REQ-2026-"), true);
+    assert.equal(request.number?.startsWith("REQ-2627-"), true);
     const early = await fulfillRequisition({ ...actor, requisitionId: request.id });
     assert.equal(early.ok, false);
     const approved = await approveRequisition({ ...actor, requisitionId: request.id });

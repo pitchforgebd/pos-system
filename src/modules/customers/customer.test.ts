@@ -76,7 +76,7 @@ test("phase 10 posts customer due and advance without inventing points", async (
     });
     assert.equal(payment.ok, true);
     if (payment.ok) {
-      assert.equal(payment.number?.startsWith("PAY-2026-"), true);
+      assert.equal(payment.number?.startsWith("PAY-2627-"), true);
     }
     const replay = await postCustomerPayment({
       ...actor,

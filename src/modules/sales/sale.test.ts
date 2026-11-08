@@ -159,7 +159,7 @@ test("phase 07 sales post stock, invoice, and a balanced journal", async () => {
     });
     assert.equal(sold.ok, true);
     if (sold.ok) {
-      assert.match(sold.number ?? "", /^INV-2026-\d{6}$/);
+      assert.match(sold.number ?? "", /^INV-2627-\d{6}$/);
       assert.equal(sold.total, "12.00");
     }
     const replay = await postSale({

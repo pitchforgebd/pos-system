@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
 import { postBalancedJournal } from "@/modules/accounting/post";
 import { outstandingReceivable } from "@/modules/customers/customers";
-import { allocateNumber, documentYear } from "@/modules/documents/numbers";
+import { allocateNumber } from "@/modules/documents/numbers";
 import { documentSorts, listQuery, pageInfo, type ListQuery, type Paged } from "@/core/list";
 import { hashPayload, idempotentTransaction, isKeyRace, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { decimalString, money, parseMoney, parseQuantity, zero } from "@/core/money";
@@ -207,7 +207,7 @@ export async function postSale(
       const number = await allocateNumber(tx, {
         organizationId: input.organizationId,
         documentType: "INV",
-        year: documentYear(input.businessDate),
+        businessDate: input.businessDate,
       });
       const sale = await tx.sale.create({
         data: {

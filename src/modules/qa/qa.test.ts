@@ -22,7 +22,7 @@ test("phase 18 checks money, numbers, permissions, and the sale path", async () 
   const { resetRateLimits } = await import("../auth/rate-limit.ts");
   const { postCustomerPayment } = await import("../customers/dues.ts");
   const { outstandingReceivable } = await import("../customers/customers.ts");
-  const { allocateNumber, documentYear } = await import("../documents/numbers.ts");
+  const { allocateNumber } = await import("../documents/numbers.ts");
   const { createProduct } = await import("../catalog/products.ts");
   const { postOpeningStock } = await import("../inventory/documents.ts");
   const { decimalString, parseMoney, parseQuantity } = await import("../../core/money/index.ts");
@@ -33,7 +33,6 @@ test("phase 18 checks money, numbers, permissions, and the sale path", async () 
   assert.equal(parseMoney("1.005"), null);
   assert.equal(parseQuantity("0"), null);
   assert.equal(decimalString(new Prisma.Decimal("1.005"), 2), "1.01");
-  assert.equal(documentYear("2026-10-01"), 2026);
   assert.equal(decidePageAccess("/users", new Set(["sales.view"])), "forbidden");
   assert.equal(decidePageAccess("/pos", new Set(["sales.view"])), "allow");
   assert.equal(decidePageAccess("/users", null), "login");
@@ -74,11 +73,11 @@ test("phase 18 checks money, numbers, permissions, and the sale path", async () 
 
   try {
     const numbers = await prisma.$transaction(async (tx) => {
-      const first = await allocateNumber(tx, { organizationId: org.id, documentType: "INV", year: 2026 });
-      const second = await allocateNumber(tx, { organizationId: org.id, documentType: "INV", year: 2026 });
+      const first = await allocateNumber(tx, { organizationId: org.id, documentType: "INV", businessDate: "2026-10-01" });
+      const second = await allocateNumber(tx, { organizationId: org.id, documentType: "INV", businessDate: "2026-10-01" });
       return [first, second];
     });
-    assert.deepEqual(numbers, ["INV-2026-000001", "INV-2026-000002"]);
+    assert.deepEqual(numbers, ["INV-2627-000001", "INV-2627-000002"]);
 
     const created = await createProduct({
       ...actor,
@@ -145,7 +144,7 @@ test("phase 18 checks money, numbers, permissions, and the sale path", async () 
     if (!sold.ok) {
       return;
     }
-    assert.equal(sold.number, "INV-2026-000003");
+    assert.equal(sold.number, "INV-2627-000003");
     assert.equal(sold.total, "12.00");
     const collected = await postCustomerPayment({
       ...actor,
@@ -157,7 +156,7 @@ test("phase 18 checks money, numbers, permissions, and the sale path", async () 
     });
     assert.equal(collected.ok, true);
     if (collected.ok) {
-      assert.match(collected.number ?? "", /^PAY-2026-/);
+      assert.match(collected.number ?? "", /^PAY-2627-/);
     }
 
     const balance = await prisma.stockBalance.findFirst({ where: { productId: created.product.id } });

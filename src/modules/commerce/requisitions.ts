@@ -5,7 +5,7 @@ import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
-import { allocateNumber, documentYear } from "@/modules/documents/numbers";
+import { allocateNumber } from "@/modules/documents/numbers";
 import { hashPayload, isKeyRace, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { StockRuleError } from "@/modules/inventory/stock";
 import { occurredDate } from "@/lib/format/date";
@@ -114,7 +114,7 @@ export async function createRequisition(input: Actor & { businessDate: string; n
       const number = await allocateNumber(tx, {
         organizationId: input.organizationId,
         documentType: "REQ",
-        year: documentYear(input.businessDate),
+        businessDate: input.businessDate,
       });
       const requisition = await tx.requisition.create({
         data: {

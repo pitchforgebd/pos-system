@@ -639,7 +639,7 @@ export async function postTransfer(
       const number = await allocateNumber(tx, {
         organizationId: input.organizationId,
         documentType: "TRF",
-        year: new Date().getUTCFullYear(),
+        businessDate: businessDate(),
       });
       const transfer = await tx.stockTransfer.create({
         data: {

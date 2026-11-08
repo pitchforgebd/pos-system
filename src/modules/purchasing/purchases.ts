@@ -5,7 +5,7 @@ import { dateOnly } from "@/core/time/business-date";
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
 import { postBalancedJournal } from "@/modules/accounting/post";
-import { allocateNumber, documentYear } from "@/modules/documents/numbers";
+import { allocateNumber } from "@/modules/documents/numbers";
 import { documentSorts, listQuery, pageInfo, type ListQuery, type Paged } from "@/core/list";
 import { hashPayload, idempotentTransaction, isKeyRace, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { decimalString, money, parseMoney, parseQuantity } from "@/core/money";
@@ -121,7 +121,7 @@ export async function postPurchase(
       const number = await allocateNumber(tx, {
         organizationId: input.organizationId,
         documentType: "PUR",
-        year: documentYear(input.businessDate),
+        businessDate: input.businessDate,
       });
       const purchase = await tx.purchase.create({
         data: {
@@ -279,7 +279,7 @@ async function settleSupplier(
   const number = await allocateNumber(tx, {
     organizationId: input.organizationId,
     documentType: "PAY",
-    year: documentYear(input.businessDate),
+    businessDate: input.businessDate,
   });
   const journalId = await postBalancedJournal(tx, {
     organizationId: input.organizationId,
