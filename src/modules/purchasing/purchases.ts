@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
 import { postBalancedJournal } from "@/modules/accounting/post";
 import { allocateNumber, documentYear } from "@/modules/documents/numbers";
+import { documentSorts, listQuery, pageInfo, type ListQuery, type Paged } from "@/core/list";
 import { hashPayload, idempotentTransaction, isKeyRace, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { decimalString, money, parseMoney, parseQuantity } from "@/core/money";
 import { addExpiryLots, applyMovement, resolveWarehouse, StockRuleError } from "@/modules/inventory/stock";
@@ -401,11 +402,28 @@ export async function postSupplierPayment(
   }
 }
 
-export async function listPurchases(organizationId: string, branchId: string) {
+/** The sorts a purchase list may ask for: by date or by number, newest first by default. */
+export const purchaseSorts = documentSorts({ number: "asc" });
+
+/** One page of the branch's purchases, newest first (business date, then number). `search` matches the number or the supplier name in SQL. */
+export async function listPurchases(
+  organizationId: string,
+  branchId: string,
+  query: ListQuery = listQuery({}, { sorts: purchaseSorts }),
+  search = "",
+): Promise<Paged<{ id: string; number: string | null; status: string; total: string; businessDate: string; supplierName: string }>> {
+  const text = search.trim();
+  const where: Prisma.PurchaseWhereInput = {
+    organizationId,
+    branchId,
+    ...(text ? { OR: [{ number: { contains: text } }, { supplier: { name: { contains: text } } }] } : {}),
+  };
+  const total = await prisma.purchase.count({ where });
   const rows = await prisma.purchase.findMany({
-    where: { organizationId, branchId },
-    orderBy: { businessDate: "desc" },
-    take: 100,
+    where,
+    orderBy: query.orderBy as Prisma.PurchaseOrderByWithRelationInput[],
+    skip: query.skip,
+    take: query.take,
     select: {
       id: true,
       number: true,
@@ -415,14 +433,17 @@ export async function listPurchases(organizationId: string, branchId: string) {
       supplier: { select: { name: true } },
     },
   });
-  return rows.map((row) => ({
-    id: row.id,
-    number: row.number,
-    status: row.status,
-    total: decimalString(row.total, 2),
-    businessDate: dateOnly(row.businessDate),
-    supplierName: row.supplier.name,
-  }));
+  return {
+    rows: rows.map((row) => ({
+      id: row.id,
+      number: row.number,
+      status: row.status,
+      total: decimalString(row.total, 2),
+      businessDate: dateOnly(row.businessDate),
+      supplierName: row.supplier.name,
+    })),
+    page: pageInfo(total, query, rows.length),
+  };
 }
 
 export async function getPurchase(organizationId: string, branchId: string, id: string) {

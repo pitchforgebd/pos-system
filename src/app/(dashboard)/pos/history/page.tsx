@@ -1,19 +1,23 @@
 import { redirect } from "next/navigation";
 
-import { SalesTable } from "@/components/sales/sales-table";
+import { SalesList } from "@/components/sales/sales-list";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
+import { listQuery } from "@/core/list";
 import { getSession } from "@/modules/auth/current-session";
-import { listSales } from "@/modules/sales/sales";
+import { listSales, saleSorts } from "@/modules/sales/sales";
 
 export const metadata = { title: "POS history" };
 
-export default async function PosHistoryPage() {
+type SearchParams = Promise<{ page?: string; pageSize?: string; sort?: string }>;
+
+export default async function PosHistoryPage({ searchParams }: { searchParams: SearchParams }) {
   const session = await getSession();
   if (!session?.branchId) {
     redirect("/login");
   }
-  const sales = await listSales(session.organizationId, session.branchId);
+  const params = await searchParams;
+  const { rows, page } = await listSales(session.organizationId, session.branchId, listQuery(params, { sorts: saleSorts }));
 
   return (
     <div className="space-y-6">
@@ -27,7 +31,7 @@ export default async function PosHistoryPage() {
           </Button>
         }
       />
-      <SalesTable rows={sales} />
+      <SalesList rows={rows} page={page} path="/pos/history" params={{ sort: params.sort }} />
     </div>
   );
 }

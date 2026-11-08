@@ -3,26 +3,28 @@ import { redirect } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
+import { Pagination } from "@/components/ui/pagination";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/states";
+import { listQuery, pageHref } from "@/core/list";
 import { getSession } from "@/modules/auth/current-session";
-import { listPurchases } from "@/modules/purchasing/purchases";
+import { listPurchases, purchaseSorts } from "@/modules/purchasing/purchases";
 
 export const metadata = { title: "Purchases" };
 
-export default async function PurchasesPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+export default async function PurchasesPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string; pageSize?: string; sort?: string }> }) {
   const session = await getSession();
   if (!session?.branchId) {
     redirect("/login");
   }
   const params = await searchParams;
-  const q = params.q?.trim().toLowerCase() ?? "";
-  const purchases = (await listPurchases(session.organizationId, session.branchId)).filter((row) => {
-    if (!q) {
-      return true;
-    }
-    return `${row.number ?? ""} ${row.supplierName}`.toLowerCase().includes(q);
-  });
+  // The search runs in SQL, so it finds a purchase on any page, not only among the rows that were loaded.
+  const { rows: purchases, page } = await listPurchases(
+    session.organizationId,
+    session.branchId,
+    listQuery(params, { sorts: purchaseSorts }),
+    params.q ?? "",
+  );
 
   return (
     <div className="space-y-6">
@@ -54,6 +56,15 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Pr
         getRowKey={(row) => row.id}
         empty={<EmptyState title="No purchases" description="Post a purchase to receive stock from a supplier." />}
       />
+      {page.total > page.pageSize ? (
+        <Pagination
+          page={page.page}
+          pageCount={page.pageCount}
+          total={page.total}
+          pageSize={page.pageSize}
+          hrefFor={(target) => pageHref("/purchases", { q: params.q, sort: params.sort, pageSize: page.pageSize === 25 ? undefined : page.pageSize }, target)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -1,19 +1,23 @@
 import { redirect } from "next/navigation";
 
-import { SalesTable } from "@/components/sales/sales-table";
+import { SalesList } from "@/components/sales/sales-list";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
+import { listQuery } from "@/core/list";
 import { getSession } from "@/modules/auth/current-session";
-import { listSales } from "@/modules/sales/sales";
+import { listSales, saleSorts } from "@/modules/sales/sales";
 
 export const metadata = { title: "Sales" };
 
-export default async function SalesPage() {
+type SearchParams = Promise<{ page?: string; pageSize?: string; sort?: string }>;
+
+export default async function SalesPage({ searchParams }: { searchParams: SearchParams }) {
   const session = await getSession();
   if (!session?.branchId) {
     redirect("/login");
   }
-  const sales = await listSales(session.organizationId, session.branchId);
+  const params = await searchParams;
+  const { rows, page } = await listSales(session.organizationId, session.branchId, listQuery(params, { sorts: saleSorts }));
 
   return (
     <div className="space-y-6">
@@ -23,7 +27,7 @@ export default async function SalesPage() {
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Sales" }]}
         actions={session.permissions.has("sales.create") ? <Button href="/sales/new">New sale</Button> : null}
       />
-      <SalesTable rows={sales} />
+      <SalesList rows={rows} page={page} path="/sales" params={{ sort: params.sort }} />
     </div>
   );
 }

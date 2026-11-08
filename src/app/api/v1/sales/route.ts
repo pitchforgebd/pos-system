@@ -5,7 +5,8 @@ import { isoDate } from "@/core/time/iso-date";
 import { jsonError, jsonOk } from "@/lib/api/http";
 import { requirePermission } from "@/modules/access/guard";
 import { idempotencyKey, stockActor } from "@/modules/inventory/actor";
-import { listSales, postSale } from "@/modules/sales/sales";
+import { listQuery } from "@/core/list";
+import { listSales, postSale, saleSorts } from "@/modules/sales/sales";
 
 const lineSchema = z.object({
   productId: z.string().uuid().optional(),
@@ -36,7 +37,10 @@ export const GET = defineRoute({
     if (!actor) {
       return jsonError("BUSINESS_RULE", "Select a branch before viewing sales.", 422);
     }
-    return jsonOk(await listSales(actor.organizationId, actor.branchId));
+    const params = new URL(request.url).searchParams;
+    const query = listQuery({ page: params.get("page"), pageSize: params.get("pageSize"), sort: params.get("sort") }, { sorts: saleSorts });
+    const { rows, page } = await listSales(actor.organizationId, actor.branchId, query);
+    return jsonOk(rows, "Operation completed", 200, { page });
   },
 });
 

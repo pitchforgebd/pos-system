@@ -7,6 +7,7 @@ import { writeAudit } from "@/modules/auth/audit";
 import { postBalancedJournal } from "@/modules/accounting/post";
 import { outstandingReceivable } from "@/modules/customers/customers";
 import { allocateNumber, documentYear } from "@/modules/documents/numbers";
+import { documentSorts, listQuery, pageInfo, type ListQuery, type Paged } from "@/core/list";
 import { hashPayload, idempotentTransaction, isKeyRace, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { decimalString, money, parseMoney, parseQuantity, zero } from "@/core/money";
 import { applyMovement, currentUnitCost, resolveWarehouse, StockRuleError } from "@/modules/inventory/stock";
@@ -475,11 +476,22 @@ async function requireCustomer(tx: Prisma.TransactionClient, organizationId: str
   return customer;
 }
 
-export async function listSales(organizationId: string, branchId: string) {
+/** The sorts a sale list may ask for: by date or by invoice number, newest first by default. */
+export const saleSorts = documentSorts({ invoice: { number: "asc" } });
+
+/** One page of the branch's sales, newest first (business date, then invoice number), with the total for the pager. */
+export async function listSales(
+  organizationId: string,
+  branchId: string,
+  query: ListQuery = listQuery({}, { sorts: saleSorts }),
+): Promise<Paged<{ id: string; number: string | null; status: string; total: string; businessDate: string; customerName: string }>> {
+  const where = { organizationId, branchId };
+  const total = await prisma.sale.count({ where });
   const rows = await prisma.sale.findMany({
-    where: { organizationId, branchId },
-    orderBy: { businessDate: "desc" },
-    take: 100,
+    where,
+    orderBy: query.orderBy as Prisma.SaleOrderByWithRelationInput[],
+    skip: query.skip,
+    take: query.take,
     select: {
       id: true,
       status: true,
@@ -489,14 +501,17 @@ export async function listSales(organizationId: string, branchId: string) {
       invoice: { select: { number: true } },
     },
   });
-  return rows.map((row) => ({
-    id: row.id,
-    number: row.invoice?.number ?? null,
-    status: row.status,
-    total: decimalString(row.total, 2),
-    businessDate: dateOnly(row.businessDate),
-    customerName: row.customer?.name ?? "Walk-in",
-  }));
+  return {
+    rows: rows.map((row) => ({
+      id: row.id,
+      number: row.invoice?.number ?? null,
+      status: row.status,
+      total: decimalString(row.total, 2),
+      businessDate: dateOnly(row.businessDate),
+      customerName: row.customer?.name ?? "Walk-in",
+    })),
+    page: pageInfo(total, query, rows.length),
+  };
 }
 
 export async function getSale(organizationId: string, branchId: string, id: string) {
