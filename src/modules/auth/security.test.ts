@@ -174,14 +174,11 @@ test("phase 16 rejects cross-site, cross-branch, injection, and secret leakage",
     assert.equal(await getSale(org.id, elsewhere.id, sale.id), null);
     assert.ok(await getSale(org.id, branch.id, sale.id));
   } finally {
-    await prisma.auditLog.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
     await prisma.auditLog.deleteMany({ where: { action: "failed_login", ip: "203.0.113.8", userAgent: "test" } });
-    await prisma.session.deleteMany({ where: { organizationId: org.id } });
-    await prisma.sale.deleteMany({ where: { organizationId: org.id } });
-    await prisma.product.deleteMany({ where: { organizationId: org.id } });
-    await prisma.user.deleteMany({ where: { organizationId: org.id } });
-    await prisma.branch.deleteMany({ where: { organizationId: org.id } });
-    await prisma.organization.deleteMany({ where: { id: { in: [org.id, other.id] } } });
+    const { cleanupOrg } = await import("../../tests/helpers/cleanup.ts");
+    for (const id of [org.id, other.id]) {
+      await cleanupOrg(id);
+    }
     await prisma.$disconnect();
   }
 });

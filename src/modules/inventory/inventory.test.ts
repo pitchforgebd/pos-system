@@ -167,22 +167,10 @@ test("phase 05 stock and products", async () => {
     assert.equal(removed.ok, true);
     assert.equal(await getProduct(org.id, created.product.id), null);
   } finally {
-    await prisma.auditLog.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.idempotencyKey.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.stockLedger.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.stockBalance.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.stockAdjustment.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.damageRecord.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.expiryBatch.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.openingStock.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.ownStockInvoice.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.productBarcode.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.productVariant.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.product.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.warehouse.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.user.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.branch.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.organization.deleteMany({ where: { id: { in: [org.id, other.id] } } });
+    const { cleanupOrg } = await import("../../tests/helpers/cleanup.ts");
+    for (const id of [org.id, other.id]) {
+      await cleanupOrg(id);
+    }
     await prisma.$disconnect();
   }
 });

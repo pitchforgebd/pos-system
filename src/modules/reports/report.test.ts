@@ -178,22 +178,8 @@ test("phase 14 reports sum posted rows and keep the trial balance equal", async 
     assert.equal(cash.debit, "10.00");
     assert.equal(cash.credit, "5.00");
   } finally {
-    await prisma.invoice.deleteMany({ where: { organizationId: org.id } });
-    await prisma.sale.deleteMany({ where: { organizationId: org.id } });
-    await prisma.purchase.deleteMany({ where: { organizationId: org.id } });
-    await prisma.customerLedger.deleteMany({ where: { organizationId: org.id } });
-    await prisma.supplierLedger.deleteMany({ where: { organizationId: org.id } });
-    await prisma.customer.deleteMany({ where: { organizationId: org.id } });
-    await prisma.supplier.deleteMany({ where: { organizationId: org.id } });
-    await prisma.stockBalance.deleteMany({ where: { organizationId: org.id } });
-    await prisma.product.deleteMany({ where: { organizationId: org.id } });
-    await prisma.journalLine.deleteMany({ where: { organizationId: org.id } });
-    await prisma.journal.deleteMany({ where: { organizationId: org.id } });
-    await prisma.account.deleteMany({ where: { organizationId: org.id } });
-    await prisma.accountGroup.deleteMany({ where: { organizationId: org.id } });
-    await prisma.warehouse.deleteMany({ where: { organizationId: org.id } });
-    await prisma.branch.deleteMany({ where: { organizationId: org.id } });
-    await prisma.organization.deleteMany({ where: { id: org.id } });
+    const { cleanupOrg } = await import("../../tests/helpers/cleanup.ts");
+    await cleanupOrg(org.id);
     await prisma.$disconnect();
   }
 });

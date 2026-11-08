@@ -162,26 +162,10 @@ test("phase 06 purchases and supplier balances", async () => {
       assert.equal(debit, credit);
     }
   } finally {
-    await prisma.auditLog.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.idempotencyKey.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.stockLedger.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.stockBalance.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.purchasePayment.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.purchaseItem.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.purchase.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.supplierPayment.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.journalLine.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.journal.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.supplierLedger.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.supplier.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.product.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.account.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.accountGroup.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.documentSequence.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.warehouse.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.user.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.branch.deleteMany({ where: { organizationId: { in: [org.id, other.id] } } });
-    await prisma.organization.deleteMany({ where: { id: { in: [org.id, other.id] } } });
+    const { cleanupOrg } = await import("../../tests/helpers/cleanup.ts");
+    for (const id of [org.id, other.id]) {
+      await cleanupOrg(id);
+    }
     await prisma.$disconnect();
   }
 });

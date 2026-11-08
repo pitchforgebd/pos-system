@@ -203,23 +203,8 @@ test("phase 09 journals balance and reversals do not edit the original", async (
       assert.equal(debit, credit);
     }
   } finally {
-    await prisma.auditLog.deleteMany({ where: { organizationId: org.id } });
-    await prisma.idempotencyKey.deleteMany({ where: { organizationId: org.id } });
-    await prisma.voucher.deleteMany({ where: { organizationId: org.id } });
-    await prisma.expense.deleteMany({ where: { organizationId: org.id } });
-    await prisma.income.deleteMany({ where: { organizationId: org.id } });
-    await prisma.capitalTransaction.deleteMany({ where: { organizationId: org.id } });
-    await prisma.loan.deleteMany({ where: { organizationId: org.id } });
-    await prisma.bankAccount.deleteMany({ where: { organizationId: org.id } });
-    await prisma.journalLine.deleteMany({ where: { organizationId: org.id } });
-    await prisma.journal.deleteMany({ where: { organizationId: org.id, reversalOfId: { not: null } } });
-    await prisma.journal.deleteMany({ where: { organizationId: org.id } });
-    await prisma.account.deleteMany({ where: { organizationId: org.id } });
-    await prisma.accountGroup.deleteMany({ where: { organizationId: org.id } });
-    await prisma.documentSequence.deleteMany({ where: { organizationId: org.id } });
-    await prisma.user.deleteMany({ where: { organizationId: org.id } });
-    await prisma.branch.deleteMany({ where: { organizationId: org.id } });
-    await prisma.organization.deleteMany({ where: { id: org.id } });
+    const { cleanupOrg } = await import("../../tests/helpers/cleanup.ts");
+    await cleanupOrg(org.id);
     await prisma.$disconnect();
   }
 });

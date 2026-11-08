@@ -233,31 +233,8 @@ test("phase 10 posts customer due and advance without inventing points", async (
     });
     assert.equal(blocked.ok, false);
   } finally {
-    await prisma.auditLog.deleteMany({ where: { organizationId: org.id } });
-    await prisma.idempotencyKey.deleteMany({ where: { organizationId: org.id } });
-    await prisma.loyaltyCard.deleteMany({ where: { organizationId: org.id } });
-    await prisma.loyaltyTransaction.deleteMany({ where: { organizationId: org.id } });
-    await prisma.loyaltyTier.deleteMany({ where: { organizationId: org.id } });
-    await prisma.crmAssignment.deleteMany({ where: { organizationId: org.id } });
-    await prisma.crmActivity.deleteMany({ where: { organizationId: org.id } });
-    await prisma.crmContact.deleteMany({ where: { organizationId: org.id } });
-    await prisma.crmSegment.deleteMany({ where: { organizationId: org.id } });
-    await prisma.installment.deleteMany({ where: { organizationId: org.id } });
-    await prisma.customerPayment.deleteMany({ where: { organizationId: org.id } });
-    await prisma.customerAdvance.deleteMany({ where: { organizationId: org.id } });
-    await prisma.customerLedger.deleteMany({ where: { organizationId: org.id } });
-    await prisma.invoice.deleteMany({ where: { organizationId: org.id } });
-    await prisma.sale.deleteMany({ where: { organizationId: org.id } });
-    await prisma.journalLine.deleteMany({ where: { organizationId: org.id } });
-    await prisma.journal.deleteMany({ where: { organizationId: org.id } });
-    await prisma.customer.deleteMany({ where: { organizationId: org.id } });
-    await prisma.customerType.deleteMany({ where: { organizationId: org.id } });
-    await prisma.account.deleteMany({ where: { organizationId: org.id } });
-    await prisma.accountGroup.deleteMany({ where: { organizationId: org.id } });
-    await prisma.documentSequence.deleteMany({ where: { organizationId: org.id } });
-    await prisma.user.deleteMany({ where: { organizationId: org.id } });
-    await prisma.branch.deleteMany({ where: { organizationId: org.id } });
-    await prisma.organization.deleteMany({ where: { id: org.id } });
+    const { cleanupOrg } = await import("../../tests/helpers/cleanup.ts");
+    await cleanupOrg(org.id);
     await prisma.$disconnect();
   }
 });

@@ -41,12 +41,17 @@ function ensurePermissionCatalog() {
     const have = new Set(
       (await prisma.permission.findMany({ where: { code: { in: [...permissionCodes] } }, select: { code: true } })).map((row) => row.code),
     );
-    const missing = permissionCodes.filter((code) => !have.has(code));
-    if (missing.length > 0) {
-      await prisma.permission.createMany({
-        data: missing.map((code) => ({ code, module: code.split(".")[0] ?? code })),
-        skipDuplicates: true,
-      });
+    // One statement per code, each on its own (autocommit), always in the same order. A single multi-row
+    // INSERT IGNORE into an empty table takes gap locks on the unique index, and two test files doing that at
+    // the same moment deadlock (N21). One row at a time holds one lock for an instant, so no cycle can form;
+    // ON DUPLICATE KEY UPDATE makes "another file got there first" a no-op instead of an error.
+    const missing = permissionCodes.filter((code) => !have.has(code)).sort();
+    for (const code of missing) {
+      await prisma.$executeRaw`
+        INSERT INTO permissions (id, code, module, updatedAt)
+        VALUES (${randomUUID()}, ${code}, ${code.split(".")[0] ?? code}, NOW(3))
+        ON DUPLICATE KEY UPDATE code = code
+      `;
     }
   })().catch((error: unknown) => {
     catalog = null;

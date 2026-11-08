@@ -76,9 +76,8 @@ test("phase 17 lists dues in one pass and the new indexes cover the explained fi
     );
     assert.equal(journals.possible.includes("journals_organizationId_branchId_status_businessDate_idx"), true);
   } finally {
-    await prisma.customerLedger.deleteMany({ where: { organizationId: org.id } });
-    await prisma.customer.deleteMany({ where: { organizationId: org.id } });
-    await prisma.organization.deleteMany({ where: { id: org.id } });
+    const { cleanupOrg } = await import("../../tests/helpers/cleanup.ts");
+    await cleanupOrg(org.id);
     await prisma.$disconnect();
   }
 });

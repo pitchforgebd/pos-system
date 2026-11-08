@@ -85,19 +85,8 @@ test("phase 15 imports each row on its own and does not post opening stock to a 
       assert.match(exported.csv, new RegExp(sku));
     }
   } finally {
-    await prisma.auditLog.deleteMany({ where: { organizationId: org.id } });
-    await prisma.idempotencyKey.deleteMany({ where: { organizationId: org.id } });
-    await prisma.importRow.deleteMany({ where: { organizationId: org.id } });
-    await prisma.import.deleteMany({ where: { organizationId: org.id } });
-    await prisma.expiryBatch.deleteMany({ where: { organizationId: org.id } });
-    await prisma.stockLedger.deleteMany({ where: { organizationId: org.id } });
-    await prisma.stockBalance.deleteMany({ where: { organizationId: org.id } });
-    await prisma.openingStock.deleteMany({ where: { organizationId: org.id } });
-    await prisma.product.deleteMany({ where: { organizationId: org.id } });
-    await prisma.warehouse.deleteMany({ where: { organizationId: org.id } });
-    await prisma.user.deleteMany({ where: { organizationId: org.id } });
-    await prisma.branch.deleteMany({ where: { organizationId: org.id } });
-    await prisma.organization.deleteMany({ where: { id: org.id } });
+    const { cleanupOrg } = await import("../../tests/helpers/cleanup.ts");
+    await cleanupOrg(org.id);
     await prisma.$disconnect();
   }
 });

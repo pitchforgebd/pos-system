@@ -124,16 +124,8 @@ test("phase 13 sms substitutes text, fails closed, and does not post a journal",
     assert.equal(dashboard.sentTotal, 0);
     assert.equal(dashboard.balance, "4.00");
   } finally {
-    await prisma.auditLog.deleteMany({ where: { organizationId: org.id } });
-    await prisma.idempotencyKey.deleteMany({ where: { organizationId: org.id } });
-    await prisma.smsLog.deleteMany({ where: { organizationId: org.id } });
-    await prisma.smsMessage.deleteMany({ where: { organizationId: org.id } });
-    await prisma.smsTemplate.deleteMany({ where: { organizationId: org.id } });
-    await prisma.smsRechargeRequest.deleteMany({ where: { organizationId: org.id } });
-    await prisma.notificationLog.deleteMany({ where: { organizationId: org.id } });
-    await prisma.setting.deleteMany({ where: { organizationId: org.id } });
-    await prisma.user.deleteMany({ where: { organizationId: org.id } });
-    await prisma.organization.deleteMany({ where: { id: org.id } });
+    const { cleanupOrg } = await import("../../tests/helpers/cleanup.ts");
+    await cleanupOrg(org.id);
     await prisma.$disconnect();
   }
 });

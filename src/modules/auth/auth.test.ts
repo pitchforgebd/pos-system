@@ -164,16 +164,10 @@ test("phase 04 access controls", async () => {
     const reused = await resetPassword({ token: reset.token, password: "new-password-2", ip: "127.0.0.1", userAgent: "test" });
     assert.equal(reused.ok, false);
   } finally {
-    await prisma.auditLog.deleteMany({ where: { organizationId: { in: [orgA.id, orgB.id] } } });
-    await prisma.passwordReset.deleteMany({ where: { organizationId: { in: [orgA.id, orgB.id] } } });
-    await prisma.session.deleteMany({ where: { organizationId: { in: [orgA.id, orgB.id] } } });
-    await prisma.userRole.deleteMany({ where: { organizationId: { in: [orgA.id, orgB.id] } } });
-    await prisma.rolePermission.deleteMany({ where: { organizationId: { in: [orgA.id, orgB.id] } } });
-    await prisma.userBranchAccess.deleteMany({ where: { organizationId: { in: [orgA.id, orgB.id] } } });
-    await prisma.user.deleteMany({ where: { organizationId: { in: [orgA.id, orgB.id] } } });
-    await prisma.role.deleteMany({ where: { organizationId: { in: [orgA.id, orgB.id] } } });
-    await prisma.branch.deleteMany({ where: { organizationId: { in: [orgA.id, orgB.id] } } });
-    await prisma.organization.deleteMany({ where: { id: { in: [orgA.id, orgB.id] } } });
+    const { cleanupOrg } = await import("../../tests/helpers/cleanup.ts");
+    for (const id of [orgA.id, orgB.id]) {
+      await cleanupOrg(id);
+    }
     await prisma.$disconnect();
   }
 });

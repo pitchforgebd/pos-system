@@ -102,25 +102,8 @@ test("a purchase of an expiry-tracked product creates its lots", async () => {
     assert.equal((await buy([{ productId: salt.id, quantity: "5", unitCost: "5.00" }])).ok, true);
     assert.equal(await prisma.expiryBatch.count({ where: { organizationId: org.id, productId: salt.id } }), 0);
   } finally {
-    await prisma.auditLog.deleteMany({ where: { organizationId: org.id } });
-    await prisma.idempotencyKey.deleteMany({ where: { organizationId: org.id } });
-    await prisma.stockLedger.deleteMany({ where: { organizationId: org.id } });
-    await prisma.stockBalance.deleteMany({ where: { organizationId: org.id } });
-    await prisma.expiryBatch.deleteMany({ where: { organizationId: org.id } });
-    await prisma.supplierLedger.deleteMany({ where: { organizationId: org.id } });
-    await prisma.purchaseItem.deleteMany({ where: { organizationId: org.id } });
-    await prisma.purchase.deleteMany({ where: { organizationId: org.id } });
-    await prisma.journalLine.deleteMany({ where: { organizationId: org.id } });
-    await prisma.journal.deleteMany({ where: { organizationId: org.id } });
-    await prisma.supplier.deleteMany({ where: { organizationId: org.id } });
-    await prisma.product.deleteMany({ where: { organizationId: org.id } });
-    await prisma.account.deleteMany({ where: { organizationId: org.id } });
-    await prisma.accountGroup.deleteMany({ where: { organizationId: org.id } });
-    await prisma.documentSequence.deleteMany({ where: { organizationId: org.id } });
-    await prisma.warehouse.deleteMany({ where: { organizationId: org.id } });
-    await prisma.user.deleteMany({ where: { organizationId: org.id } });
-    await prisma.branch.deleteMany({ where: { organizationId: org.id } });
-    await prisma.organization.deleteMany({ where: { id: org.id } });
+    const { cleanupOrg } = await import("../../tests/helpers/cleanup.ts");
+    await cleanupOrg(org.id);
     await prisma.$disconnect();
   }
 });

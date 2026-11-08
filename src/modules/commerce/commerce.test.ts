@@ -69,15 +69,8 @@ test("phase 11 quotations and requisitions do not post money or stock", async ()
     const finalStatus = await prisma.requisition.findFirst({ where: { id: request.id } });
     assert.equal(finalStatus?.status, "FULFILLED");
   } finally {
-    await prisma.auditLog.deleteMany({ where: { organizationId: org.id } });
-    await prisma.idempotencyKey.deleteMany({ where: { organizationId: org.id } });
-    await prisma.quotation.deleteMany({ where: { organizationId: org.id } });
-    await prisma.requisition.deleteMany({ where: { organizationId: org.id } });
-    await prisma.customer.deleteMany({ where: { organizationId: org.id } });
-    await prisma.documentSequence.deleteMany({ where: { organizationId: org.id } });
-    await prisma.user.deleteMany({ where: { organizationId: org.id } });
-    await prisma.branch.deleteMany({ where: { organizationId: org.id } });
-    await prisma.organization.deleteMany({ where: { id: org.id } });
+    const { cleanupOrg } = await import("../../tests/helpers/cleanup.ts");
+    await cleanupOrg(org.id);
     await prisma.$disconnect();
   }
 });

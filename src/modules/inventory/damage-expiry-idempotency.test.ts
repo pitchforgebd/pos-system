@@ -141,21 +141,8 @@ test("damage and expiry write-off are idempotent", async () => {
     }
     assert.equal(await quantityOf(expiring), "7.0000");
   } finally {
-    const where = { organizationId: org.id };
-    await prisma.auditLog.deleteMany({ where });
-    await prisma.idempotencyKey.deleteMany({ where });
-    await prisma.stockLedger.deleteMany({ where });
-    await prisma.stockBalance.deleteMany({ where });
-    await prisma.damageRecord.deleteMany({ where });
-    await prisma.expiryBatch.deleteMany({ where });
-    await prisma.openingStock.deleteMany({ where });
-    await prisma.productBarcode.deleteMany({ where });
-    await prisma.productVariant.deleteMany({ where });
-    await prisma.product.deleteMany({ where });
-    await prisma.warehouse.deleteMany({ where });
-    await prisma.user.deleteMany({ where });
-    await prisma.branch.deleteMany({ where });
-    await prisma.organization.deleteMany({ where: { id: org.id } });
+    const { cleanupOrg } = await import("../../tests/helpers/cleanup.ts");
+    await cleanupOrg(org.id);
     await prisma.$disconnect();
   }
 });
