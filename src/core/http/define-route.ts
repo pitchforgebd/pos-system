@@ -122,32 +122,47 @@ export function defineRoute<TBody = undefined, TParams = Record<string, string>>
       idempotencyKey = header;
     }
 
+    // A body can be read once. The request is read here, one time, and every attempt of the handler gets its own copy
+    // built from those bytes: a rerun after an idempotency-key race must still find its body.
+    const transactional = config.transaction ?? mutating;
+    const raw = mutating && request.body !== null && (config.body || transactional) ? await request.arrayBuffer() : null;
+    const attemptRequest = () =>
+      raw === null ? request : new Request(request.url, { method: request.method, headers: request.headers, body: raw.byteLength > 0 ? raw : undefined });
+
     let body = undefined as TBody;
     if (config.body) {
-      const parsed = config.body.safeParse(await request.json().catch(() => null));
+      let json: unknown = null;
+      if (raw !== null) {
+        try {
+          json = JSON.parse(new TextDecoder().decode(raw));
+        } catch {
+          json = null;
+        }
+      }
+      const parsed = config.body.safeParse(json);
       if (!parsed.success) {
         return jsonError("VALIDATION_ERROR", "The request is not valid.", 400, fieldErrors(parsed.error.issues));
       }
       body = parsed.data;
     }
 
-    const ctx: RouteContext<TBody, TParams> = {
-      request,
+    const makeContext = (): RouteContext<TBody, TParams> => ({
+      request: attemptRequest(),
       session,
       params,
       body,
       idempotencyKey,
       ip: clientIp(request),
       userAgent: request.headers.get("user-agent"),
-    };
+    });
 
     try {
-      if (config.transaction ?? mutating) {
+      if (transactional) {
         // READ COMMITTED: a repeated request sees the key its twin has just committed, and a scan of a small table
         // takes no gap locks that block another request's insert.
         return await runTx(
           async () => {
-            const response = await config.handler(ctx);
+            const response = await config.handler(makeContext());
             if (response.status >= 400) {
               throw new RollbackWith(response);
             }
@@ -157,7 +172,7 @@ export function defineRoute<TBody = undefined, TParams = Record<string, string>>
           { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, retryIf: isKeyRace },
         );
       }
-      return await config.handler(ctx);
+      return await config.handler(makeContext());
     } catch (error) {
       if (error instanceof RollbackWith) {
         return error.response;

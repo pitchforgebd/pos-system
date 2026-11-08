@@ -7,7 +7,7 @@ import { prisma } from "@/lib/db/client";
 import { occurredDate } from "@/lib/format/date";
 import { allocateNumber } from "@/modules/documents/numbers";
 import { writeAudit } from "@/modules/auth/audit";
-import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } from "@/core/idempotency";
+import { hashPayload, idempotentTransaction, isKeyRace, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { decimalString, parseMoney, parseQuantity } from "@/core/money";
 import { addExpiryLots, applyMovement, currentUnitCost, resolveWarehouse, StockRuleError, type ConsumedLot } from "@/modules/inventory/stock";
 
@@ -41,6 +41,9 @@ function failure(error: unknown): Failure | null {
       code: error.status === 404 ? "NOT_FOUND" : error.status === 409 ? "CONFLICT" : "BUSINESS_RULE",
       message: error.message,
     };
+  }
+  if (isKeyRace(error)) {
+    throw error;
   }
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
     return { ok: false, status: 409, code: "CONFLICT", message: "That stock row was updated by someone else. Try again." };

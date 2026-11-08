@@ -7,7 +7,7 @@ import { writeAudit } from "@/modules/auth/audit";
 import { postBalancedJournal } from "@/modules/accounting/post";
 import { outstandingReceivable } from "@/modules/customers/customers";
 import { allocateNumber, documentYear } from "@/modules/documents/numbers";
-import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } from "@/core/idempotency";
+import { hashPayload, idempotentTransaction, isKeyRace, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { decimalString, parseMoney } from "@/core/money";
 import { StockRuleError } from "@/modules/inventory/stock";
 import { occurredDate } from "@/lib/format/date";
@@ -30,6 +30,9 @@ function failure(error: unknown): Failure | null {
   }
   if (error instanceof RuleError) {
     return { ok: false, status: 422, code: "BUSINESS_RULE", message: error.message };
+  }
+  if (isKeyRace(error)) {
+    throw error;
   }
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
     return { ok: false, status: 409, code: "CONFLICT", message: "That document number was already used. Try again." };

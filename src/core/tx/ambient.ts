@@ -10,7 +10,12 @@ export type Ambient = {
   tx: Prisma.TransactionClient;
 };
 
-const storage = new AsyncLocalStorage<Ambient>();
+// One store per process, kept on globalThis like the Prisma client. The production build can include this module in
+// more than one bundle; with a store per copy, runTx would write the transaction into one and the shared client
+// would read another, so nothing would join the transaction and every query would take its own connection.
+const holder = globalThis as unknown as Record<symbol, AsyncLocalStorage<Ambient> | undefined>;
+const key = Symbol.for("meridian.ambientTransaction");
+const storage = (holder[key] ??= new AsyncLocalStorage<Ambient>());
 
 export function currentAmbient(): Ambient | undefined {
   return storage.getStore();

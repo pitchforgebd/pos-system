@@ -29,7 +29,10 @@ export function hashPayload(value: unknown) {
 // What happened to the idempotency key inside one transaction, so `idempotentTransaction` can store the answer
 // of a first request and give it back to a repeated one. Keyed by the transaction client.
 type KeyContext = { existing?: { response: Prisma.JsonValue | null }; savedId?: string };
-const contexts = new WeakMap<object, KeyContext>();
+// Kept on globalThis, like the ambient transaction: the production build can include this module in several bundles,
+// and the key-race check in defineRoute must recognise an error that saveIdempotency (in another copy) marked.
+const shared = globalThis as unknown as Record<symbol, unknown>;
+const contexts = (shared[Symbol.for("meridian.idempotencyContexts")] ??= new WeakMap<object, KeyContext>()) as WeakMap<object, KeyContext>;
 
 function contextOf(tx: Prisma.TransactionClient) {
   let context = contexts.get(tx);
@@ -58,7 +61,7 @@ export async function readIdempotency(
 }
 
 // Errors raised because another request with the same key committed first.
-const keyRaces = new WeakSet<object>();
+const keyRaces = (shared[Symbol.for("meridian.idempotencyKeyRaces")] ??= new WeakSet<object>()) as WeakSet<object>;
 
 export async function saveIdempotency(
   tx: Prisma.TransactionClient,

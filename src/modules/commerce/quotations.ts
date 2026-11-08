@@ -6,7 +6,7 @@ import { dateOnly } from "@/core/time/business-date";
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
 import { allocateNumber, documentYear } from "@/modules/documents/numbers";
-import { hashPayload, readIdempotency, saveIdempotency } from "@/core/idempotency";
+import { hashPayload, isKeyRace, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { decimalString, parseMoney, parseQuantity } from "@/core/money";
 import { StockRuleError } from "@/modules/inventory/stock";
 import { postSale } from "@/modules/sales/sales";
@@ -31,6 +31,9 @@ function failure(error: unknown): Failure | null {
   if (error instanceof RuleError) {
     const code = error.status === 404 ? "NOT_FOUND" : error.status === 409 ? "CONFLICT" : "BUSINESS_RULE";
     return { ok: false, status: error.status, code, message: error.message };
+  }
+  if (isKeyRace(error)) {
+    throw error;
   }
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
     return { ok: false, status: 409, code: "CONFLICT", message: "That document number was already used. Try again." };

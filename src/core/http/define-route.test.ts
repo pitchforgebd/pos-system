@@ -7,7 +7,7 @@ import test from "node:test";
 import { z } from "zod";
 
 import { basePrisma, prisma } from "../../lib/db/client.ts";
-import { jsonOk } from "../../lib/api/http.ts";
+import { jsonError, jsonOk } from "../../lib/api/http.ts";
 import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } from "../idempotency/index.ts";
 import { concurrently } from "../../tests/helpers/index.ts";
 import { writeAudit } from "../../modules/auth/audit.ts";
@@ -240,5 +240,52 @@ test("ten parallel requests with one Idempotency-Key through a route create one 
     assert.equal(results.every((result) => result.body.data?.number === "INV-2627-000007"), true);
     assert.equal(results.filter((result) => result.body.data?.replayed === false).length, 1);
     assert.equal(await basePrisma.branch.count({ where: { organizationId: t.org.id, name: "Invoice" } }), 1);
+  });
+});
+
+test("a request that is run again after a key race still has its body, whether the handler or defineRoute reads it", async () => {
+  await withTestOrg(async (t) => {
+    const work = async (idempotencyKey: string, name: string) => {
+      const requestHash = hashPayload({ name });
+      return idempotentTransaction(async (tx) => {
+        const existing = await readIdempotency(tx, { organizationId: t.org.id, key: idempotencyKey, requestHash });
+        if (existing && existing !== "mismatch") {
+          return { id: existing.entityId, replayed: true, name: null as string | null };
+        }
+        const branch = await tx.branch.create({ data: { organizationId: t.org.id, name } });
+        await saveIdempotency(tx, { organizationId: t.org.id, userId: t.owner.id, key: idempotencyKey, requestHash, entityType: "branch", entityId: branch.id });
+        return { id: branch.id, replayed: false, name };
+      });
+    };
+    const readsItself = defineRoute({
+      permission: "sales.create",
+      idempotent: true,
+      handler: async ({ request, idempotencyKey }) => {
+        const sent = (await request.json().catch(() => null)) as { name?: string } | null;
+        if (!sent?.name) {
+          return jsonError("VALIDATION_ERROR", "The body was empty.", 400);
+        }
+        return jsonOk(await work(idempotencyKey as string, sent.name), "Operation completed", 200);
+      },
+    });
+    const parsedByRoute = defineRoute({
+      permission: "sales.create",
+      idempotent: true,
+      body: z.object({ name: z.string().min(1) }),
+      handler: async ({ body, request, idempotencyKey }) => {
+        // Reading the body again in the handler must also work: it is a copy built for this attempt.
+        const again = (await request.json().catch(() => null)) as { name?: string } | null;
+        assert.equal(again?.name, body.name);
+        return jsonOk(await work(idempotencyKey as string, body.name), "Operation completed", 200);
+      },
+    });
+    for (const [route, name] of [[readsItself, "Body read by the handler"], [parsedByRoute, "Body read by defineRoute"]] as const) {
+      const key = randomUUID();
+      const results = await concurrently(10, () => call(t, route, { headers: { "idempotency-key": key }, body: { name } }));
+      assert.deepEqual(results.filter((result) => result.status !== 200).map((result) => `${result.status} ${result.body.error?.message}`), []);
+      assert.equal(new Set(results.map((result) => result.body.data?.id)).size, 1);
+      assert.equal(results.filter((result) => result.body.data?.replayed === false).length, 1);
+      assert.equal(await basePrisma.branch.count({ where: { organizationId: t.org.id, name } }), 1);
+    }
   });
 });
