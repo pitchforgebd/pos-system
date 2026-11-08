@@ -1,24 +1,18 @@
 import { z } from "zod";
+import { defineRoute } from "@/core/http/define-route";
 
-import { jsonError, jsonOk, rejectCrossSite } from "@/lib/api/http";
-import { requireSession } from "@/modules/access/guard";
+import { jsonError, jsonOk } from "@/lib/api/http";
 
 const bodySchema = z.object({ lang: z.enum(["bn", "en"]) });
 
-export async function POST(request: Request) {
-  const rejected = rejectCrossSite(request);
-  if (rejected) {
-    return rejected;
-  }
-  const auth = await requireSession(request);
-  if (!auth.ok) {
-    return auth.response;
-  }
-  const parsed = bodySchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) {
-    return jsonError("VALIDATION_ERROR", "Choose English or Bangla.", 400);
-  }
-  const response = jsonOk({ lang: parsed.data.lang });
-  response.headers.append("set-cookie", `meridian_lang=${parsed.data.lang}; Path=/; SameSite=Lax`);
-  return response;
-}
+export const POST = defineRoute({
+  handler: async ({ request }) => {
+    const parsed = bodySchema.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) {
+      return jsonError("VALIDATION_ERROR", "Choose English or Bangla.", 400);
+    }
+    const response = jsonOk({ lang: parsed.data.lang });
+    response.headers.append("set-cookie", `meridian_lang=${parsed.data.lang}; Path=/; SameSite=Lax`);
+    return response;
+  },
+});

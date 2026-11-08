@@ -83,7 +83,8 @@ function fieldErrors(issues: { path: (string | number)[]; message: string }[]) {
  *   });
  */
 export function defineRoute<TBody = undefined, TParams = Record<string, string>>(config: RouteConfig<TBody, TParams>) {
-  return async function route(request: Request, context?: { params: Promise<TParams> }): Promise<Response> {
+  // Next.js passes { params } as the second argument; the type must not be optional for its route type check.
+  return async function route(request: Request, context: { params: Promise<TParams> }): Promise<Response> {
     const mutating = !SAFE_METHODS.has(request.method.toUpperCase());
 
     if (config.csrf ?? mutating) {

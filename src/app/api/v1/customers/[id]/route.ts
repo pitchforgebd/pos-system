@@ -1,7 +1,7 @@
 import { z } from "zod";
+import { defineRoute } from "@/core/http/define-route";
 
-import { clientIp, jsonError, jsonOk, rejectCrossSite } from "@/lib/api/http";
-import { requirePermission, requireSession } from "@/modules/access/guard";
+import { clientIp, jsonError, jsonOk } from "@/lib/api/http";
 import { getCustomer, updateCustomer } from "@/modules/customers/customers";
 
 const patchSchema = z.object({
@@ -15,54 +15,40 @@ const patchSchema = z.object({
   status: z.enum(["ACTIVE", "INACTIVE"]),
 });
 
-export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
-  const auth = await requireSession(request);
-  if (!auth.ok) {
-    return auth.response;
-  }
-  const denied = requirePermission(auth.session, "customers.view");
-  if (denied) {
-    return denied;
-  }
-  const { id } = await context.params;
-  if (!z.string().uuid().safeParse(id).success) {
-    return jsonError("NOT_FOUND", "That record was not found.", 404);
-  }
-  const customer = await getCustomer(auth.session.organizationId, id);
-  if (!customer) {
-    return jsonError("NOT_FOUND", "That record was not found.", 404);
-  }
-  return jsonOk(customer);
-}
+export const GET = defineRoute<undefined, { id: string }>({
+  permission: "customers.view",
+  handler: async ({ session, params }) => {
+    const { id } = await params;
+    if (!z.string().uuid().safeParse(id).success) {
+      return jsonError("NOT_FOUND", "That record was not found.", 404);
+    }
+    const customer = await getCustomer(session.organizationId, id);
+    if (!customer) {
+      return jsonError("NOT_FOUND", "That record was not found.", 404);
+    }
+    return jsonOk(customer);
+  },
+});
 
-export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
-  const rejected = rejectCrossSite(request);
-  if (rejected) {
-    return rejected;
-  }
-  const auth = await requireSession(request);
-  if (!auth.ok) {
-    return auth.response;
-  }
-  const denied = requirePermission(auth.session, "customers.edit");
-  if (denied) {
-    return denied;
-  }
-  const { id } = await context.params;
-  const parsed = patchSchema.safeParse(await request.json().catch(() => null));
-  if (!z.string().uuid().safeParse(id).success || !parsed.success) {
-    return jsonError("VALIDATION_ERROR", "Validation failed", 400);
-  }
-  const result = await updateCustomer({
-    organizationId: auth.session.organizationId,
-    actorId: auth.session.userId,
-    customerId: id,
-    ...parsed.data,
-    ip: clientIp(request),
-    userAgent: request.headers.get("user-agent"),
-  });
-  if (!result.ok) {
-    return jsonError(result.code, result.message, result.status);
-  }
-  return jsonOk(result.customer);
-}
+export const PATCH = defineRoute<undefined, { id: string }>({
+  permission: "customers.edit",
+  handler: async ({ request, session, params }) => {
+    const { id } = await params;
+    const parsed = patchSchema.safeParse(await request.json().catch(() => null));
+    if (!z.string().uuid().safeParse(id).success || !parsed.success) {
+      return jsonError("VALIDATION_ERROR", "Validation failed", 400);
+    }
+    const result = await updateCustomer({
+      organizationId: session.organizationId,
+      actorId: session.userId,
+      customerId: id,
+      ...parsed.data,
+      ip: clientIp(request),
+      userAgent: request.headers.get("user-agent"),
+    });
+    if (!result.ok) {
+      return jsonError(result.code, result.message, result.status);
+    }
+    return jsonOk(result.customer);
+  },
+});

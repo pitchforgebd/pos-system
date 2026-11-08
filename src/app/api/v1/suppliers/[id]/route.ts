@@ -1,7 +1,7 @@
 import { z } from "zod";
+import { defineRoute } from "@/core/http/define-route";
 
-import { clientIp, jsonError, jsonOk, rejectCrossSite } from "@/lib/api/http";
-import { requirePermission, requireSession } from "@/modules/access/guard";
+import { clientIp, jsonError, jsonOk } from "@/lib/api/http";
 import { getSupplier, updateSupplier } from "@/modules/purchasing/suppliers";
 
 const patchSchema = z.object({
@@ -14,54 +14,40 @@ const patchSchema = z.object({
   status: z.enum(["ACTIVE", "INACTIVE"]),
 });
 
-export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
-  const auth = await requireSession(request);
-  if (!auth.ok) {
-    return auth.response;
-  }
-  const denied = requirePermission(auth.session, "suppliers.view");
-  if (denied) {
-    return denied;
-  }
-  const { id } = await context.params;
-  if (!z.string().uuid().safeParse(id).success) {
-    return jsonError("NOT_FOUND", "That record was not found.", 404);
-  }
-  const supplier = await getSupplier(auth.session.organizationId, id);
-  if (!supplier) {
-    return jsonError("NOT_FOUND", "That record was not found.", 404);
-  }
-  return jsonOk(supplier);
-}
+export const GET = defineRoute<undefined, { id: string }>({
+  permission: "suppliers.view",
+  handler: async ({ session, params }) => {
+    const { id } = await params;
+    if (!z.string().uuid().safeParse(id).success) {
+      return jsonError("NOT_FOUND", "That record was not found.", 404);
+    }
+    const supplier = await getSupplier(session.organizationId, id);
+    if (!supplier) {
+      return jsonError("NOT_FOUND", "That record was not found.", 404);
+    }
+    return jsonOk(supplier);
+  },
+});
 
-export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
-  const rejected = rejectCrossSite(request);
-  if (rejected) {
-    return rejected;
-  }
-  const auth = await requireSession(request);
-  if (!auth.ok) {
-    return auth.response;
-  }
-  const denied = requirePermission(auth.session, "suppliers.edit");
-  if (denied) {
-    return denied;
-  }
-  const { id } = await context.params;
-  const parsed = patchSchema.safeParse(await request.json().catch(() => null));
-  if (!z.string().uuid().safeParse(id).success || !parsed.success) {
-    return jsonError("VALIDATION_ERROR", "Validation failed", 400);
-  }
-  const result = await updateSupplier({
-    organizationId: auth.session.organizationId,
-    actorId: auth.session.userId,
-    supplierId: id,
-    ...parsed.data,
-    ip: clientIp(request),
-    userAgent: request.headers.get("user-agent"),
-  });
-  if (!result.ok) {
-    return jsonError(result.code, result.message, result.status);
-  }
-  return jsonOk(result.supplier);
-}
+export const PATCH = defineRoute<undefined, { id: string }>({
+  permission: "suppliers.edit",
+  handler: async ({ request, session, params }) => {
+    const { id } = await params;
+    const parsed = patchSchema.safeParse(await request.json().catch(() => null));
+    if (!z.string().uuid().safeParse(id).success || !parsed.success) {
+      return jsonError("VALIDATION_ERROR", "Validation failed", 400);
+    }
+    const result = await updateSupplier({
+      organizationId: session.organizationId,
+      actorId: session.userId,
+      supplierId: id,
+      ...parsed.data,
+      ip: clientIp(request),
+      userAgent: request.headers.get("user-agent"),
+    });
+    if (!result.ok) {
+      return jsonError(result.code, result.message, result.status);
+    }
+    return jsonOk(result.supplier);
+  },
+});

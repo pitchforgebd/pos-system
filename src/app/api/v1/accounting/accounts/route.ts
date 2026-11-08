@@ -1,7 +1,7 @@
 import { z } from "zod";
+import { defineRoute } from "@/core/http/define-route";
 
-import { jsonError, jsonOk, rejectCrossSite } from "@/lib/api/http";
-import { requirePermission, requireSession } from "@/modules/access/guard";
+import { jsonError, jsonOk } from "@/lib/api/http";
 import { createAccount, listAccounts } from "@/modules/accounting/books";
 
 const bodySchema = z.object({
@@ -10,38 +10,24 @@ const bodySchema = z.object({
   groupCode: z.string().trim().min(1).max(16),
 });
 
-export async function GET(request: Request) {
-  const auth = await requireSession(request);
-  if (!auth.ok) {
-    return auth.response;
-  }
-  const denied = requirePermission(auth.session, "accounting.view");
-  if (denied) {
-    return denied;
-  }
-  return jsonOk(await listAccounts(auth.session.organizationId));
-}
+export const GET = defineRoute({
+  permission: "accounting.view",
+  handler: async ({ session }) => {
+    return jsonOk(await listAccounts(session.organizationId));
+  },
+});
 
-export async function POST(request: Request) {
-  const rejected = rejectCrossSite(request);
-  if (rejected) {
-    return rejected;
-  }
-  const auth = await requireSession(request);
-  if (!auth.ok) {
-    return auth.response;
-  }
-  const denied = requirePermission(auth.session, "accounting.create");
-  if (denied) {
-    return denied;
-  }
-  const parsed = bodySchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) {
-    return jsonError("VALIDATION_ERROR", "Validation failed", 400);
-  }
-  const result = await createAccount({ organizationId: auth.session.organizationId, ...parsed.data });
-  if (!result.ok) {
-    return jsonError(result.code, result.message, result.status);
-  }
-  return jsonOk(result.account, "Operation completed", 201);
-}
+export const POST = defineRoute({
+  permission: "accounting.create",
+  handler: async ({ request, session }) => {
+    const parsed = bodySchema.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) {
+      return jsonError("VALIDATION_ERROR", "Validation failed", 400);
+    }
+    const result = await createAccount({ organizationId: session.organizationId, ...parsed.data });
+    if (!result.ok) {
+      return jsonError(result.code, result.message, result.status);
+    }
+    return jsonOk(result.account, "Operation completed", 201);
+  },
+});

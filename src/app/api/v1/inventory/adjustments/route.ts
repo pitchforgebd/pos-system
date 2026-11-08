@@ -1,7 +1,7 @@
 import { z } from "zod";
+import { defineRoute } from "@/core/http/define-route";
 
-import { jsonError, jsonOk, rejectCrossSite } from "@/lib/api/http";
-import { requirePermission, requireSession } from "@/modules/access/guard";
+import { jsonError, jsonOk } from "@/lib/api/http";
 import { idempotencyKey, stockActor } from "@/modules/inventory/actor";
 import { postAdjustment } from "@/modules/inventory/documents";
 
@@ -14,28 +14,19 @@ const bodySchema = z.object({
   warehouseId: z.string().uuid().optional(),
 });
 
-export async function POST(request: Request) {
-  const rejected = rejectCrossSite(request);
-  if (rejected) {
-    return rejected;
-  }
-  const auth = await requireSession(request);
-  if (!auth.ok) {
-    return auth.response;
-  }
-  const denied = requirePermission(auth.session, "inventory.adjust");
-  if (denied) {
-    return denied;
-  }
-  const actor = stockActor(auth.session, request);
-  const key = idempotencyKey(request);
-  const parsed = bodySchema.safeParse(await request.json().catch(() => null));
-  if (!actor || !key || !parsed.success) {
-    return jsonError("VALIDATION_ERROR", "A branch, an Idempotency-Key, and an adjustment are required.", 400);
-  }
-  const result = await postAdjustment({ ...actor, idempotencyKey: key, ...parsed.data });
-  if (!result.ok) {
-    return jsonError(result.code, result.message, result.status);
-  }
-  return jsonOk({ id: result.id, replayed: result.replayed }, "Operation completed", result.replayed ? 200 : 201);
-}
+export const POST = defineRoute({
+  permission: "inventory.adjust",
+  handler: async ({ request, session }) => {
+    const actor = stockActor(session, request);
+    const key = idempotencyKey(request);
+    const parsed = bodySchema.safeParse(await request.json().catch(() => null));
+    if (!actor || !key || !parsed.success) {
+      return jsonError("VALIDATION_ERROR", "A branch, an Idempotency-Key, and an adjustment are required.", 400);
+    }
+    const result = await postAdjustment({ ...actor, idempotencyKey: key, ...parsed.data });
+    if (!result.ok) {
+      return jsonError(result.code, result.message, result.status);
+    }
+    return jsonOk({ id: result.id, replayed: result.replayed }, "Operation completed", result.replayed ? 200 : 201);
+  },
+});

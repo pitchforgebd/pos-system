@@ -86,7 +86,7 @@ test("phase 16 rejects cross-site, cross-branch, injection, and secret leakage",
     (error: unknown) => error instanceof PostingError && error.message === "The journal is not balanced.",
   );
 
-  const healthy = await health();
+  const healthy = await health(new Request("http://localhost/api/health"), { params: Promise.resolve({}) });
   const healthText = await healthy.text();
   assert.equal(healthText.includes("mysql://"), false);
   assert.equal(healthText.includes("stack"), false);

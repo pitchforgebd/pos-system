@@ -1,18 +1,9 @@
-import { jsonError, rejectCrossSite } from "@/lib/api/http";
-import { requirePermission, requireSession } from "@/modules/access/guard";
+import { jsonError } from "@/lib/api/http";
+import { defineRoute } from "@/core/http/define-route";
 
-export async function POST(request: Request) {
-  const rejected = rejectCrossSite(request);
-  if (rejected) {
-    return rejected;
-  }
-  const auth = await requireSession(request);
-  if (!auth.ok) {
-    return auth.response;
-  }
-  const denied = requirePermission(auth.session, "sales.cancel");
-  if (denied) {
-    return denied;
-  }
-  return jsonError("BUSINESS_RULE", "A posted sale is not cancelled in this phase.", 422);
-}
+export const POST = defineRoute({
+  permission: "sales.cancel",
+  handler: async ({  }) => {
+    return jsonError("BUSINESS_RULE", "A posted sale is not cancelled in this phase.", 422);
+  },
+});

@@ -1,7 +1,7 @@
 import { z } from "zod";
+import { defineRoute } from "@/core/http/define-route";
 
-import { clientIp, jsonError, jsonOk, rejectCrossSite } from "@/lib/api/http";
-import { requirePermission, requireSession } from "@/modules/access/guard";
+import { clientIp, jsonError, jsonOk } from "@/lib/api/http";
 import { disableProduct, getProduct, updateProduct } from "@/modules/catalog/products";
 
 const productSchema = z.object({
@@ -25,85 +25,62 @@ const productSchema = z.object({
   warrantyAvailable: z.boolean().default(false),
 });
 
-export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
-  const auth = await requireSession(request);
-  if (!auth.ok) {
-    return auth.response;
-  }
-  const denied = requirePermission(auth.session, "products.view");
-  if (denied) {
-    return denied;
-  }
-  const { id } = await context.params;
-  if (!z.string().uuid().safeParse(id).success) {
-    return jsonError("NOT_FOUND", "That record was not found.", 404);
-  }
-  const product = await getProduct(auth.session.organizationId, id);
-  if (!product) {
-    return jsonError("NOT_FOUND", "That record was not found.", 404);
-  }
-  return jsonOk(product);
-}
+export const GET = defineRoute<undefined, { id: string }>({
+  permission: "products.view",
+  handler: async ({ session, params }) => {
+    const { id } = await params;
+    if (!z.string().uuid().safeParse(id).success) {
+      return jsonError("NOT_FOUND", "That record was not found.", 404);
+    }
+    const product = await getProduct(session.organizationId, id);
+    if (!product) {
+      return jsonError("NOT_FOUND", "That record was not found.", 404);
+    }
+    return jsonOk(product);
+  },
+});
 
-export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
-  const rejected = rejectCrossSite(request);
-  if (rejected) {
-    return rejected;
-  }
-  const auth = await requireSession(request);
-  if (!auth.ok) {
-    return auth.response;
-  }
-  const denied = requirePermission(auth.session, "products.edit");
-  if (denied) {
-    return denied;
-  }
-  const { id } = await context.params;
-  const parsed = productSchema.safeParse(await request.json().catch(() => null));
-  if (!z.string().uuid().safeParse(id).success || !parsed.success) {
-    return jsonError("VALIDATION_ERROR", "Validation failed", 400);
-  }
-  const result = await updateProduct({
-    organizationId: auth.session.organizationId,
-    actorId: auth.session.userId,
-    productId: id,
-    ...parsed.data,
-    ip: clientIp(request),
-    userAgent: request.headers.get("user-agent"),
-  });
-  if (!result.ok) {
-    const code = result.status === 409 ? "CONFLICT" : result.status === 404 ? "NOT_FOUND" : "BUSINESS_RULE";
-    return jsonError(code, result.message, result.status);
-  }
-  return jsonOk(result.product);
-}
+export const PATCH = defineRoute<undefined, { id: string }>({
+  permission: "products.edit",
+  handler: async ({ request, session, params }) => {
+    const { id } = await params;
+    const parsed = productSchema.safeParse(await request.json().catch(() => null));
+    if (!z.string().uuid().safeParse(id).success || !parsed.success) {
+      return jsonError("VALIDATION_ERROR", "Validation failed", 400);
+    }
+    const result = await updateProduct({
+      organizationId: session.organizationId,
+      actorId: session.userId,
+      productId: id,
+      ...parsed.data,
+      ip: clientIp(request),
+      userAgent: request.headers.get("user-agent"),
+    });
+    if (!result.ok) {
+      const code = result.status === 409 ? "CONFLICT" : result.status === 404 ? "NOT_FOUND" : "BUSINESS_RULE";
+      return jsonError(code, result.message, result.status);
+    }
+    return jsonOk(result.product);
+  },
+});
 
-export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
-  const rejected = rejectCrossSite(request);
-  if (rejected) {
-    return rejected;
-  }
-  const auth = await requireSession(request);
-  if (!auth.ok) {
-    return auth.response;
-  }
-  const denied = requirePermission(auth.session, "products.delete");
-  if (denied) {
-    return denied;
-  }
-  const { id } = await context.params;
-  if (!z.string().uuid().safeParse(id).success) {
-    return jsonError("NOT_FOUND", "That record was not found.", 404);
-  }
-  const result = await disableProduct({
-    organizationId: auth.session.organizationId,
-    actorId: auth.session.userId,
-    productId: id,
-    ip: clientIp(request),
-    userAgent: request.headers.get("user-agent"),
-  });
-  if (!result.ok) {
-    return jsonError("NOT_FOUND", result.message, 404);
-  }
-  return jsonOk({ id });
-}
+export const DELETE = defineRoute<undefined, { id: string }>({
+  permission: "products.delete",
+  handler: async ({ request, session, params }) => {
+    const { id } = await params;
+    if (!z.string().uuid().safeParse(id).success) {
+      return jsonError("NOT_FOUND", "That record was not found.", 404);
+    }
+    const result = await disableProduct({
+      organizationId: session.organizationId,
+      actorId: session.userId,
+      productId: id,
+      ip: clientIp(request),
+      userAgent: request.headers.get("user-agent"),
+    });
+    if (!result.ok) {
+      return jsonError("NOT_FOUND", result.message, 404);
+    }
+    return jsonOk({ id });
+  },
+});

@@ -4,8 +4,9 @@ import { join, relative, sep } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-// Static guard. src/proxy.ts does not check sessions for /api, so each route handler must.
-// A new route fails this test until it calls requireSession or is added to the public list on purpose.
+// Static guard (invariant I17). src/proxy.ts does not check sessions for /api, so every route handler must go
+// through defineRoute (origin check, session, permission, transaction, error answers). A new route fails this
+// test until it uses defineRoute; it can be public only if it is added to the list below on purpose.
 
 const apiRoot = fileURLToPath(new URL("../../app/api", import.meta.url));
 
@@ -16,9 +17,6 @@ const publicRoutes = new Set([
   "v1/auth/forgot-password/route.ts",
   "v1/auth/reset-password/route.ts",
 ]);
-
-// Public routes that change state still need the same-origin check.
-const publicRoutesWithoutOriginCheck = new Set(["health/route.ts"]);
 
 function routeFiles() {
   return readdirSync(apiRoot, { recursive: true, encoding: "utf8" })
@@ -39,19 +37,46 @@ test("the API route list is found", () => {
   }
 });
 
-test("every API route except the public list requires a session", () => {
-  const missing = routeFiles().filter((route) => !publicRoutes.has(route) && !source(route).includes("requireSession("));
+test("every route handler is written with defineRoute, none as a plain function", () => {
+  const plain = routeFiles().filter((route) => /^export\s+(async\s+)?function\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b/m.test(source(route)));
+  assert.deepEqual(plain, []);
+  const without = routeFiles().filter((route) => !/export const (GET|POST|PUT|PATCH|DELETE)\s*=\s*defineRoute/.test(source(route)));
+  assert.deepEqual(without, []);
+});
+
+test("every API route except the public list requires a session (no `public: true` elsewhere)", () => {
+  const publicHere = routeFiles().filter((route) => /\bpublic:\s*true\b/.test(source(route)));
+  assert.deepEqual(publicHere, [...publicRoutes].sort());
+});
+
+test("no route repeats the guards by hand: defineRoute does the origin check, the session and the permission", () => {
+  const manual = routeFiles().filter((route) => /\b(rejectCrossSite|requireSession)\s*\(/.test(source(route)));
+  assert.deepEqual(manual, []);
+});
+
+test("no route that changes data switches the origin check off", () => {
+  const off = routeFiles().filter((route) => /\bcsrf:\s*false\b/.test(source(route)));
+  assert.deepEqual(off, []);
+});
+
+// Routes without a permission line. A session is enough for the first two (any signed-in user may change their own
+// language or branch); the others decide by the user's permissions inside the handler (any of several, or by method).
+const sessionOnly = new Set(["v1/locale/route.ts", "v1/session/branch/route.ts"]);
+const checksInside = new Set(["v1/pos/barcode/route.ts", "v1/products/[id]/image/route.ts", "v1/users/[id]/route.ts"]);
+
+test("every route except the public list names the permission it needs", () => {
+  const missing = routeFiles()
+    .filter((route) => !publicRoutes.has(route) && !sessionOnly.has(route) && !checksInside.has(route))
+    .filter((route) => {
+      const text = source(route);
+      const handlers = text.match(/export const (GET|POST|PUT|PATCH|DELETE)\s*=\s*defineRoute/g) ?? [];
+      const permissions = text.match(/\bpermission:\s*(\[|")/g) ?? [];
+      return permissions.length < handlers.length;
+    });
   assert.deepEqual(missing, []);
 });
 
-test("every API route that changes data rejects cross-site requests", () => {
-  const missing = routeFiles().filter((route) => {
-    if (publicRoutesWithoutOriginCheck.has(route)) {
-      return false;
-    }
-    const text = source(route);
-    const mutates = /export\s+(async\s+)?function\s+(POST|PUT|PATCH|DELETE)\b/.test(text);
-    return mutates && !text.includes("rejectCrossSite(");
-  });
-  assert.deepEqual(missing, []);
+test("a route that checks permissions itself really does", () => {
+  const silent = [...checksInside].filter((route) => !/permissions\.has\(|requirePermission\(/.test(source(route)));
+  assert.deepEqual(silent, []);
 });

@@ -1,8 +1,9 @@
 import { z } from "zod";
+import { defineRoute } from "@/core/http/define-route";
 import { isoDate } from "@/core/time/iso-date";
 
-import { jsonError, jsonOk, rejectCrossSite } from "@/lib/api/http";
-import { requirePermission, requireSession } from "@/modules/access/guard";
+import { jsonError, jsonOk } from "@/lib/api/http";
+import { requirePermission } from "@/modules/access/guard";
 import { idempotencyKey, stockActor } from "@/modules/inventory/actor";
 import { listSales, postSale } from "@/modules/sales/sales";
 
@@ -28,60 +29,46 @@ const bodySchema = z.object({
   lines: z.array(lineSchema).min(1).max(100),
 });
 
-export async function GET(request: Request) {
-  const auth = await requireSession(request);
-  if (!auth.ok) {
-    return auth.response;
-  }
-  const denied = requirePermission(auth.session, "sales.view");
-  if (denied) {
-    return denied;
-  }
-  const actor = stockActor(auth.session, request);
-  if (!actor) {
-    return jsonError("BUSINESS_RULE", "Select a branch before viewing sales.", 422);
-  }
-  return jsonOk(await listSales(actor.organizationId, actor.branchId));
-}
-
-export async function POST(request: Request) {
-  const rejected = rejectCrossSite(request);
-  if (rejected) {
-    return rejected;
-  }
-  const auth = await requireSession(request);
-  if (!auth.ok) {
-    return auth.response;
-  }
-  const denied = requirePermission(auth.session, "sales.create");
-  if (denied) {
-    return denied;
-  }
-  const actor = stockActor(auth.session, request);
-  const key = idempotencyKey(request);
-  const parsed = bodySchema.safeParse(await request.json().catch(() => null));
-  if (!actor || !key || !parsed.success) {
-    return jsonError("VALIDATION_ERROR", "A branch, an Idempotency-Key, and at least one line are required.", 400);
-  }
-  if (parsed.data.lines.some((line) => line.discountAmount && line.discountAmount !== "0" && line.discountAmount !== "0.00")) {
-    const discountDenied = requirePermission(auth.session, "sales.discount");
-    if (discountDenied) {
-      return discountDenied;
+export const GET = defineRoute({
+  permission: "sales.view",
+  handler: async ({ request, session }) => {
+    const actor = stockActor(session, request);
+    if (!actor) {
+      return jsonError("BUSINESS_RULE", "Select a branch before viewing sales.", 422);
     }
-  }
-  const result = await postSale({
-    ...actor,
-    idempotencyKey: key,
-    warehouseId: parsed.data.warehouseId,
-    allowPriceOverride: auth.session.permissions.has("sales.price_override"),
-    ...parsed.data,
-  });
-  if (!result.ok) {
-    return jsonError(result.code, result.message, result.status);
-  }
-  return jsonOk(
-    { id: result.id, number: result.number, total: result.total, replayed: result.replayed },
-    "Operation completed",
-    result.replayed ? 200 : 201,
-  );
-}
+    return jsonOk(await listSales(actor.organizationId, actor.branchId));
+  },
+});
+
+export const POST = defineRoute({
+  permission: "sales.create",
+  handler: async ({ request, session }) => {
+    const actor = stockActor(session, request);
+    const key = idempotencyKey(request);
+    const parsed = bodySchema.safeParse(await request.json().catch(() => null));
+    if (!actor || !key || !parsed.success) {
+      return jsonError("VALIDATION_ERROR", "A branch, an Idempotency-Key, and at least one line are required.", 400);
+    }
+    if (parsed.data.lines.some((line) => line.discountAmount && line.discountAmount !== "0" && line.discountAmount !== "0.00")) {
+      const discountDenied = requirePermission(session, "sales.discount");
+      if (discountDenied) {
+        return discountDenied;
+      }
+    }
+    const result = await postSale({
+      ...actor,
+      idempotencyKey: key,
+      warehouseId: parsed.data.warehouseId,
+      allowPriceOverride: session.permissions.has("sales.price_override"),
+      ...parsed.data,
+    });
+    if (!result.ok) {
+      return jsonError(result.code, result.message, result.status);
+    }
+    return jsonOk(
+      { id: result.id, number: result.number, total: result.total, replayed: result.replayed },
+      "Operation completed",
+      result.replayed ? 200 : 201,
+    );
+  },
+});

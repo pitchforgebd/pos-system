@@ -1,23 +1,18 @@
 import { jsonError, jsonOk } from "@/lib/api/http";
-import { requirePermission, requireSession } from "@/modules/access/guard";
+import { defineRoute } from "@/core/http/define-route";
 import { getSale } from "@/modules/sales/sales";
 
-export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
-  const auth = await requireSession(request);
-  if (!auth.ok) {
-    return auth.response;
-  }
-  const denied = requirePermission(auth.session, "sales.view");
-  if (denied) {
-    return denied;
-  }
-  const { id } = await context.params;
-  if (!auth.session.branchId) {
-    return jsonError("NOT_FOUND", "That record was not found.", 404);
-  }
-  const sale = await getSale(auth.session.organizationId, auth.session.branchId, id);
-  if (!sale) {
-    return jsonError("NOT_FOUND", "That record was not found.", 404);
-  }
-  return jsonOk(sale);
-}
+export const GET = defineRoute<undefined, { id: string }>({
+  permission: "sales.view",
+  handler: async ({ session, params }) => {
+    const { id } = await params;
+    if (!session.branchId) {
+      return jsonError("NOT_FOUND", "That record was not found.", 404);
+    }
+    const sale = await getSale(session.organizationId, session.branchId, id);
+    if (!sale) {
+      return jsonError("NOT_FOUND", "That record was not found.", 404);
+    }
+    return jsonOk(sale);
+  },
+});

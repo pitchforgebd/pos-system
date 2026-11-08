@@ -1,7 +1,7 @@
 import { z } from "zod";
+import { defineRoute } from "@/core/http/define-route";
 
-import { clientIp, jsonError, jsonOk, rejectCrossSite } from "@/lib/api/http";
-import { requirePermission, requireSession } from "@/modules/access/guard";
+import { clientIp, jsonError, jsonOk } from "@/lib/api/http";
 import { createProduct, listProducts } from "@/modules/catalog/products";
 
 const productSchema = z.object({
@@ -26,46 +26,32 @@ const productSchema = z.object({
   barcode: z.string().trim().min(1).max(64).optional(),
 });
 
-export async function GET(request: Request) {
-  const auth = await requireSession(request);
-  if (!auth.ok) {
-    return auth.response;
-  }
-  const denied = requirePermission(auth.session, "products.view");
-  if (denied) {
-    return denied;
-  }
-  const search = new URL(request.url).searchParams.get("search")?.trim() || undefined;
-  return jsonOk(await listProducts(auth.session.organizationId, search));
-}
+export const GET = defineRoute({
+  permission: "products.view",
+  handler: async ({ request, session }) => {
+    const search = new URL(request.url).searchParams.get("search")?.trim() || undefined;
+    return jsonOk(await listProducts(session.organizationId, search));
+  },
+});
 
-export async function POST(request: Request) {
-  const rejected = rejectCrossSite(request);
-  if (rejected) {
-    return rejected;
-  }
-  const auth = await requireSession(request);
-  if (!auth.ok) {
-    return auth.response;
-  }
-  const denied = requirePermission(auth.session, "products.create");
-  if (denied) {
-    return denied;
-  }
-  const parsed = productSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) {
-    return jsonError("VALIDATION_ERROR", "Validation failed", 400);
-  }
-  const result = await createProduct({
-    organizationId: auth.session.organizationId,
-    actorId: auth.session.userId,
-    ...parsed.data,
-    ip: clientIp(request),
-    userAgent: request.headers.get("user-agent"),
-  });
-  if (!result.ok) {
-    const code = result.status === 409 ? "CONFLICT" : result.status === 404 ? "NOT_FOUND" : "BUSINESS_RULE";
-    return jsonError(code, result.message, result.status);
-  }
-  return jsonOk(result.product, "Operation completed", 201);
-}
+export const POST = defineRoute({
+  permission: "products.create",
+  handler: async ({ request, session }) => {
+    const parsed = productSchema.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) {
+      return jsonError("VALIDATION_ERROR", "Validation failed", 400);
+    }
+    const result = await createProduct({
+      organizationId: session.organizationId,
+      actorId: session.userId,
+      ...parsed.data,
+      ip: clientIp(request),
+      userAgent: request.headers.get("user-agent"),
+    });
+    if (!result.ok) {
+      const code = result.status === 409 ? "CONFLICT" : result.status === 404 ? "NOT_FOUND" : "BUSINESS_RULE";
+      return jsonError(code, result.message, result.status);
+    }
+    return jsonOk(result.product, "Operation completed", 201);
+  },
+});
