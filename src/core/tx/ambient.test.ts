@@ -95,16 +95,28 @@ test("an error from a nested call reaches the outermost runTx, which retries the
 });
 
 test("concurrent transactions each have their own connection, and one transaction keeps one", async () => {
-  const ids = await concurrently(6, () =>
+  // Three is the smallest pool Prisma opens by default (2 x physical cores + 1), so this holds on any machine. A barrier
+  // keeps all three transactions open at once; without it a fast one could finish and hand its connection to the next.
+  const count = 3;
+  let arrived = 0;
+  let release: () => void = () => undefined;
+  const everyoneIsIn = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const ids = await concurrently(count, () =>
     runTx(async () => {
       const first = await prisma.$queryRaw<{ id: bigint }[]>(Prisma.sql`SELECT CONNECTION_ID() AS id`);
-      await new Promise((resolve) => setTimeout(resolve, 30));
+      arrived += 1;
+      if (arrived === count) {
+        release();
+      }
+      await everyoneIsIn;
       const second = await prisma.$queryRaw<{ id: bigint }[]>(Prisma.sql`SELECT CONNECTION_ID() AS id`);
       assert.equal(first[0].id, second[0].id);
       return String(first[0].id);
     }),
   );
-  assert.equal(new Set(ids).size, 6);
+  assert.equal(new Set(ids).size, count);
 });
 
 test("outside runTx the shared client is the ordinary client, and $disconnect and friends still work", async () => {
