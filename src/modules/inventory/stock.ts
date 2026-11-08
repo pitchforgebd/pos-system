@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { Prisma, type StockMovementType } from "@prisma/client";
 
 import { RuleError, type RuleStatus } from "@/core/errors/rule-error";
@@ -215,6 +217,17 @@ export async function applyMovement(tx: Prisma.TransactionClient, input: Movemen
   }
 
   const variantScope = input.variantId ?? "";
+  // N21. The stock row is the pair (product, warehouse). "Look for the row, create it if it is missing" races: two
+  // first stock-ins both see nothing, and one hits the unique key (READ COMMITTED) or both take a gap lock and
+  // deadlock (REPEATABLE READ). Instead make sure the row exists with an INSERT that does nothing when it already
+  // does (ON DUPLICATE KEY UPDATE with no change): concurrent creators wait on the unique key one after the other,
+  // none fails. Then lock the row and work on it. A row created for a movement that is then refused disappears with
+  // the transaction.
+  await tx.$executeRaw`
+    INSERT INTO stock_balances (id, organizationId, productId, variantId, variantScope, branchId, warehouseId, quantity, updatedAt)
+    VALUES (${randomUUID()}, ${input.organizationId}, ${input.productId}, ${input.variantId ?? null}, ${variantScope}, ${input.branchId}, ${input.warehouseId}, 0, NOW(3))
+    ON DUPLICATE KEY UPDATE id = id
+  `;
   const locked = await tx.$queryRaw<Array<{ id: string; quantity: Prisma.Decimal; averageCost: Prisma.Decimal | null }>>`
     SELECT id, quantity, averageCost FROM stock_balances
     WHERE organizationId = ${input.organizationId}
@@ -224,7 +237,10 @@ export async function applyMovement(tx: Prisma.TransactionClient, input: Movemen
       AND warehouseId = ${input.warehouseId}
     FOR UPDATE
   `;
-  const current = locked[0] ? new Prisma.Decimal(locked[0].quantity) : new Prisma.Decimal(0);
+  if (!locked[0]) {
+    throw new Error("The stock row was not found after it was created.");
+  }
+  const current = new Prisma.Decimal(locked[0].quantity);
   const next = input.direction === "IN" ? current.plus(input.quantity) : current.minus(input.quantity);
   if (next.isNeg()) {
     throw new StockRuleError("Insufficient stock.");
@@ -232,28 +248,13 @@ export async function applyMovement(tx: Prisma.TransactionClient, input: Movemen
 
   const averageCost = nextAverageCost({
     onHand: current,
-    average: locked[0]?.averageCost == null ? null : new Prisma.Decimal(locked[0].averageCost),
+    average: locked[0].averageCost == null ? null : new Prisma.Decimal(locked[0].averageCost),
     direction: input.direction,
     quantity: input.quantity,
     unitCost: input.unitCost ?? null,
   });
 
-  if (locked[0]) {
-    await tx.stockBalance.updateMany({ where: { id: locked[0].id }, data: { quantity: next, averageCost } });
-  } else {
-    await tx.stockBalance.create({
-      data: {
-        organizationId: input.organizationId,
-        productId: input.productId,
-        variantId: input.variantId ?? null,
-        variantScope,
-        branchId: input.branchId,
-        warehouseId: input.warehouseId,
-        quantity: next,
-        averageCost,
-      },
-    });
-  }
+  await tx.stockBalance.updateMany({ where: { id: locked[0].id }, data: { quantity: next, averageCost } });
 
   if (input.direction === "OUT" && product.trackExpiry && consumesLots.has(input.movementType)) {
     await consumeExpiryLots(tx, input, next);
