@@ -1,44 +1,29 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
-import { useAttemptKey } from "@/lib/client/attempt-key";
+import { useSubmit } from "@/lib/client/use-submit";
 
 type Branch = { id: string; name: string; warehouses: { id: string; name: string }[] };
 type Product = { id: string; name: string; sku: string };
 
 export function TransferForm({ branches, products }: { branches: Branch[]; products: Product[] }) {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
-  const attempt = useAttemptKey();
+  const { submit, pending, message } = useSubmit();
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    setPending(true);
-    setMessage("");
-    void fetch("/api/v1/inventory/transfers", {
-      method: "POST",
-      headers: { "content-type": "application/json", "idempotency-key": attempt.current() },
-      body: JSON.stringify({
+    void submit({
+      url: "/api/v1/inventory/transfers",
+      body: {
         fromBranchId: data.get("fromBranchId"),
         toBranchId: data.get("toBranchId"),
         fromWarehouseId: data.get("fromWarehouseId"),
         toWarehouseId: data.get("toWarehouseId"),
         lines: [{ productId: data.get("productId"), quantity: data.get("quantity") }],
-      }),
-    })
-      .then(async (response) => {
-        const payload = (await response.json()) as { error?: { message?: string } };
-        if (!response.ok) {
-          setMessage(payload.error?.message ?? "The transfer was not posted.");
-          return;
-        }
-        attempt.renew();
-        window.location.reload();
-      })
-      .finally(() => setPending(false));
+      },
+    });
   }
 
   return (

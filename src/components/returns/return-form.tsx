@@ -4,12 +4,14 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useSubmit } from "@/lib/client/use-submit";
 
 type Line = { documentId: string; itemId: string; label: string };
 
 export function ReturnForm({ lines, kind }: { lines: Line[]; kind: "sale" | "purchase" }) {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const [localMessage, setLocalMessage] = useState("");
+  const { submit, pending, message: serverMessage } = useSubmit();
+  const message = localMessage || serverMessage;
   const [query, setQuery] = useState("");
   const visible = lines.filter((line) => line.label.toLowerCase().includes(query.trim().toLowerCase()));
 
@@ -22,33 +24,25 @@ export function ReturnForm({ lines, kind }: { lines: Line[]; kind: "sale" | "pur
         const [documentId, itemId] = String(form.get("line") || "").split("|");
         const method = String(form.get("refundMethod") || "");
         if (!documentId || !itemId) {
-          setMessage("Choose a line.");
+          setLocalMessage("Choose a line.");
           return;
         }
-        setPending(true);
-        setMessage("");
+        setLocalMessage("");
         const path = kind === "sale" ? `/api/v1/sales/${documentId}/return` : `/api/v1/purchases/${documentId}/return`;
         const line = kind === "sale"
           ? { saleItemId: itemId, quantity: form.get("quantity") }
           : { purchaseItemId: itemId, quantity: form.get("quantity") };
-        void fetch(path, {
-          method: "POST",
-          headers: { "content-type": "application/json", "idempotency-key": crypto.randomUUID() },
-          body: JSON.stringify({
-            businessDate: form.get("businessDate"),
-            refundMethod: kind === "purchase" && method ? method : undefined,
-            lines: [line],
-          }),
-        })
-          .then(async (response) => {
-            const payload = (await response.json()) as { error?: { message?: string } };
-            if (!response.ok) {
-              setMessage(payload.error?.message ?? "The return was not saved.");
-              return;
-            }
-            window.location.reload();
-          })
-          .finally(() => setPending(false));
+        void submit(
+          {
+            url: path,
+            body: {
+              businessDate: form.get("businessDate"),
+              refundMethod: kind === "purchase" && method ? method : undefined,
+              lines: [line],
+            },
+          },
+          { successMessage: "রিটার্ন সংরক্ষিত হয়েছে। (Return saved.)" },
+        );
       }}
     >
       <label className="grid gap-1 text-sm">

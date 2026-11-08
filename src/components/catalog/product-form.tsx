@@ -1,13 +1,17 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useSubmit } from "@/lib/client/use-submit";
 
 export function ProductForm() {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const router = useRouter();
+  const [photoMessage, setPhotoMessage] = useState("");
+  const { submit, pending, message: serverMessage } = useSubmit();
+  const message = photoMessage || serverMessage;
 
   return (
     <form
@@ -15,44 +19,41 @@ export function ProductForm() {
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        setPending(true);
-        setMessage("");
         const file = form.get("file");
-        void fetch("/api/v1/products", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            sku: form.get("sku"),
-            name: form.get("name"),
-            purchasePrice: form.get("purchasePrice"),
-            sellingPrice: form.get("sellingPrice"),
-            wholesalePrice: form.get("wholesalePrice"),
-            minimumPrice: form.get("minimumPrice"),
-            reorderLevel: form.get("reorderLevel") || "0",
-            barcode: String(form.get("barcode") || "") || undefined,
-            trackStock: form.get("trackStock") === "on",
-            trackExpiry: form.get("trackExpiry") === "on",
-          }),
-        })
-          .then(async (response) => {
-            const body = (await response.json()) as { data?: { id?: string }; error?: { message?: string } };
-            if (!response.ok || !body.data?.id) {
-              setMessage(body.error?.message ?? "The product was not saved.");
+        setPhotoMessage("");
+        void (async () => {
+          const created = await submit<{ id: string }>(
+            {
+              url: "/api/v1/products",
+              body: {
+                sku: form.get("sku"),
+                name: form.get("name"),
+                purchasePrice: form.get("purchasePrice"),
+                sellingPrice: form.get("sellingPrice"),
+                wholesalePrice: form.get("wholesalePrice"),
+                minimumPrice: form.get("minimumPrice"),
+                reorderLevel: form.get("reorderLevel") || "0",
+                barcode: String(form.get("barcode") || "") || undefined,
+                trackStock: form.get("trackStock") === "on",
+                trackExpiry: form.get("trackExpiry") === "on",
+              },
+            },
+            { successMessage: "পণ্য সংরক্ষিত হয়েছে। (Product saved.)", refresh: false },
+          );
+          if (!created.ok) {
+            return;
+          }
+          if (file instanceof File && file.size > 0) {
+            const photo = new FormData();
+            photo.set("file", file);
+            const uploaded = await submit({ url: `/api/v1/products/${created.data.id}/image`, body: photo }, { quiet: true });
+            if (!uploaded.ok) {
+              setPhotoMessage(`The product was saved, but the photo was not: ${uploaded.message}`);
               return;
             }
-            if (file instanceof File && file.size > 0) {
-              const photo = new FormData();
-              photo.set("file", file);
-              const uploaded = await fetch(`/api/v1/products/${body.data.id}/image`, { method: "POST", body: photo });
-              if (!uploaded.ok) {
-                const payload = (await uploaded.json()) as { error?: { message?: string } };
-                setMessage(payload.error?.message ?? "The product was saved, but the photo was not.");
-                return;
-              }
-            }
-            window.location.replace("/products");
-          })
-          .finally(() => setPending(false));
+          }
+          router.push("/products");
+        })();
       }}
     >
       <Input name="sku" required placeholder="SKU" aria-label="SKU" />

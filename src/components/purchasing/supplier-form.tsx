@@ -1,13 +1,11 @@
 "use client";
 
-import { useState } from "react";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useSubmit } from "@/lib/client/use-submit";
 
 export function SupplierForm() {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const { submit, pending, message } = useSubmit();
 
   return (
     <form
@@ -15,30 +13,21 @@ export function SupplierForm() {
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        setPending(true);
-        setMessage("");
-        void fetch("/api/v1/suppliers", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            name: form.get("name"),
-            phone: String(form.get("phone") || "") || null,
-            email: String(form.get("email") || "") || null,
-            address: String(form.get("address") || "") || null,
-            openingPayable: form.get("openingPayable") || "0.00",
-            creditLimit: String(form.get("creditLimit") || "") || null,
-            paymentTerms: String(form.get("paymentTerms") || "") || null,
-          }),
-        })
-          .then(async (response) => {
-            const body = (await response.json()) as { error?: { message?: string } };
-            if (!response.ok) {
-              setMessage(body.error?.message ?? "The supplier was not saved.");
-              return;
-            }
-            window.location.replace("/suppliers");
-          })
-          .finally(() => setPending(false));
+        void submit(
+          {
+            url: "/api/v1/suppliers",
+            body: {
+              name: form.get("name"),
+              phone: String(form.get("phone") || "") || null,
+              email: String(form.get("email") || "") || null,
+              address: String(form.get("address") || "") || null,
+              openingPayable: form.get("openingPayable") || "0.00",
+              creditLimit: String(form.get("creditLimit") || "") || null,
+              paymentTerms: String(form.get("paymentTerms") || "") || null,
+            },
+          },
+          { goTo: "/suppliers" },
+        );
       }}
     >
       <Input name="name" required placeholder="Name" aria-label="Name" />

@@ -2,9 +2,12 @@
 
 import { useState } from "react";
 
+import { useSubmit } from "@/lib/client/use-submit";
+
 export function ProductPhotoForm({ productId, hasImage }: { productId: string; hasImage: boolean }) {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const [localMessage, setLocalMessage] = useState("");
+  const { submit, pending, message: serverMessage } = useSubmit();
+  const message = localMessage || serverMessage;
 
   return (
     <form
@@ -13,21 +16,11 @@ export function ProductPhotoForm({ productId, hasImage }: { productId: string; h
         event.preventDefault();
         const data = new FormData(event.currentTarget);
         if (!(data.get("file") instanceof File) || (data.get("file") as File).size === 0) {
-          setMessage("Choose a photo.");
+          setLocalMessage("Choose a photo.");
           return;
         }
-        setPending(true);
-        setMessage("");
-        void fetch(`/api/v1/products/${productId}/image`, { method: "POST", body: data })
-          .then(async (response) => {
-            const payload = (await response.json()) as { error?: { message?: string } };
-            if (!response.ok) {
-              setMessage(payload.error?.message ?? "The photo was not saved.");
-              return;
-            }
-            window.location.reload();
-          })
-          .finally(() => setPending(false));
+        setLocalMessage("");
+        void submit({ url: `/api/v1/products/${productId}/image`, body: data }, { successMessage: "ছবি সংরক্ষিত হয়েছে। (Photo saved.)" });
       }}
     >
       {hasImage ? <img src={`/api/v1/products/${productId}/image`} alt="" className="size-10 rounded-md object-cover" /> : null}

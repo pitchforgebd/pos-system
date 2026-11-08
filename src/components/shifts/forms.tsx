@@ -1,45 +1,13 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useFormSubmit } from "@/lib/client/use-form-submit";
 
 type Option = { id: string; label: string };
 
-function postJson(url: string, body?: unknown) {
-  return fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json", "idempotency-key": crypto.randomUUID() },
-    body: JSON.stringify(body ?? {}),
-  }).then(async (response) => {
-    const payload = (await response.json()) as { error?: { message?: string } };
-    return { ok: response.ok, message: payload.error?.message ?? "" };
-  });
-}
-
-function useSubmit(url: string, body: (form: FormData) => unknown) {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    setPending(true);
-    setMessage("");
-    void postJson(url, body(form)).then((result) => {
-      if (!result.ok) {
-        setMessage(result.message || "The shift was not updated.");
-        setPending(false);
-        return;
-      }
-      window.location.reload();
-    });
-  }
-  return { message, pending, onSubmit };
-}
-
 export function OpenShiftForm() {
-  const form = useSubmit("/api/v1/shifts", (data) => ({ openingCash: data.get("openingCash") }));
+  const form = useFormSubmit("/api/v1/shifts", (data) => ({ openingCash: data.get("openingCash") }));
   return (
     <form className="grid max-w-xl gap-3" onSubmit={form.onSubmit}>
       <Input name="openingCash" required placeholder="Opening cash" aria-label="Opening cash" defaultValue="0.00" />
@@ -53,7 +21,7 @@ export function OpenShiftForm() {
 }
 
 export function ActivateShiftForm({ shiftId }: { shiftId: string }) {
-  const form = useSubmit(`/api/v1/shifts/${shiftId}/activate`, () => ({}));
+  const form = useFormSubmit(`/api/v1/shifts/${shiftId}/activate`, () => ({}));
   return (
     <form onSubmit={form.onSubmit}>
       {form.message ? <p className="text-sm text-error">{form.message}</p> : null}
@@ -65,7 +33,7 @@ export function ActivateShiftForm({ shiftId }: { shiftId: string }) {
 }
 
 export function MovementForm({ shiftId }: { shiftId: string }) {
-  const form = useSubmit(`/api/v1/shifts/${shiftId}/movements`, (data) => ({
+  const form = useFormSubmit(`/api/v1/shifts/${shiftId}/movements`, (data) => ({
     direction: data.get("direction"),
     amount: data.get("amount"),
     reason: String(data.get("reason") || "") || null,
@@ -87,7 +55,7 @@ export function MovementForm({ shiftId }: { shiftId: string }) {
 }
 
 export function CountForm({ shiftId }: { shiftId: string }) {
-  const form = useSubmit(`/api/v1/shifts/${shiftId}/closing`, (data) => ({ actualCash: data.get("actualCash") }));
+  const form = useFormSubmit(`/api/v1/shifts/${shiftId}/closing`, (data) => ({ actualCash: data.get("actualCash") }));
   return (
     <form className="grid max-w-xl gap-3" onSubmit={form.onSubmit}>
       <Input name="actualCash" required placeholder="Actual cash" aria-label="Actual cash" />
@@ -101,7 +69,7 @@ export function CountForm({ shiftId }: { shiftId: string }) {
 }
 
 export function CloseShiftForm({ shiftId }: { shiftId: string }) {
-  const form = useSubmit(`/api/v1/shifts/${shiftId}/close`, () => ({}));
+  const form = useFormSubmit(`/api/v1/shifts/${shiftId}/close`, () => ({}));
   return (
     <form onSubmit={form.onSubmit}>
       {form.message ? <p className="text-sm text-error">{form.message}</p> : null}
@@ -113,7 +81,7 @@ export function CloseShiftForm({ shiftId }: { shiftId: string }) {
 }
 
 export function HandoverForm({ shiftId, users }: { shiftId: string; users: Option[] }) {
-  const form = useSubmit(`/api/v1/shifts/${shiftId}/handover`, (data) => ({
+  const form = useFormSubmit(`/api/v1/shifts/${shiftId}/handover`, (data) => ({
     toUserId: data.get("toUserId"),
     amount: data.get("amount"),
   }));

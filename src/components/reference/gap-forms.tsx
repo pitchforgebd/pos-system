@@ -1,48 +1,15 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useFormSubmit } from "@/lib/client/use-form-submit";
 
 type Option = { id: string; label: string };
-
-function postJson(url: string, body: unknown) {
-  return fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  }).then(async (response) => {
-    const payload = (await response.json()) as { error?: { message?: string } };
-    return { ok: response.ok, message: payload.error?.message ?? "" };
-  });
-}
-
-function useSubmit(url: string, body: (form: FormData) => unknown) {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    setPending(true);
-    setMessage("");
-    void postJson(url, body(form))
-      .then((result) => {
-        if (!result.ok) {
-          setMessage(result.message || "That was not saved.");
-          return;
-        }
-        window.location.reload();
-      })
-      .finally(() => setPending(false));
-  }
-  return { message, pending, onSubmit };
-}
 
 const selectClass = "h-10 rounded-md border border-border bg-surface px-3 text-sm";
 
 export function SerialForm({ products }: { products: Option[] }) {
-  const form = useSubmit("/api/v1/products/serials", (data) => ({ productId: data.get("productId"), serial: data.get("serial") }));
+  const form = useFormSubmit("/api/v1/products/serials", (data) => ({ productId: data.get("productId"), serial: data.get("serial") }));
   return (
     <form className="grid max-w-xl gap-3" onSubmit={form.onSubmit}>
       <select name="productId" required aria-label="Product" className={selectClass}>
@@ -59,7 +26,7 @@ export function SerialForm({ products }: { products: Option[] }) {
 }
 
 export function ClaimForm({ products, customers }: { products: Option[]; customers: Option[] }) {
-  const form = useSubmit("/api/v1/warranty-claims", (data) => ({
+  const form = useFormSubmit("/api/v1/warranty-claims", (data) => ({
     productId: data.get("productId"),
     customerId: data.get("customerId"),
     serial: String(data.get("serial") || "") || undefined,
@@ -88,29 +55,18 @@ export function ClaimForm({ products, customers }: { products: Option[]; custome
 }
 
 export function CloseClaim({ id }: { id: string }) {
-  const [message, setMessage] = useState("");
+  const form = useFormSubmit(`/api/v1/warranty-claims/${id}/close`, () => ({}));
+  const message = form.message;
   return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault();
-        setMessage("");
-        void postJson(`/api/v1/warranty-claims/${id}/close`, {}).then((result) => {
-          if (!result.ok) {
-            setMessage(result.message || "The claim was not closed.");
-            return;
-          }
-          window.location.reload();
-        });
-      }}
-    >
-      <Button type="submit" variant="secondary" size="sm">Close</Button>
+    <form onSubmit={form.onSubmit}>
+      <Button type="submit" variant="secondary" size="sm" loading={form.pending}>Close</Button>
       {message ? <p className="text-sm text-error">{message}</p> : null}
     </form>
   );
 }
 
 export function CourierForm() {
-  const form = useSubmit("/api/v1/couriers", (data) => ({
+  const form = useFormSubmit("/api/v1/couriers", (data) => ({
     name: data.get("name"),
     phone: String(data.get("phone") || "") || undefined,
   }));
@@ -125,7 +81,7 @@ export function CourierForm() {
 }
 
 export function ShipmentForm({ couriers, customers }: { couriers: Option[]; customers: Option[] }) {
-  const form = useSubmit("/api/v1/shipments", (data) => ({
+  const form = useFormSubmit("/api/v1/shipments", (data) => ({
     courierId: data.get("courierId"),
     customerId: String(data.get("customerId") || "") || undefined,
     reference: String(data.get("reference") || "") || undefined,
@@ -155,7 +111,7 @@ export function ShipmentForm({ couriers, customers }: { couriers: Option[]; cust
 }
 
 export function DirectReturnForm({ products }: { products: Option[] }) {
-  const form = useSubmit("/api/v1/direct-returns", (data) => ({
+  const form = useFormSubmit("/api/v1/direct-returns", (data) => ({
     productId: data.get("productId"),
     quantity: data.get("quantity"),
     refundAmount: data.get("refundAmount"),
@@ -185,7 +141,7 @@ export function DirectReturnForm({ products }: { products: Option[] }) {
 }
 
 export function DealerForm({ customers }: { customers: Option[] }) {
-  const form = useSubmit("/api/v1/customers/dealers", (data) => ({ customerId: data.get("customerId") }));
+  const form = useFormSubmit("/api/v1/customers/dealers", (data) => ({ customerId: data.get("customerId") }));
   return (
     <form className="grid max-w-xl gap-3" onSubmit={form.onSubmit}>
       <select name="customerId" required aria-label="Customer" className={selectClass}>
@@ -201,7 +157,7 @@ export function DealerForm({ customers }: { customers: Option[] }) {
 }
 
 export function RedeemForm({ customers }: { customers: Option[] }) {
-  const form = useSubmit("/api/v1/loyalty/redeem", (data) => ({
+  const form = useFormSubmit("/api/v1/loyalty/redeem", (data) => ({
     customerId: data.get("customerId"),
     points: data.get("points"),
     businessDate: data.get("businessDate"),

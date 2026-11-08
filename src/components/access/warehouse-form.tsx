@@ -1,33 +1,18 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useSubmit } from "@/lib/client/use-submit";
 
 export function WarehouseForm({ branches }: { branches: { id: string; name: string }[] }) {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const { submit, pending, message } = useSubmit();
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    setPending(true);
-    setMessage("");
-    void fetch("/api/v1/warehouses", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ branchId: data.get("branchId"), name: data.get("name") }),
-    })
-      .then(async (response) => {
-        const payload = (await response.json()) as { error?: { message?: string } };
-        if (!response.ok) {
-          setMessage(payload.error?.message ?? "The warehouse was not created.");
-          return;
-        }
-        window.location.reload();
-      })
-      .finally(() => setPending(false));
+    void submit({ url: "/api/v1/warehouses", body: { branchId: data.get("branchId"), name: data.get("name") } });
   }
 
   return (

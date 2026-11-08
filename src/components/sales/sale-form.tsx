@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useSubmit } from "@/lib/client/use-submit";
 
 type RegisterProduct = {
   id: string;
@@ -156,14 +157,16 @@ export function SaleForm({
   const [customerQuery, setCustomerQuery] = useState("");
   const [customerOpen, setCustomerOpen] = useState(false);
   const [extraPay, setExtraPay] = useState(false);
-  const [businessDate, setOccurredOn] = useState(today);
+  const [saleDate, setSaleDate] = useState(today);
   const [tender, setTender] = useState<Tender>("CASH");
   const [cash, setCash] = useState("");
   const [cashEdited, setCashEdited] = useState(false);
   const [discountText, setDiscountText] = useState("0.00");
   const [chargesText, setChargesText] = useState("0.00");
   const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const sending = useSubmit();
+  const pending = sending.pending;
+  const shownMessage = message || sending.message;
   const discountRef = useRef<HTMLInputElement>(null);
   const chargesRef = useRef<HTMLInputElement>(null);
   const barcodeRef = useRef<HTMLInputElement>(null);
@@ -388,7 +391,6 @@ export function SaleForm({
       }
     }
     setTender(method);
-    setPending(true);
     setMessage("");
     const lines = cart.map((line, index) => ({
       productId: line.productId,
@@ -401,27 +403,21 @@ export function SaleForm({
     const body = hold
       ? { customerId: customerId || undefined, lines }
       : {
-          businessDate,
+          businessDate: saleDate,
           customerId: customerId || undefined,
           chargesTotal: chargesText,
           paymentAmount: money(postedPay ?? zero),
           paymentMethod: postedPay && postedPay > zero ? method : undefined,
           lines,
         };
-    void fetch(hold ? "/api/v1/pos/tickets" : "/api/v1/sales", {
-      method: "POST",
-      headers: { "content-type": "application/json", "idempotency-key": crypto.randomUUID() },
-      body: JSON.stringify(body),
-    })
-      .then(async (response) => {
-        const payload = (await response.json()) as { data?: { id?: string }; error?: { message?: string } };
-        if (!response.ok || !payload.data?.id) {
-          setMessage(payload.error?.message ?? "The sale was not saved.");
-          return;
-        }
-        window.location.replace(hold ? "/pos/open-tickets" : `/sales/${payload.data.id}`);
-      })
-      .finally(() => setPending(false));
+    // One key per attempt: if the answer is lost, pressing again sends the same key and the server saves one sale.
+    void sending.submit<{ id: string }>(
+      { url: hold ? "/api/v1/pos/tickets" : "/api/v1/sales", body },
+      {
+        successMessage: hold ? "টিকিট রাখা হয়েছে। (Ticket held.)" : "বিক্রয় সংরক্ষিত হয়েছে। (Sale saved.)",
+        goTo: (data) => (hold ? "/pos/open-tickets" : `/sales/${data.id}`),
+      },
+    );
   }
 
   const submitRef = useRef(submit);
@@ -468,7 +464,7 @@ export function SaleForm({
     >
       <div className="flex flex-wrap items-center gap-2 border-b border-border bg-white px-3 py-2">
         <span className="text-sm font-semibold text-[#123a63]">{branchName}</span>
-        <input aria-label="Date" type="date" required value={businessDate} onChange={(event) => setOccurredOn(event.target.value)} className="h-8 rounded-md border border-border px-2 text-sm" />
+        <input aria-label="Date" type="date" required value={saleDate} onChange={(event) => setSaleDate(event.target.value)} className="h-8 rounded-md border border-border px-2 text-sm" />
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <button type="button" className="h-9 rounded-md bg-[#1f9d55] px-3 text-sm font-semibold text-white" onClick={() => { setCustomerId(""); setCustomerOpen(false); }}>
             Walking
@@ -705,7 +701,7 @@ export function SaleForm({
           />
         </label>
         <p className="mt-2 text-right text-sm">Current due {due === null ? "—" : money(due)}</p>
-        {message ? <p className="mt-2 text-sm text-error">{message}</p> : null}
+        {shownMessage ? <p role="alert" className="mt-2 text-sm text-error">{shownMessage}</p> : null}
         <button type="submit" disabled={pending || cart.length === 0} className="mt-3 h-10 w-full rounded-full bg-[#7c4dff] text-sm font-semibold text-white disabled:opacity-60">
           Cash F9
         </button>
@@ -742,31 +738,19 @@ function Summary({ label, value, strong = false }: { label: string; value: strin
 }
 
 export function CustomerForm() {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const { submit, pending, message } = useSubmit();
 
   return (
     <form
       className="grid max-w-xl gap-3"
       onSubmit={(event) => {
         event.preventDefault();
-        const form = new FormData(event.currentTarget);
-        setPending(true);
-        setMessage("");
-        void fetch("/api/v1/customers", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ name: form.get("name"), creditLimit: String(form.get("creditLimit") || "") || undefined }),
-        })
-          .then(async (response) => {
-            const payload = (await response.json()) as { error?: { message?: string } };
-            if (!response.ok) {
-              setMessage(payload.error?.message ?? "The customer was not saved.");
-              return;
-            }
-            window.location.reload();
-          })
-          .finally(() => setPending(false));
+        const element = event.currentTarget;
+        const form = new FormData(element);
+        void submit(
+          { url: "/api/v1/customers", body: { name: form.get("name"), creditLimit: String(form.get("creditLimit") || "") || undefined } },
+          { successMessage: "কাস্টমার যোগ হয়েছে। (Customer added.)", onSuccess: () => element.reset() },
+        );
       }}
     >
       <Input name="name" required placeholder="Customer name" aria-label="Customer name" />

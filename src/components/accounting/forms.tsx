@@ -1,27 +1,14 @@
 "use client";
 
-import { useState } from "react";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useSubmit } from "@/lib/client/use-submit";
 
 type AccountOption = { code: string; label: string };
 type GroupOption = { code: string; name: string };
 
-function postJson(path: string, body: unknown, idempotency: boolean) {
-  return fetch(path, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      ...(idempotency ? { "idempotency-key": crypto.randomUUID() } : {}),
-    },
-    body: JSON.stringify(body),
-  });
-}
-
 export function JournalForm({ accounts }: { accounts: AccountOption[] }) {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const { submit, pending, message } = useSubmit();
 
   return (
     <form
@@ -29,25 +16,20 @@ export function JournalForm({ accounts }: { accounts: AccountOption[] }) {
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        setPending(true);
-        setMessage("");
-        void postJson("/api/v1/accounting/journals", {
-          businessDate: form.get("businessDate"),
-          description: form.get("description"),
-          lines: [
-            { accountCode: form.get("debitAccount"), debit: form.get("amount"), credit: "0.00" },
-            { accountCode: form.get("creditAccount"), debit: "0.00", credit: form.get("amount") },
-          ],
-        }, true)
-          .then(async (response) => {
-            const payload = (await response.json()) as { data?: { id?: string }; error?: { message?: string } };
-            if (!response.ok || !payload.data?.id) {
-              setMessage(payload.error?.message ?? "The journal was not posted.");
-              return;
-            }
-            window.location.replace(`/accounting/journals/${payload.data.id}`);
-          })
-          .finally(() => setPending(false));
+        void submit<{ id: string }>(
+          {
+            url: "/api/v1/accounting/journals",
+            body: {
+              businessDate: form.get("businessDate"),
+              description: form.get("description"),
+              lines: [
+                { accountCode: form.get("debitAccount"), debit: form.get("amount"), credit: "0.00" },
+                { accountCode: form.get("creditAccount"), debit: "0.00", credit: form.get("amount") },
+              ],
+            },
+          },
+          { goTo: (data) => `/accounting/journals/${data.id}` },
+        );
       }}
     >
       <Input name="businessDate" type="date" required aria-label="Date" />
@@ -77,8 +59,7 @@ export function JournalForm({ accounts }: { accounts: AccountOption[] }) {
 }
 
 export function ExpenseForm({ accounts }: { accounts: AccountOption[] }) {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const { submit, pending, message } = useSubmit();
 
   return (
     <form
@@ -86,24 +67,16 @@ export function ExpenseForm({ accounts }: { accounts: AccountOption[] }) {
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        setPending(true);
-        setMessage("");
-        void postJson("/api/v1/accounting/expenses", {
-          businessDate: form.get("businessDate"),
-          accountCode: form.get("accountCode"),
-          amount: form.get("amount"),
-          method: form.get("method"),
-          note: String(form.get("note") || "") || undefined,
-        }, true)
-          .then(async (response) => {
-            const payload = (await response.json()) as { error?: { message?: string } };
-            if (!response.ok) {
-              setMessage(payload.error?.message ?? "The expense was not posted.");
-              return;
-            }
-            window.location.reload();
-          })
-          .finally(() => setPending(false));
+        void submit({
+          url: "/api/v1/accounting/expenses",
+          body: {
+            businessDate: form.get("businessDate"),
+            accountCode: form.get("accountCode"),
+            amount: form.get("amount"),
+            method: form.get("method"),
+            note: String(form.get("note") || "") || undefined,
+          },
+        });
       }}
     >
       <Input name="businessDate" type="date" required aria-label="Date" />
@@ -131,8 +104,7 @@ export function ExpenseForm({ accounts }: { accounts: AccountOption[] }) {
 }
 
 export function ContraForm() {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const { submit, pending, message } = useSubmit();
 
   return (
     <form
@@ -140,22 +112,14 @@ export function ContraForm() {
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        setPending(true);
-        setMessage("");
-        void postJson("/api/v1/accounting/contras", {
-          businessDate: form.get("businessDate"),
-          direction: form.get("direction"),
-          amount: form.get("amount"),
-        }, true)
-          .then(async (response) => {
-            const payload = (await response.json()) as { error?: { message?: string } };
-            if (!response.ok) {
-              setMessage(payload.error?.message ?? "The transfer was not posted.");
-              return;
-            }
-            window.location.reload();
-          })
-          .finally(() => setPending(false));
+        void submit({
+          url: "/api/v1/accounting/contras",
+          body: {
+            businessDate: form.get("businessDate"),
+            direction: form.get("direction"),
+            amount: form.get("amount"),
+          },
+        });
       }}
     >
       <Input name="businessDate" type="date" required aria-label="Date" />
@@ -174,8 +138,7 @@ export function ContraForm() {
 }
 
 export function AccountForm({ groups }: { groups: GroupOption[] }) {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const { submit, pending, message } = useSubmit();
 
   return (
     <form
@@ -183,22 +146,10 @@ export function AccountForm({ groups }: { groups: GroupOption[] }) {
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        setPending(true);
-        setMessage("");
-        void postJson("/api/v1/accounting/accounts", {
-          code: form.get("code"),
-          name: form.get("name"),
-          groupCode: form.get("groupCode"),
-        }, false)
-          .then(async (response) => {
-            const payload = (await response.json()) as { error?: { message?: string } };
-            if (!response.ok) {
-              setMessage(payload.error?.message ?? "The account was not saved.");
-              return;
-            }
-            window.location.reload();
-          })
-          .finally(() => setPending(false));
+        void submit({
+          url: "/api/v1/accounting/accounts",
+          body: { code: form.get("code"), name: form.get("name"), groupCode: form.get("groupCode") },
+        });
       }}
     >
       <Input name="code" required placeholder="Code" aria-label="Code" />
@@ -218,8 +169,7 @@ export function AccountForm({ groups }: { groups: GroupOption[] }) {
 }
 
 export function ReverseForm({ journalId }: { journalId: string }) {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const { submit, pending, message } = useSubmit();
 
   return (
     <form
@@ -227,18 +177,10 @@ export function ReverseForm({ journalId }: { journalId: string }) {
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        setPending(true);
-        setMessage("");
-        void postJson(`/api/v1/accounting/journals/${journalId}/reverse`, { businessDate: form.get("businessDate") }, true)
-          .then(async (response) => {
-            const payload = (await response.json()) as { data?: { id?: string }; error?: { message?: string } };
-            if (!response.ok || !payload.data?.id) {
-              setMessage(payload.error?.message ?? "The journal was not reversed.");
-              return;
-            }
-            window.location.replace(`/accounting/journals/${payload.data.id}`);
-          })
-          .finally(() => setPending(false));
+        void submit<{ id: string }>(
+          { url: `/api/v1/accounting/journals/${journalId}/reverse`, body: { businessDate: form.get("businessDate") } },
+          { goTo: (data) => `/accounting/journals/${data.id}` },
+        );
       }}
     >
       <Input name="businessDate" type="date" required aria-label="Reversal date" />
@@ -286,39 +228,26 @@ function MethodSelect({ moneyAccounts }: { moneyAccounts: AccountOption[] }) {
   );
 }
 
-function reloadForm(path: string, body: unknown, fallback: string, setMessage: (value: string) => void, setPending: (value: boolean) => void) {
-  setPending(true);
-  setMessage("");
-  void postJson(path, body, true)
-    .then(async (response) => {
-      const payload = (await response.json()) as { error?: { message?: string } };
-      if (!response.ok) {
-        setMessage(payload.error?.message ?? fallback);
-        return;
-      }
-      window.location.reload();
-    })
-    .finally(() => setPending(false));
-}
-
 export function IncomeForm({ accounts, moneyAccounts }: { accounts: AccountOption[]; moneyAccounts: AccountOption[] }) {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const { submit, pending, message } = useSubmit();
   return (
     <form
       className="grid max-w-xl gap-3"
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        reloadForm("/api/v1/accounting/incomes", {
-          businessDate: form.get("businessDate"),
-          accountCode: form.get("accountCode"),
-          amount: form.get("amount"),
-          method: form.get("method"),
-          bankCode: form.get("bankCode") || undefined,
-          category: String(form.get("category") || "") || undefined,
-          note: String(form.get("note") || "") || undefined,
-        }, "The income was not posted.", setMessage, setPending);
+        void submit({
+          url: "/api/v1/accounting/incomes",
+          body: {
+            businessDate: form.get("businessDate"),
+            accountCode: form.get("accountCode"),
+            amount: form.get("amount"),
+            method: form.get("method"),
+            bankCode: form.get("bankCode") || undefined,
+            category: String(form.get("category") || "") || undefined,
+            note: String(form.get("note") || "") || undefined,
+          },
+        });
       }}
     >
       <Input name="businessDate" type="date" required aria-label="Date" />
@@ -335,22 +264,24 @@ export function IncomeForm({ accounts, moneyAccounts }: { accounts: AccountOptio
 }
 
 export function CapitalForm({ moneyAccounts }: { moneyAccounts: AccountOption[] }) {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const { submit, pending, message } = useSubmit();
   return (
     <form
       className="grid max-w-xl gap-3"
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        reloadForm("/api/v1/accounting/capitals", {
-          businessDate: form.get("businessDate"),
-          capitalType: form.get("capitalType"),
-          ownerName: form.get("ownerName"),
-          amount: form.get("amount"),
-          method: form.get("method"),
-          bankCode: form.get("bankCode") || undefined,
-        }, "The capital entry was not posted.", setMessage, setPending);
+        void submit({
+          url: "/api/v1/accounting/capitals",
+          body: {
+            businessDate: form.get("businessDate"),
+            capitalType: form.get("capitalType"),
+            ownerName: form.get("ownerName"),
+            amount: form.get("amount"),
+            method: form.get("method"),
+            bankCode: form.get("bankCode") || undefined,
+          },
+        });
       }}
     >
       <Input name="businessDate" type="date" required aria-label="Date" />
@@ -372,22 +303,24 @@ export function CapitalForm({ moneyAccounts }: { moneyAccounts: AccountOption[] 
 }
 
 export function LoanForm({ moneyAccounts }: { moneyAccounts: AccountOption[] }) {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const { submit, pending, message } = useSubmit();
   return (
     <form
       className="grid max-w-xl gap-3"
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        reloadForm("/api/v1/accounting/loans", {
-          businessDate: form.get("businessDate"),
-          direction: form.get("direction"),
-          lender: form.get("lender"),
-          amount: form.get("amount"),
-          method: form.get("method"),
-          bankCode: form.get("bankCode") || undefined,
-        }, "The loan was not posted.", setMessage, setPending);
+        void submit({
+          url: "/api/v1/accounting/loans",
+          body: {
+            businessDate: form.get("businessDate"),
+            direction: form.get("direction"),
+            lender: form.get("lender"),
+            amount: form.get("amount"),
+            method: form.get("method"),
+            bankCode: form.get("bankCode") || undefined,
+          },
+        });
       }}
     >
       <Input name="businessDate" type="date" required aria-label="Date" />
@@ -409,22 +342,24 @@ export function LoanForm({ moneyAccounts }: { moneyAccounts: AccountOption[] }) 
 }
 
 export function CashVoucherForm({ accounts, moneyAccounts }: { accounts: AccountOption[]; moneyAccounts: AccountOption[] }) {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const { submit, pending, message } = useSubmit();
   return (
     <form
       className="grid max-w-xl gap-3"
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        reloadForm("/api/v1/accounting/vouchers", {
-          businessDate: form.get("businessDate"),
-          voucherType: form.get("voucherType"),
-          accountCode: form.get("accountCode"),
-          amount: form.get("amount"),
-          method: form.get("method"),
-          bankCode: form.get("bankCode") || undefined,
-        }, "The voucher was not posted.", setMessage, setPending);
+        void submit({
+          url: "/api/v1/accounting/vouchers",
+          body: {
+            businessDate: form.get("businessDate"),
+            voucherType: form.get("voucherType"),
+            accountCode: form.get("accountCode"),
+            amount: form.get("amount"),
+            method: form.get("method"),
+            bankCode: form.get("bankCode") || undefined,
+          },
+        });
       }}
     >
       <Input name="businessDate" type="date" required aria-label="Date" />
@@ -446,18 +381,20 @@ export function CashVoucherForm({ accounts, moneyAccounts }: { accounts: Account
 }
 
 export function BankForm() {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const { submit, pending, message } = useSubmit();
   return (
     <form
       className="grid max-w-xl gap-3"
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        reloadForm("/api/v1/accounting/banks", {
-          name: form.get("name"),
-          openingAmount: String(form.get("openingAmount") || "") || undefined,
-        }, "The bank was not saved.", setMessage, setPending);
+        void submit({
+          url: "/api/v1/accounting/banks",
+          body: {
+            name: form.get("name"),
+            openingAmount: String(form.get("openingAmount") || "") || undefined,
+          },
+        });
       }}
     >
       <Input name="name" required placeholder="Bank name" aria-label="Bank name" />

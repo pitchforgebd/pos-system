@@ -11,6 +11,7 @@ import { SEARCH_DEBOUNCE_MS } from "@/constants/ui";
 import { IconButton } from "@/components/ui/icon-button";
 import { Menu as Dropdown, MenuItem, MenuLabel } from "@/components/ui/dropdown-menu";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useSubmit } from "@/lib/client/use-submit";
 
 export function Header({
   onOpenMenu,
@@ -26,6 +27,7 @@ export function Header({
   session: { name: string; branches: { id: string; name: string }[]; branchId: string | null };
 }) {
   const current = session.branches.find((item) => item.id === session.branchId) ?? session.branches[0];
+  const { submit } = useSubmit();
   const [branchName, setBranchName] = useState(current?.name ?? "No branch");
   const [query, setQuery] = useState("");
   const [clock, setClock] = useState("");
@@ -34,11 +36,7 @@ export function Header({
   const matches = useMemo(() => searchReferenceNav(debouncedQuery), [debouncedQuery]);
 
   function chooseLanguage(next: UiLang) {
-    void fetch("/api/v1/locale", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ lang: next }),
-    }).then(() => window.location.reload());
+    void submit({ url: "/api/v1/locale", body: { lang: next } }, { quiet: true, refresh: true });
   }
 
   useEffect(() => {
@@ -60,17 +58,15 @@ export function Header({
   }, []);
 
   function selectBranch(branchId: string) {
-    void fetch("/api/v1/session/branch", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ branchId }),
-    }).then((response) => {
-      if (response.ok) {
-        const next = session.branches.find((item) => item.id === branchId);
-        setBranchName(next?.name ?? branchName);
-        window.location.reload();
-      }
-    });
+    // Everything in the layout reads the session branch, so the server data is fetched again after the switch.
+    void submit(
+      { url: "/api/v1/session/branch", body: { branchId } },
+      {
+        quiet: true,
+        refresh: true,
+        onSuccess: () => setBranchName(session.branches.find((item) => item.id === branchId)?.name ?? branchName),
+      },
+    );
   }
 
   return (
@@ -159,9 +155,7 @@ export function Header({
         ))}
         <MenuItem
           onSelect={() => {
-            void fetch("/api/v1/auth/logout", { method: "POST" }).then(() => {
-              window.location.replace("/login");
-            });
+            void submit({ url: "/api/v1/auth/logout" }, { quiet: true, goTo: "/login" });
           }}
         >
           Log Out

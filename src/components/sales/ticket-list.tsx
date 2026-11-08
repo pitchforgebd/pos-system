@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
-
 import { Button } from "@/components/ui/button";
+import { useSubmit } from "@/lib/client/use-submit";
 
 type Ticket = { id: string; createdOn: string; customerName: string; lines: number; previewTotal: string };
 
 export function TicketList({ tickets, canDiscard }: { tickets: Ticket[]; canDiscard: boolean }) {
-  const [message, setMessage] = useState("");
+  const { submit, pending, message } = useSubmit();
 
   return (
     <div className="space-y-3">
@@ -20,15 +19,9 @@ export function TicketList({ tickets, canDiscard }: { tickets: Ticket[]; canDisc
           <Button
             type="button"
             variant="secondary"
+            disabled={pending}
             onClick={() => {
-              setMessage("");
-              void fetch(`/api/v1/pos/tickets/${ticket.id}`, { method: "DELETE" }).then(async (response) => {
-                if (!response.ok) {
-                  setMessage("The ticket was not discarded.");
-                  return;
-                }
-                window.location.reload();
-              });
+              void submit({ url: `/api/v1/pos/tickets/${ticket.id}`, method: "DELETE" }, { successMessage: "টিকিট বাতিল হয়েছে। (Ticket discarded.)" });
             }}
           >
             Discard

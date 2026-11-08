@@ -1,12 +1,10 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
+import { useSubmit } from "@/lib/client/use-submit";
 
 export function RoleAdmin({
   roles,
@@ -17,35 +15,23 @@ export function RoleAdmin({
   permissions: string[];
   lockedRoleIds?: string[];
 }) {
-  const router = useRouter();
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { submit, pending, message: error } = useSubmit();
 
   return (
     <div className="space-y-6">
-      {message ? <Alert tone="success" title={message} /> : null}
       {error ? <Alert tone="error" title={error} /> : null}
       <form
         className="flex max-w-md items-end gap-3"
         onSubmit={(event) => {
           event.preventDefault();
           const form = new FormData(event.currentTarget);
-          void fetch("/api/v1/roles", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ name: String(form.get("name") ?? "") }),
-          }).then(async (response) => {
-            if (response.ok) {
-              setMessage("Role created.");
-              router.refresh();
-            }
-          });
+          void submit({ url: "/api/v1/roles", body: { name: String(form.get("name") ?? "") } }, { successMessage: "Role created." });
         }}
       >
         <FormField label="Role name" htmlFor="role-name" required>
           <Input id="role-name" name="name" required />
         </FormField>
-        <Button type="submit">Create role</Button>
+        <Button type="submit" loading={pending}>Create role</Button>
       </form>
       {roles.map((role) => lockedRoleIds.includes(role.id) ? (
         <section key={role.id} className="space-y-2 rounded-md border border-border bg-surface p-4">
@@ -59,21 +45,7 @@ export function RoleAdmin({
           onSubmit={(event) => {
             event.preventDefault();
             const selected = new FormData(event.currentTarget).getAll("permissions").map(String);
-            void fetch(`/api/v1/roles/${role.id}`, {
-              method: "PATCH",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({ permissions: selected }),
-            }).then(async (response) => {
-              const body = (await response.json()) as { error?: { message?: string } };
-              if (!response.ok) {
-                setError(body.error?.message ?? "Those permissions were not saved.");
-                setMessage(null);
-                return;
-              }
-              setError(null);
-              setMessage(`${role.name} permissions saved.`);
-              router.refresh();
-            });
+            void submit({ url: `/api/v1/roles/${role.id}`, method: "PATCH", body: { permissions: selected } }, { successMessage: `${role.name} permissions saved.` });
           }}
         >
           <h2 className="text-sm font-semibold">{role.name}</h2>
@@ -85,7 +57,7 @@ export function RoleAdmin({
               </label>
             ))}
           </div>
-          <Button type="submit" size="sm">
+          <Button type="submit" size="sm" loading={pending}>
             Save permissions
           </Button>
         </form>

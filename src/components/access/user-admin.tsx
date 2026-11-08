@@ -1,12 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
+import { useSubmit } from "@/lib/client/use-submit";
 
 type UserRow = {
   id: string;
@@ -34,13 +32,10 @@ export function UserAdmin({
   canAssignRoles: boolean;
   protectedUserIds?: string[];
 }) {
-  const router = useRouter();
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { submit, pending, message: error } = useSubmit();
 
   return (
     <div className="space-y-6">
-      {message ? <Alert tone="success" title={message} /> : null}
       {error ? <Alert tone="error" title={error} /> : null}
       {canCreate ? (
         <form
@@ -49,27 +44,19 @@ export function UserAdmin({
             event.preventDefault();
             const form = new FormData(event.currentTarget);
             const roleIds = canAssignRoles ? form.getAll("roleIds").map(String) : [];
-            void fetch("/api/v1/users", {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({
-                name: String(form.get("name") ?? ""),
-                email: String(form.get("email") ?? ""),
-                password: String(form.get("password") ?? ""),
-                roleIds,
-                branchIds: form.getAll("branchIds").map(String),
-              }),
-            }).then(async (response) => {
-              const body = (await response.json()) as { error?: { message?: string } };
-              if (!response.ok) {
-                setError(body.error?.message ?? "The user was not created.");
-                setMessage(null);
-                return;
-              }
-              setError(null);
-              setMessage("User created.");
-              router.refresh();
-            });
+            void submit(
+              {
+                url: "/api/v1/users",
+                body: {
+                  name: String(form.get("name") ?? ""),
+                  email: String(form.get("email") ?? ""),
+                  password: String(form.get("password") ?? ""),
+                  roleIds,
+                  branchIds: form.getAll("branchIds").map(String),
+                },
+              },
+              { successMessage: "User created." },
+            );
           }}
         >
           <FormField label="Name" htmlFor="user-name" required>
@@ -129,12 +116,9 @@ export function UserAdmin({
                     <Button
                       size="sm"
                       variant="secondary"
+                      loading={pending}
                       onClick={() => {
-                        void fetch(`/api/v1/users/${user.id}`, {
-                          method: "PATCH",
-                          headers: { "content-type": "application/json" },
-                          body: JSON.stringify({ status: "DISABLED" }),
-                        }).then(() => router.refresh());
+                        void submit({ url: `/api/v1/users/${user.id}`, method: "PATCH", body: { status: "DISABLED" } }, { successMessage: "User disabled." });
                       }}
                     >
                       Disable

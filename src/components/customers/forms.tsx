@@ -4,23 +4,12 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useSubmit } from "@/lib/client/use-submit";
 
 type Option = { id: string; label: string };
 
-function postJson(url: string, body: unknown, idempotent = false) {
-  const headers: Record<string, string> = { "content-type": "application/json" };
-  if (idempotent) {
-    headers["idempotency-key"] = crypto.randomUUID();
-  }
-  return fetch(url, { method: "POST", headers, body: JSON.stringify(body) }).then(async (response) => {
-    const payload = (await response.json()) as { error?: { message?: string } };
-    return { ok: response.ok, message: payload.error?.message ?? "" };
-  });
-}
-
 export function CustomerForm({ types }: { types: Option[] }) {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const { submit, pending, message } = useSubmit();
 
   return (
     <form
@@ -28,26 +17,22 @@ export function CustomerForm({ types }: { types: Option[] }) {
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        setPending(true);
-        setMessage("");
-        void postJson("/api/v1/customers", {
-          name: form.get("name"),
-          phone: String(form.get("phone") || "") || null,
-          email: String(form.get("email") || "") || null,
-          address: String(form.get("address") || "") || null,
-          customerTypeId: String(form.get("customerTypeId") || "") || null,
-          openingBalance: form.get("openingBalance") || "0.00",
-          creditLimit: String(form.get("creditLimit") || "") || null,
-          paymentTerms: String(form.get("paymentTerms") || "") || null,
-        })
-          .then((result) => {
-            if (!result.ok) {
-              setMessage(result.message || "The customer was not saved.");
-              return;
-            }
-            window.location.replace("/customers");
-          })
-          .finally(() => setPending(false));
+        void submit(
+          {
+            url: "/api/v1/customers",
+            body: {
+              name: form.get("name"),
+              phone: String(form.get("phone") || "") || null,
+              email: String(form.get("email") || "") || null,
+              address: String(form.get("address") || "") || null,
+              customerTypeId: String(form.get("customerTypeId") || "") || null,
+              openingBalance: form.get("openingBalance") || "0.00",
+              creditLimit: String(form.get("creditLimit") || "") || null,
+              paymentTerms: String(form.get("paymentTerms") || "") || null,
+            },
+          },
+          { goTo: "/customers" },
+        );
       }}
     >
       <Input name="name" required placeholder="Name" aria-label="Name" />
@@ -91,8 +76,7 @@ export function CustomerEditForm({
   };
   types: Option[];
 }) {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const { submit, pending, message } = useSubmit();
 
   return (
     <form
@@ -100,12 +84,10 @@ export function CustomerEditForm({
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        setPending(true);
-        setMessage("");
-        void fetch(`/api/v1/customers/${customer.id}`, {
+        void submit({
+          url: `/api/v1/customers/${customer.id}`,
           method: "PATCH",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
+          body: {
             name: form.get("name"),
             phone: String(form.get("phone") || "") || null,
             email: String(form.get("email") || "") || null,
@@ -114,17 +96,8 @@ export function CustomerEditForm({
             creditLimit: String(form.get("creditLimit") || "") || null,
             paymentTerms: String(form.get("paymentTerms") || "") || null,
             status: form.get("status"),
-          }),
-        })
-          .then(async (response) => {
-            const payload = (await response.json()) as { error?: { message?: string } };
-            if (!response.ok) {
-              setMessage(payload.error?.message ?? "The customer was not saved.");
-              return;
-            }
-            window.location.reload();
-          })
-          .finally(() => setPending(false));
+          },
+        });
       }}
     >
       <Input name="name" required defaultValue={customer.name} aria-label="Name" />
@@ -155,25 +128,14 @@ export function CustomerEditForm({
 }
 
 export function TypeForm() {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const { submit, pending, message } = useSubmit();
   return (
     <form
       className="grid max-w-xl gap-3"
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        setPending(true);
-        setMessage("");
-        void postJson("/api/v1/customer-types", { name: form.get("name") })
-          .then((result) => {
-            if (!result.ok) {
-              setMessage(result.message || "The type was not saved.");
-              return;
-            }
-            window.location.reload();
-          })
-          .finally(() => setPending(false));
+        void submit({ url: "/api/v1/customer-types", body: { name: form.get("name") } });
       }}
     >
       <Input name="name" required placeholder="Type name" aria-label="Type name" />
@@ -194,34 +156,22 @@ function MoneyForm({
   url: string;
   customers: Option[];
 }) {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const { submit, pending, message } = useSubmit();
   return (
     <form
       className="grid max-w-xl gap-3"
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        setPending(true);
-        setMessage("");
-        void postJson(
-          url,
-          {
+        void submit({
+          url: url,
+          body: {
             customerId: form.get("customerId"),
             businessDate: form.get("businessDate"),
             amount: form.get("amount"),
             method: form.get("method"),
           },
-          true,
-        )
-          .then((result) => {
-            if (!result.ok) {
-              setMessage(result.message || "The amount was not posted.");
-              return;
-            }
-            window.location.reload();
-          })
-          .finally(() => setPending(false));
+        });
       }}
     >
       <select name="customerId" required aria-label="Customer" className="h-10 rounded-md border border-border bg-surface px-3 text-sm">
@@ -255,8 +205,7 @@ export function AdvanceForm({ customers }: { customers: Option[] }) {
 }
 
 export function InstallmentForm({ customers, invoices }: { customers: Option[]; invoices: Array<Option & { customerId: string | null }> }) {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const { submit, pending, message } = useSubmit();
   const [customerId, setCustomerId] = useState("");
   const visible = invoices.filter((invoice) => invoice.customerId === customerId);
   return (
@@ -265,23 +214,16 @@ export function InstallmentForm({ customers, invoices }: { customers: Option[]; 
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        setPending(true);
-        setMessage("");
-        void postJson("/api/v1/installments", {
-          customerId: form.get("customerId"),
-          invoiceId: form.get("invoiceId"),
-          amount: form.get("amount"),
-          dueOn: form.get("dueOn"),
-          interestPercent: String(form.get("interestPercent") || "") || undefined,
-        })
-          .then((result) => {
-            if (!result.ok) {
-              setMessage(result.message || "The reminder was not saved.");
-              return;
-            }
-            window.location.reload();
-          })
-          .finally(() => setPending(false));
+        void submit({
+          url: "/api/v1/installments",
+          body: {
+            customerId: form.get("customerId"),
+            invoiceId: form.get("invoiceId"),
+            amount: form.get("amount"),
+            dueOn: form.get("dueOn"),
+            interestPercent: String(form.get("interestPercent") || "") || undefined,
+          },
+        });
       }}
     >
       <select
@@ -318,24 +260,15 @@ export function InstallmentForm({ customers, invoices }: { customers: Option[]; 
 }
 
 export function CloseReminder({ id }: { id: string }) {
-  const [message, setMessage] = useState("");
+  const { submit, pending, message } = useSubmit();
   return (
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        setMessage("");
-        void fetch(`/api/v1/installments/${id}/close`, { method: "POST" })
-          .then(async (response) => {
-            const payload = (await response.json()) as { error?: { message?: string } };
-            if (!response.ok) {
-              setMessage(payload.error?.message ?? "The reminder was not closed.");
-              return;
-            }
-            window.location.reload();
-          });
+        void submit({ url: `/api/v1/installments/${id}/close` });
       }}
     >
-      <Button type="submit" variant="secondary" size="sm">
+      <Button type="submit" variant="secondary" size="sm" loading={pending}>
         Close reminder
       </Button>
       {message ? <p className="text-sm text-error">{message}</p> : null}
@@ -344,30 +277,22 @@ export function CloseReminder({ id }: { id: string }) {
 }
 
 export function TierForm() {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const { submit, pending, message } = useSubmit();
   return (
     <form
       className="grid max-w-xl gap-3"
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        setPending(true);
-        setMessage("");
-        void postJson("/api/v1/loyalty/tiers", {
-          name: form.get("name"),
-          minimumSpend: form.get("minimumSpend"),
-          discountPercent: form.get("discountPercent"),
-          benefits: String(form.get("benefits") || "") || null,
-        })
-          .then((result) => {
-            if (!result.ok) {
-              setMessage(result.message || "The tier was not saved.");
-              return;
-            }
-            window.location.reload();
-          })
-          .finally(() => setPending(false));
+        void submit({
+          url: "/api/v1/loyalty/tiers",
+          body: {
+            name: form.get("name"),
+            minimumSpend: form.get("minimumSpend"),
+            discountPercent: form.get("discountPercent"),
+            benefits: String(form.get("benefits") || "") || null,
+          },
+        });
       }}
     >
       <Input name="name" required placeholder="Tier name" aria-label="Tier name" />
@@ -384,32 +309,24 @@ export function TierForm() {
 }
 
 export function CardForm({ customers, tiers }: { customers: Option[]; tiers: Option[] }) {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const { submit, pending, message } = useSubmit();
   return (
     <form
       className="grid max-w-xl gap-3"
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        setPending(true);
-        setMessage("");
-        void postJson("/api/v1/loyalty/cards", {
-          customerId: form.get("customerId"),
-          tierId: String(form.get("tierId") || "") || null,
-          number: form.get("number"),
-          cardType: form.get("cardType"),
-          issuedOn: form.get("issuedOn"),
-          expiresOn: String(form.get("expiresOn") || "") || null,
-        })
-          .then((result) => {
-            if (!result.ok) {
-              setMessage(result.message || "The card was not saved.");
-              return;
-            }
-            window.location.reload();
-          })
-          .finally(() => setPending(false));
+        void submit({
+          url: "/api/v1/loyalty/cards",
+          body: {
+            customerId: form.get("customerId"),
+            tierId: String(form.get("tierId") || "") || null,
+            number: form.get("number"),
+            cardType: form.get("cardType"),
+            issuedOn: form.get("issuedOn"),
+            expiresOn: String(form.get("expiresOn") || "") || null,
+          },
+        });
       }}
     >
       <Input name="number" required placeholder="Card number" aria-label="Card number" />
@@ -449,8 +366,7 @@ export function CrmForms({
   segments: Option[];
   users: Option[];
 }) {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const { submit, pending, message } = useSubmit();
   return (
     <div className="grid gap-8 lg:grid-cols-2">
       <form
@@ -458,21 +374,14 @@ export function CrmForms({
         onSubmit={(event) => {
           event.preventDefault();
           const form = new FormData(event.currentTarget);
-          setPending(true);
-          setMessage("");
-          void postJson("/api/v1/crm/contacts", {
-            name: form.get("name"),
-            phone: String(form.get("phone") || "") || null,
-            segmentId: String(form.get("segmentId") || "") || null,
-          })
-            .then((result) => {
-              if (!result.ok) {
-                setMessage(result.message || "The contact was not saved.");
-                return;
-              }
-              window.location.reload();
-            })
-            .finally(() => setPending(false));
+          void submit({
+            url: "/api/v1/crm/contacts",
+            body: {
+              name: form.get("name"),
+              phone: String(form.get("phone") || "") || null,
+              segmentId: String(form.get("segmentId") || "") || null,
+            },
+          });
         }}
       >
         <Input name="name" required placeholder="Contact name" aria-label="Contact name" />
@@ -494,15 +403,7 @@ export function CrmForms({
         onSubmit={(event) => {
           event.preventDefault();
           const form = new FormData(event.currentTarget);
-          setPending(true);
-          void postJson("/api/v1/crm/segments", { name: form.get("segmentName") }).then((result) => {
-            if (!result.ok) {
-              setMessage(result.message || "The segment was not saved.");
-              setPending(false);
-              return;
-            }
-            window.location.reload();
-          });
+          void submit({ url: "/api/v1/crm/segments", body: { name: form.get("segmentName") } });
         }}
       >
         <Input name="segmentName" required placeholder="Segment name" aria-label="Segment name" />
@@ -515,18 +416,13 @@ export function CrmForms({
         onSubmit={(event) => {
           event.preventDefault();
           const form = new FormData(event.currentTarget);
-          setPending(true);
-          void postJson("/api/v1/crm/activities", {
-            contactId: form.get("contactId"),
-            businessDate: form.get("businessDate"),
-            note: form.get("note"),
-          }).then((result) => {
-            if (!result.ok) {
-              setMessage(result.message || "The follow-up was not saved.");
-              setPending(false);
-              return;
-            }
-            window.location.reload();
+          void submit({
+            url: "/api/v1/crm/activities",
+            body: {
+              contactId: form.get("contactId"),
+              businessDate: form.get("businessDate"),
+              note: form.get("note"),
+            },
           });
         }}
       >
@@ -549,17 +445,12 @@ export function CrmForms({
         onSubmit={(event) => {
           event.preventDefault();
           const form = new FormData(event.currentTarget);
-          setPending(true);
-          void postJson("/api/v1/crm/assignments", {
-            contactId: form.get("assignContactId"),
-            userId: form.get("userId"),
-          }).then((result) => {
-            if (!result.ok) {
-              setMessage(result.message || "The assignment was not saved.");
-              setPending(false);
-              return;
-            }
-            window.location.reload();
+          void submit({
+            url: "/api/v1/crm/assignments",
+            body: {
+              contactId: form.get("assignContactId"),
+              userId: form.get("userId"),
+            },
           });
         }}
       >

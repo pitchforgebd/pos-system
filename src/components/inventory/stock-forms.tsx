@@ -1,10 +1,8 @@
 "use client";
 
-import { useState } from "react";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useAttemptKey } from "@/lib/client/attempt-key";
+import { useSubmit } from "@/lib/client/use-submit";
 
 type ProductOption = { id: string; label: string };
 
@@ -16,10 +14,6 @@ export function PrintButton() {
   );
 }
 
-function messageFrom(body: { error?: { message?: string } }, fallback: string) {
-  return body.error?.message ?? fallback;
-}
-
 export function InboundForm({
   action,
   products,
@@ -29,9 +23,7 @@ export function InboundForm({
   products: ProductOption[];
   submitLabel: string;
 }) {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
-  const attempt = useAttemptKey();
+  const { submit, pending, message } = useSubmit();
 
   return (
     <form
@@ -40,36 +32,24 @@ export function InboundForm({
         event.preventDefault();
         const element = event.currentTarget;
         const form = new FormData(element);
-        setPending(true);
-        setMessage("");
-        void fetch(action, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "idempotency-key": attempt.current(),
+        void submit(
+          {
+            url: action,
+            body: {
+              businessDate: form.get("businessDate"),
+              lines: [
+                {
+                  productId: form.get("productId"),
+                  quantity: form.get("quantity"),
+                  unitCost: String(form.get("unitCost") || "") || undefined,
+                  lot: String(form.get("lot") || "") || undefined,
+                  expiresOn: String(form.get("expiresOn") || "") || undefined,
+                },
+              ],
+            },
           },
-          body: JSON.stringify({
-            businessDate: form.get("businessDate"),
-            lines: [
-              {
-                productId: form.get("productId"),
-                quantity: form.get("quantity"),
-                unitCost: String(form.get("unitCost") || "") || undefined,
-                lot: String(form.get("lot") || "") || undefined,
-                expiresOn: String(form.get("expiresOn") || "") || undefined,
-              },
-            ],
-          }),
-        })
-          .then(async (response) => {
-            const body = (await response.json()) as { error?: { message?: string } };
-            setMessage(response.ok ? "Saved." : messageFrom(body, "The stock was not updated."));
-            if (response.ok) {
-              attempt.renew();
-              element.reset();
-            }
-          })
-          .finally(() => setPending(false));
+          { onSuccess: () => element.reset() },
+        );
       }}
     >
       <label className="grid gap-1 text-sm">
@@ -96,9 +76,7 @@ export function InboundForm({
 }
 
 export function AdjustmentForm({ products }: { products: ProductOption[] }) {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
-  const attempt = useAttemptKey();
+  const { submit, pending, message } = useSubmit();
 
   return (
     <form
@@ -106,27 +84,15 @@ export function AdjustmentForm({ products }: { products: ProductOption[] }) {
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        setPending(true);
-        setMessage("");
-        void fetch("/api/v1/inventory/adjustments", {
-          method: "POST",
-          headers: { "content-type": "application/json", "idempotency-key": attempt.current() },
-          body: JSON.stringify({
+        void submit({
+          url: "/api/v1/inventory/adjustments",
+          body: {
             productId: form.get("productId"),
             quantity: form.get("quantity"),
             direction: form.get("direction"),
             reason: form.get("reason"),
-          }),
-        })
-          .then(async (response) => {
-            const body = (await response.json()) as { error?: { message?: string } };
-            setMessage(response.ok ? "Saved." : messageFrom(body, "The adjustment was not saved."));
-            if (response.ok) {
-              attempt.renew();
-              window.location.reload();
-            }
-          })
-          .finally(() => setPending(false));
+          },
+        });
       }}
     >
       <label className="grid gap-1 text-sm">
@@ -157,9 +123,7 @@ export function AdjustmentForm({ products }: { products: ProductOption[] }) {
 }
 
 export function DamageForm({ products }: { products: ProductOption[] }) {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
-  const attempt = useAttemptKey();
+  const { submit, pending, message } = useSubmit();
 
   return (
     <form
@@ -168,33 +132,24 @@ export function DamageForm({ products }: { products: ProductOption[] }) {
         event.preventDefault();
         const element = event.currentTarget;
         const form = new FormData(element);
-        setPending(true);
-        setMessage("");
-        void fetch("/api/v1/inventory/damage", {
-          method: "POST",
-          headers: { "content-type": "application/json", "idempotency-key": attempt.current() },
-          body: JSON.stringify({
-            productId: form.get("productId"),
-            businessDate: form.get("businessDate"),
-            place: form.get("place"),
-            lot: String(form.get("lot") || "") || undefined,
-            purchasePrice: form.get("purchasePrice"),
-            salePrice: form.get("salePrice"),
-            discountAmount: form.get("discountAmount") || "0.00",
-            vatAmount: form.get("vatAmount") || "0.00",
-            quantity: form.get("quantity"),
-            reason: form.get("reason"),
-          }),
-        })
-          .then(async (response) => {
-            const body = (await response.json()) as { error?: { message?: string } };
-            setMessage(response.ok ? "Saved." : messageFrom(body, "The damage record was not saved."));
-            if (response.ok) {
-              attempt.renew();
-              element.reset();
-            }
-          })
-          .finally(() => setPending(false));
+        void submit(
+          {
+            url: "/api/v1/inventory/damage",
+            body: {
+              productId: form.get("productId"),
+              businessDate: form.get("businessDate"),
+              place: form.get("place"),
+              lot: String(form.get("lot") || "") || undefined,
+              purchasePrice: form.get("purchasePrice"),
+              salePrice: form.get("salePrice"),
+              discountAmount: form.get("discountAmount") || "0.00",
+              vatAmount: form.get("vatAmount") || "0.00",
+              quantity: form.get("quantity"),
+              reason: form.get("reason"),
+            },
+          },
+          { onSuccess: () => element.reset() },
+        );
       }}
     >
       <label className="grid gap-1 text-sm">
@@ -225,9 +180,7 @@ export function DamageForm({ products }: { products: ProductOption[] }) {
 }
 
 export function ExpiryWriteOffForm({ batches }: { batches: { id: string; label: string }[] }) {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
-  const attempt = useAttemptKey();
+  const { submit, pending, message } = useSubmit();
 
   return (
     <form
@@ -235,22 +188,10 @@ export function ExpiryWriteOffForm({ batches }: { batches: { id: string; label: 
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        setPending(true);
-        setMessage("");
-        void fetch("/api/v1/inventory/expiry", {
-          method: "POST",
-          headers: { "content-type": "application/json", "idempotency-key": attempt.current() },
-          body: JSON.stringify({ batchId: form.get("batchId"), quantity: form.get("quantity") }),
-        })
-          .then(async (response) => {
-            const body = (await response.json()) as { error?: { message?: string } };
-            setMessage(response.ok ? "Saved." : messageFrom(body, "The write-off was not saved."));
-            if (response.ok) {
-              attempt.renew();
-              window.location.reload();
-            }
-          })
-          .finally(() => setPending(false));
+        void submit({
+          url: "/api/v1/inventory/expiry",
+          body: { batchId: form.get("batchId"), quantity: form.get("quantity") },
+        });
       }}
     >
       <label className="grid gap-1 text-sm">

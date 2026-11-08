@@ -1,45 +1,16 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useFormSubmit } from "@/lib/client/use-form-submit";
 import { smsVariables } from "@/modules/sms/templates";
 
 type Option = { id: string; label: string };
 
-function postJson(url: string, body: unknown, idempotent = false) {
-  const headers: Record<string, string> = { "content-type": "application/json" };
-  if (idempotent) {
-    headers["idempotency-key"] = crypto.randomUUID();
-  }
-  return fetch(url, { method: "POST", headers, body: JSON.stringify(body) }).then(async (response) => {
-    const payload = (await response.json()) as { error?: { message?: string } };
-    return { ok: response.ok, message: payload.error?.message ?? "" };
-  });
-}
-
-function useSubmit(url: string, body: (form: FormData) => unknown, idempotent = false) {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setPending(true);
-    setMessage("");
-    void postJson(url, body(new FormData(event.currentTarget)), idempotent).then((result) => {
-      if (!result.ok) {
-        setMessage(result.message || "The SMS was not saved.");
-        setPending(false);
-        return;
-      }
-      window.location.reload();
-    });
-  }
-  return { message, pending, onSubmit };
-}
-
 export function TemplateForm() {
-  const form = useSubmit("/api/v1/sms/templates", (data) => ({
+  const form = useFormSubmit("/api/v1/sms/templates", (data) => ({
     name: data.get("name"),
     kind: data.get("kind"),
     body: data.get("body"),
@@ -75,7 +46,7 @@ export function SendForm({
   const [tab, setTab] = useState<"new" | "customers" | "suppliers">("new");
   const [recipient, setRecipient] = useState("");
   const [characters, setCharacters] = useState(0);
-  const form = useSubmit("/api/v1/sms/messages", (data) => {
+  const form = useFormSubmit("/api/v1/sms/messages", (data) => {
     const variables: Record<string, string> = {};
     for (const name of smsVariables) {
       const value = String(data.get(name) || "");
@@ -89,7 +60,7 @@ export function SendForm({
       body: String(data.get("body") || "") || null,
       variables,
     };
-  }, true);
+  });
   const parties = tab === "customers" ? customers : suppliers;
   return (
     <form className="grid max-w-xl gap-3" onSubmit={form.onSubmit}>
@@ -159,7 +130,7 @@ export function SendForm({
 }
 
 export function SettingsForm({ sender, provider }: { sender: string; provider: string }) {
-  const form = useSubmit("/api/v1/sms/settings", (data) => ({
+  const form = useFormSubmit("/api/v1/sms/settings", (data) => ({
     sender: data.get("sender"),
     provider: String(data.get("provider") || "") || null,
   }));
@@ -177,7 +148,7 @@ export function SettingsForm({ sender, provider }: { sender: string; provider: s
 }
 
 export function RetryForm({ messageId }: { messageId: string }) {
-  const form = useSubmit(`/api/v1/sms/messages/${messageId}/retry`, () => ({}), true);
+  const form = useFormSubmit(`/api/v1/sms/messages/${messageId}/retry`, () => ({}));
   return (
     <form onSubmit={form.onSubmit}>
       <Button type="submit" variant="secondary" size="sm" loading={form.pending}>

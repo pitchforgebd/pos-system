@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useSubmit } from "@/lib/client/use-submit";
 
 export function ProfileForm({
   name,
@@ -24,18 +25,14 @@ export function ProfileForm({
   pointsPerHundred: string;
   takaPerPoint: string;
 }) {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const { submit, pending, message } = useSubmit();
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    setPending(true);
-    setMessage("");
-    void fetch("/api/v1/settings/profile", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
+    void submit({
+      url: "/api/v1/settings/profile",
+      body: {
         name: data.get("name"),
         phone: String(data.get("phone") || "") || null,
         address: String(data.get("address") || "") || null,
@@ -44,17 +41,8 @@ export function ProfileForm({
         logoUrl: String(data.get("logoUrl") || "") || null,
         pointsPerHundred: String(data.get("pointsPerHundred") || "") || null,
         takaPerPoint: String(data.get("takaPerPoint") || "") || null,
-      }),
-    })
-      .then(async (response) => {
-        const payload = (await response.json()) as { error?: { message?: string } };
-        if (!response.ok) {
-          setMessage(payload.error?.message ?? "The shop profile was not saved.");
-          return;
-        }
-        window.location.reload();
-      })
-      .finally(() => setPending(false));
+      },
+    });
   }
 
   return (

@@ -22,6 +22,7 @@ import { useState } from "react";
 import type { WingSummary } from "@/modules/reports/wing-summary";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState, PermissionDenied } from "@/components/ui/states";
+import { useSubmit } from "@/lib/client/use-submit";
 
 const tones = [
   "from-[#c026d3] to-[#7a1f7a]",
@@ -67,6 +68,7 @@ export function DashboardView({
   summary: WingSummary;
 }) {
   const router = useRouter();
+  const { submit } = useSubmit();
   const [weekOpen, setWeekOpen] = useState(true);
 
   if (view === "loading") {
@@ -138,17 +140,8 @@ export function DashboardView({
                   openDay(day, "all");
                   return;
                 }
-                void fetch("/api/v1/session/branch", {
-                  method: "POST",
-                  headers: { "content-type": "application/json" },
-                  body: JSON.stringify({ branchId: value }),
-                }).then((response) => {
-                  if (response.ok) {
-                    router.push(`/dashboard?date=${day}`);
-                    // The header and layout read the session branch, so reload their server data too.
-                    router.refresh();
-                  }
-                });
+                // The header and layout read the session branch, so the page is opened again with fresh server data.
+                void submit({ url: "/api/v1/session/branch", body: { branchId: value } }, { quiet: true, goTo: `/dashboard?date=${day}` });
               }}
             >
               <option value="all">All Branch</option>

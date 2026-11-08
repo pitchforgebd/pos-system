@@ -1,17 +1,13 @@
 "use client";
 
-import { useState } from "react";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useAttemptKey } from "@/lib/client/attempt-key";
+import { useSubmit } from "@/lib/client/use-submit";
 
 type Option = { id: string; label: string };
 
 export function PurchaseForm({ suppliers, products }: { suppliers: Option[]; products: Option[] }) {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
-  const attempt = useAttemptKey();
+  const { submit, pending, message } = useSubmit();
 
   return (
     <form
@@ -20,38 +16,28 @@ export function PurchaseForm({ suppliers, products }: { suppliers: Option[]; pro
         event.preventDefault();
         const form = new FormData(event.currentTarget);
         const paymentAmount = String(form.get("paymentAmount") || "");
-        setPending(true);
-        setMessage("");
-        void fetch("/api/v1/purchases", {
-          method: "POST",
-          headers: { "content-type": "application/json", "idempotency-key": attempt.current() },
-          body: JSON.stringify({
-            supplierId: form.get("supplierId"),
-            businessDate: form.get("businessDate"),
-            paymentAmount: paymentAmount || undefined,
-            paymentMethod: paymentAmount ? form.get("paymentMethod") : undefined,
-            lines: [
-              {
-                productId: form.get("productId"),
-                quantity: form.get("quantity"),
-                unitCost: form.get("unitCost"),
-                lot: String(form.get("lot") || "") || undefined,
-                manufacturedOn: String(form.get("manufacturedOn") || "") || undefined,
-                expiresOn: String(form.get("expiresOn") || "") || undefined,
-              },
-            ],
-          }),
-        })
-          .then(async (response) => {
-            const body = (await response.json()) as { data?: { id?: string }; error?: { message?: string } };
-            if (!response.ok || !body.data?.id) {
-              setMessage(body.error?.message ?? "The purchase was not saved.");
-              return;
-            }
-            attempt.renew();
-            window.location.replace(`/purchases/${body.data.id}`);
-          })
-          .finally(() => setPending(false));
+        void submit<{ id: string }>(
+          {
+            url: "/api/v1/purchases",
+            body: {
+              supplierId: form.get("supplierId"),
+              businessDate: form.get("businessDate"),
+              paymentAmount: paymentAmount || undefined,
+              paymentMethod: paymentAmount ? form.get("paymentMethod") : undefined,
+              lines: [
+                {
+                  productId: form.get("productId"),
+                  quantity: form.get("quantity"),
+                  unitCost: form.get("unitCost"),
+                  lot: String(form.get("lot") || "") || undefined,
+                  manufacturedOn: String(form.get("manufacturedOn") || "") || undefined,
+                  expiresOn: String(form.get("expiresOn") || "") || undefined,
+                },
+              ],
+            },
+          },
+          { successMessage: "ক্রয় সংরক্ষিত হয়েছে। (Purchase saved.)", goTo: (data) => `/purchases/${data.id}` },
+        );
       }}
     >
       <label className="grid gap-1 text-sm">
@@ -98,8 +84,7 @@ export function PurchaseForm({ suppliers, products }: { suppliers: Option[]; pro
 }
 
 export function SupplierPaymentForm({ suppliers }: { suppliers: Option[] }) {
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const { submit, pending, message } = useSubmit();
 
   return (
     <form
@@ -107,22 +92,13 @@ export function SupplierPaymentForm({ suppliers }: { suppliers: Option[] }) {
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        setPending(true);
-        setMessage("");
-        void fetch(`/api/v1/suppliers/${form.get("supplierId")}/payments`, {
-          method: "POST",
-          headers: { "content-type": "application/json", "idempotency-key": crypto.randomUUID() },
-          body: JSON.stringify({
-            businessDate: form.get("businessDate"),
-            amount: form.get("amount"),
-            method: form.get("method"),
-          }),
-        })
-          .then(async (response) => {
-            const body = (await response.json()) as { error?: { message?: string } };
-            setMessage(response.ok ? "Saved." : (body.error?.message ?? "The payment was not saved."));
-          })
-          .finally(() => setPending(false));
+        void submit(
+          {
+            url: `/api/v1/suppliers/${form.get("supplierId")}/payments`,
+            body: { businessDate: form.get("businessDate"), amount: form.get("amount"), method: form.get("method") },
+          },
+          { successMessage: "পেমেন্ট সংরক্ষিত হয়েছে। (Payment saved.)" },
+        );
       }}
     >
       <label className="grid gap-1 text-sm">

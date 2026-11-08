@@ -5,6 +5,7 @@ import { businessDate } from "@/core/time/business-date";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useSubmit } from "@/lib/client/use-submit";
 
 type Party = { id: string; name: string; phone: string | null; outstanding: string };
 
@@ -33,10 +34,11 @@ export function PartyAmountForm({
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState<Party | null>(null);
   const [amount, setAmount] = useState("");
-  const [businessDate, setOccurredOn] = useState(today);
+  const [postDate, setPostDate] = useState(today);
   const [method, setMethod] = useState("CASH");
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const [localMessage, setLocalMessage] = useState("");
+  const { submit, pending, message: serverMessage } = useSubmit();
+  const message = localMessage || serverMessage;
 
   const matched = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -56,7 +58,7 @@ export function PartyAmountForm({
   function choose(party: Party) {
     setSelected(party);
     setAmount(mode === "due" ? party.outstanding : "");
-    setMessage("");
+    setLocalMessage("");
   }
 
   return (
@@ -124,27 +126,24 @@ export function PartyAmountForm({
         onSubmit={(event) => {
           event.preventDefault();
           if (!selected) {
-            setMessage("Choose a name from the list.");
+            setLocalMessage("Choose a name from the list.");
             return;
           }
-          setPending(true);
-          setMessage("");
+          setLocalMessage("");
           const target = typeof url === "function" ? url(selected.id) : url;
-          const body = typeof url === "function" ? { businessDate, amount, method } : { customerId: selected.id, businessDate, amount, method };
-          void fetch(target, {
-            method: "POST",
-            headers: { "content-type": "application/json", "idempotency-key": crypto.randomUUID() },
-            body: JSON.stringify(body),
-          })
-            .then(async (response) => {
-              const payload = (await response.json()) as { error?: { message?: string } };
-              if (!response.ok) {
-                setMessage(payload.error?.message ?? "The amount was not posted.");
-                return;
-              }
-              window.location.reload();
-            })
-            .finally(() => setPending(false));
+          const body = typeof url === "function" ? { businessDate: postDate, amount, method } : { customerId: selected.id, businessDate: postDate, amount, method };
+          // The balance shown for the chosen party is a snapshot, so clear the form once the payment is saved.
+          void submit(
+            { url: target, body },
+            {
+              successMessage: "পেমেন্ট সংরক্ষিত হয়েছে। (Payment saved.)",
+              onSuccess: () => {
+                setSelected(null);
+                setQuery("");
+                setAmount("");
+              },
+            },
+          );
         }}
       >
         <h2 className="text-sm font-semibold">{title}</h2>
@@ -159,7 +158,7 @@ export function PartyAmountForm({
           <p className="mt-2 text-sm text-muted">Select a name from the list.</p>
         )}
         <div className="mt-3 grid gap-3">
-          <Input type="date" required aria-label="Date" value={businessDate} onChange={(event) => setOccurredOn(event.target.value)} />
+          <Input type="date" required aria-label="Date" value={postDate} onChange={(event) => setPostDate(event.target.value)} />
           <Input required aria-label="Amount" placeholder="Amount" value={amount} onChange={(event) => setAmount(event.target.value)} />
           <select aria-label="Method" value={method} onChange={(event) => setMethod(event.target.value)} className="h-10 rounded-md border border-border bg-surface px-3 text-sm">
             <option value="CASH">Cash</option>

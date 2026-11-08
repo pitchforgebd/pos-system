@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useSubmit } from "@/lib/client/use-submit";
 
 type PreviewRow = { rowNumber: number; sku: string; name: string; status: string; message: string };
 type ResultRow = { rowNumber: number; status: string; message: string };
@@ -11,30 +12,24 @@ export function ProductImportForm({ canExport }: { canExport: boolean }) {
   const [csv, setCsv] = useState("sku,name,purchasePrice,sellingPrice,wholesalePrice,minimumPrice,reorderLevel,barcode\n");
   const [preview, setPreview] = useState<PreviewRow[]>([]);
   const [result, setResult] = useState<ResultRow[]>([]);
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const { submit, pending, message } = useSubmit();
 
-  async function run(path: string, idempotent: boolean) {
-    setPending(true);
-    setMessage("");
-    const headers: Record<string, string> = { "content-type": "application/json" };
-    if (idempotent) {
-      headers["idempotency-key"] = crypto.randomUUID();
-    }
-    const response = await fetch(path, { method: "POST", headers, body: JSON.stringify({ fileName: "products.csv", csv }) });
-    const body = (await response.json()) as { data?: PreviewRow[] | { rows?: ResultRow[] }; error?: { message?: string } };
-    setPending(false);
-    if (!response.ok) {
-      setMessage(body.error?.message ?? "The CSV was not imported.");
+  async function run(path: string, confirm: boolean) {
+    // The preview only reads (no toast, no refresh); the confirmed import writes, and this form shows its result.
+    const outcome = await submit<PreviewRow[] | { rows?: ResultRow[] }>(
+      { url: path, body: { fileName: "products.csv", csv } },
+      confirm ? { successMessage: "ইমপোর্ট সম্পন্ন হয়েছে। (Import finished.)", refresh: false } : { quiet: true },
+    );
+    if (!outcome.ok) {
       return;
     }
-    if (idempotent) {
-      const rows = body.data && "rows" in body.data ? body.data.rows ?? [] : [];
+    if (confirm) {
+      const rows = outcome.data && "rows" in outcome.data ? outcome.data.rows ?? [] : [];
       setResult(rows);
       setPreview([]);
       return;
     }
-    setPreview(Array.isArray(body.data) ? body.data : []);
+    setPreview(Array.isArray(outcome.data) ? outcome.data : []);
     setResult([]);
   }
 
@@ -79,36 +74,20 @@ export function ProductImportForm({ canExport }: { canExport: boolean }) {
 
 export function OpeningImportForm() {
   const [csv, setCsv] = useState("sku,quantity,unitCost,lot,manufacturedOn,expiresOn,rack\n");
-  const [businessDate, setOccurredOn] = useState("");
-  const [message, setMessage] = useState("");
-  const [pending, setPending] = useState(false);
+  const [openingDate, setOpeningDate] = useState("");
+  const { submit, pending, message } = useSubmit();
 
   return (
     <form
       className="grid max-w-3xl gap-3"
       onSubmit={(event) => {
         event.preventDefault();
-        setPending(true);
-        setMessage("");
-        void fetch("/api/v1/inventory/opening-stock/import", {
-          method: "POST",
-          headers: { "content-type": "application/json", "idempotency-key": crypto.randomUUID() },
-          body: JSON.stringify({ fileName: "opening-stock.csv", csv, businessDate }),
-        })
-          .then(async (response) => {
-            const body = (await response.json()) as { error?: { message?: string }; data?: { successRows?: number; failedRows?: number } };
-            if (!response.ok) {
-              setMessage(body.error?.message ?? "The CSV was not imported.");
-              return;
-            }
-            window.location.reload();
-          })
-          .finally(() => setPending(false));
+        void submit({ url: "/api/v1/inventory/opening-stock/import", body: { fileName: "opening-stock.csv", csv, businessDate: openingDate } });
       }}
     >
       <label className="grid gap-1 text-sm">
         Date
-        <input name="businessDate" type="date" required aria-label="Opening date" className="h-10 rounded-md border border-border bg-surface px-3 text-sm" value={businessDate} onChange={(event) => setOccurredOn(event.target.value)} />
+        <input name="businessDate" type="date" required aria-label="Opening date" className="h-10 rounded-md border border-border bg-surface px-3 text-sm" value={openingDate} onChange={(event) => setOpeningDate(event.target.value)} />
       </label>
       <textarea aria-label="Opening stock CSV" className="min-h-32 rounded-md border border-border bg-surface px-3 py-2 font-mono text-sm" value={csv} onChange={(event) => setCsv(event.target.value)} />
       <p className="text-sm text-muted">Rack is kept in the file and is not stored. Unit cost is not posted to accounting.</p>
