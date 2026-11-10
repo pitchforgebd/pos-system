@@ -15,7 +15,7 @@ process.env.BCRYPT_COST = "4";
 test("phase 10 posts customer due and advance without inventing points", async () => {
   const { prisma } = await import("../../lib/db/client.ts");
   const { hashPassword } = await import("../auth/password.ts");
-  const { createCustomer, outstandingReceivable, updateCustomer } = await import("./customers.ts");
+  const { createCustomer, customerWallet, outstandingReceivable, updateCustomer } = await import("./customers.ts");
   const { postCustomerPayment } = await import("./dues.ts");
   const { postCustomerAdvance } = await import("./advances.ts");
   const { closeInstallment, createInstallment } = await import("./installments.ts");
@@ -102,7 +102,9 @@ test("phase 10 posts customer due and advance without inventing points", async (
       method: "BANK",
     });
     assert.equal(advance.ok, true);
-    assert.equal((await outstandingReceivable(org.id, created.customer.id)).toFixed(2), "4.00");
+    // N16: an advance is the shop's liability to the customer (the wallet), not a negative receivable.
+    assert.equal((await outstandingReceivable(org.id, created.customer.id)).toFixed(2), "6.00");
+    assert.equal((await customerWallet(org.id, created.customer.id)).toFixed(2), "2.00");
     const advanceLine = await prisma.customerLedger.findFirst({
       where: { customerId: created.customer.id, entryType: "ADVANCE" },
     });
@@ -119,7 +121,8 @@ test("phase 10 posts customer due and advance without inventing points", async (
     }
     const bank = journals.find((journal) => journal.description === "Customer advance");
     assert.equal(bank?.lines.some((line) => line.account.code === "1200" && line.debit.toFixed(2) === "2.00"), true);
-    assert.equal(bank?.lines.some((line) => line.account.code === "1300" && line.credit.toFixed(2) === "2.00"), true);
+    assert.equal(bank?.lines.some((line) => line.account.code === "2150" && line.credit.toFixed(2) === "2.00"), true, "the advance is credited to Customer Advance");
+    assert.equal(bank?.lines.some((line) => line.account.code === "1300"), false, "and not to the receivable");
 
     const sale = await prisma.sale.create({
       data: {

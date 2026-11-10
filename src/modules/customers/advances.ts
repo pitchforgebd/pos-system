@@ -81,7 +81,7 @@ export async function postCustomerAdvance(
         doc: { type: "CUSTOMER_ADVANCE", id: advanceId },
         lines: [
           { accountId: await moneyAccountFor(tx, input.organizationId, { method: input.method }), debit: amount, credit: new Prisma.Decimal(0) },
-          { role: "AR", debit: new Prisma.Decimal(0), credit: amount, party: { type: "CUSTOMER" as const, id: input.customerId } },
+          { role: "CUSTOMER_ADVANCE", debit: new Prisma.Decimal(0), credit: amount, party: { type: "CUSTOMER" as const, id: input.customerId } },
         ],
       });
       const advance = await tx.customerAdvance.create({

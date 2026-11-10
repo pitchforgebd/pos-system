@@ -5,6 +5,7 @@ import { businessDate, dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
+import { partyBalance } from "@/core/parties";
 import { postBalancedJournal } from "@/modules/accounting/post";
 import { decimalString, parseMoney } from "@/core/money";
 
@@ -32,16 +33,22 @@ function today() {
   return new Date(`${businessDate()}T00:00:00.000Z`);
 }
 
+/** What the customer owes the shop: the balance of their receivable lines in the journal (I8). An advance is not netted against it. */
 export async function outstandingReceivable(
   organizationId: string,
   customerId: string,
   tx: Prisma.TransactionClient | typeof prisma = prisma,
 ) {
-  const sum = await tx.customerLedger.aggregate({
-    where: { organizationId, customerId },
-    _sum: { debit: true, credit: true },
-  });
-  return new Prisma.Decimal(sum._sum.debit ?? 0).minus(sum._sum.credit ?? 0);
+  return partyBalance(tx as Prisma.TransactionClient, { organizationId, partyType: "CUSTOMER", partyId: customerId });
+}
+
+/** The customer's wallet: the advance the shop holds for them, from the Customer Advance lines in the journal. */
+export async function customerWallet(
+  organizationId: string,
+  customerId: string,
+  tx: Prisma.TransactionClient | typeof prisma = prisma,
+) {
+  return partyBalance(tx as Prisma.TransactionClient, { organizationId, partyType: "CUSTOMER", partyId: customerId, account: "ADVANCE" });
 }
 
 function present(
