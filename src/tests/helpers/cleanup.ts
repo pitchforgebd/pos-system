@@ -2,6 +2,7 @@ import "./env.ts";
 
 import { Prisma } from "@prisma/client";
 
+import { runTx } from "../../core/tx/run.ts";
 import { prisma } from "../../lib/db/client.ts";
 
 export type OrgTablePlan = {
@@ -95,10 +96,13 @@ async function buildPlan(): Promise<OrgTablePlan> {
   return { order, selfReference };
 }
 
-/** Deletes an organization and every row that belongs to it. Safe to call twice. */
+/**
+ * Deletes an organization and every row that belongs to it. Safe to call twice. A deadlock with another test that is
+ * writing at the same moment is retried: the delete is the same every time, so running it again is harmless.
+ */
 export async function cleanupOrg(organizationId: string) {
   const plan = await orgTablePlan();
-  await prisma.$transaction(
+  await runTx(
     async (tx) => {
       for (const [table, columns] of plan.selfReference) {
         for (const column of columns) {
@@ -113,7 +117,7 @@ export async function cleanupOrg(organizationId: string) {
       }
       await tx.$executeRawUnsafe("DELETE FROM `organizations` WHERE id = ?", organizationId);
     },
-    { isolationLevel: ISOLATION, maxWait: 20_000, timeout: 120_000 },
+    { isolationLevel: ISOLATION, maxWaitMs: 20_000, timeoutMs: 120_000, retries: 8, backoffMs: 40 },
   );
 }
 

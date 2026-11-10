@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 
 import type { Branch, Organization, Role, User, Warehouse } from "@prisma/client";
 
-import { accountGroups, accounts } from "../../../prisma/chart-of-accounts.ts";
+import { ensureChart } from "../../core/ledger/chart.ts";
 import { prisma } from "../../lib/db/client.ts";
 import { permissionCodes } from "../../lib/permissions/codes.ts";
 import { hashPassword } from "../../modules/auth/password.ts";
@@ -93,19 +93,7 @@ export async function testOrg(options: TestOrgOptions = {}): Promise<TestOrg> {
     });
 
     if (options.chart !== false) {
-      for (const group of accountGroups) {
-        await prisma.accountGroup.create({ data: { organizationId: org.id, code: group.code, name: group.name } });
-      }
-      const groups = await prisma.accountGroup.findMany({ where: { organizationId: org.id } });
-      const groupIdByCode = new Map(groups.map((group) => [group.code, group.id]));
-      await prisma.account.createMany({
-        data: accounts.map((account) => ({
-          organizationId: org.id,
-          groupId: groupIdByCode.get(account.groupCode) as string,
-          code: account.code,
-          name: account.name,
-        })),
-      });
+      await ensureChart(prisma, org.id);
     }
 
     return {
