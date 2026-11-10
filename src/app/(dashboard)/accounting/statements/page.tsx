@@ -5,7 +5,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
-import { accountStatement, listAccounts } from "@/modules/accounting/books";
+import { accountStatement, defaultStatementRange, listAccounts } from "@/modules/accounting/books";
 
 export const metadata = { title: "Account statement" };
 
@@ -14,7 +14,10 @@ export default async function StatementsPage({ searchParams }: { searchParams: P
   if (!session?.branchId) {
     redirect("/login");
   }
-  const query = await searchParams;
+  const given = await searchParams;
+  // A link to an account's ledger needs no dates: it opens on the current fiscal year up to today.
+  const range = given.accountCode && (!given.from || !given.to) ? await defaultStatementRange(session.organizationId) : null;
+  const query = { ...given, from: given.from || range?.from, to: given.to || range?.to };
   const accounts = await listAccounts(session.organizationId);
   const ready = Boolean(query.accountCode && query.from && query.to && /^\d{4}-\d{2}-\d{2}$/.test(query.from) && /^\d{4}-\d{2}-\d{2}$/.test(query.to));
   const statement = ready

@@ -381,6 +381,7 @@ export function CashVoucherForm({ accounts, moneyAccounts }: { accounts: Account
   );
 }
 
+/** Adds a bank or a mobile banking account (bKash, Nagad, ...), with the details people look for and an optional opening amount. */
 export function BankForm() {
   const { submit, pending, message } = useSubmit();
   return (
@@ -389,20 +390,55 @@ export function BankForm() {
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
+        const text = (name: string) => String(form.get(name) || "").trim() || undefined;
         void submit({
           url: "/api/v1/accounting/banks",
           body: {
             name: form.get("name"),
-            openingAmount: String(form.get("openingAmount") || "") || undefined,
+            kind: form.get("kind"),
+            bankName: text("bankName"),
+            bankBranch: text("bankBranch"),
+            accountNumber: text("accountNumber"),
+            openingAmount: text("openingAmount"),
           },
         });
       }}
     >
-      <Input name="name" required placeholder="Bank name" aria-label="Bank name" />
+      <label className="grid gap-1 text-sm">
+        Type
+        <select name="kind" defaultValue="BANK" className="h-10 rounded-md border border-border bg-surface px-2">
+          <option value="BANK">Bank account</option>
+          <option value="MOBILE">Mobile banking (bKash, Nagad, ...)</option>
+        </select>
+      </label>
+      <Input name="name" required placeholder="Account name, e.g. DBBL Current or bKash Personal" aria-label="Account name" />
+      <Input name="bankName" placeholder="Bank (for a bank account)" aria-label="Bank" />
+      <Input name="bankBranch" placeholder="Branch (for a bank account)" aria-label="Bank branch" />
+      <Input name="accountNumber" placeholder="Account or wallet number" aria-label="Account number" />
       <Input name="openingAmount" placeholder="Opening amount" aria-label="Opening amount" />
-      <p className="text-sm text-muted">A new bank gets its own account from 1201. An opening amount debits that bank and credits owner capital.</p>
+      <p className="text-sm text-muted">Each account gets a number of its own, banks and mobile accounts in separate ranges. An opening amount debits the account and credits Opening Balance Equity, so the owner&apos;s capital is not touched.</p>
       {message ? <p className="text-sm text-error">{message}</p> : null}
-      <Button type="submit" loading={pending}>Add bank</Button>
+      <Button type="submit" loading={pending}>Add account</Button>
+    </form>
+  );
+}
+
+/** The cash in the drawer when the books start, entered once per branch. */
+export function OpeningCashForm() {
+  const { submit, pending, message } = useSubmit();
+  return (
+    <form
+      className="grid max-w-xl gap-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const form = new FormData(event.currentTarget);
+        void submit({ url: "/api/v1/accounting/opening-cash", body: { amount: String(form.get("amount") || "").trim() } });
+      }}
+    >
+      <Input name="amount" required placeholder="Cash in the drawer today" aria-label="Opening cash" />
+      <p className="text-sm text-muted">Enter this once for the branch when the books start. It debits Cash in Hand and credits Opening Balance Equity. Cash after that comes from sales, receipts and the owner&apos;s capital.</p>
+      {message ? <p className="text-sm text-error">{message}</p> : null}
+      <Button type="submit" variant="secondary" loading={pending}>Save opening cash</Button>
     </form>
   );
 }

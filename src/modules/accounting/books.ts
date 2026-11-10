@@ -3,9 +3,9 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { runTx } from "@/core/tx/run";
 import { RuleError } from "@/core/errors/rule-error";
-import { accountFor, accountsFor, MONEY_KINDS, moneyAccountFor } from "@/core/ledger/accounts";
+import { accountFor, accountsFor, MONEY_ACCOUNT_RANGES, MONEY_KINDS, moneyAccountFor } from "@/core/ledger/accounts";
 import { GROUP } from "@/core/ledger/groups";
-import { businessDate, dateOnly } from "@/core/time/business-date";
+import { businessDate, dateOnly, fiscalYear } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
@@ -551,6 +551,13 @@ export async function listVouchers(organizationId: string, branchId: string) {
   }));
 }
 
+/** The dates an account's ledger opens on when none are given: the current fiscal year up to today. */
+export async function defaultStatementRange(organizationId: string) {
+  const org = await prisma.organization.findUnique({ where: { id: organizationId }, select: { fiscalYearStartMonth: true } });
+  const to = businessDate();
+  return { from: fiscalYear(to, org?.fiscalYearStartMonth ?? 7).start, to };
+}
+
 export async function accountStatement(input: { organizationId: string; branchId: string; accountCode: string; from: string; to: string }) {
   const account = await prisma.account.findFirst({
     where: { organizationId: input.organizationId, code: input.accountCode },
@@ -706,7 +713,7 @@ export async function cashFlow(organizationId: string, branchId: string, from?: 
 export async function cashBankBalances(organizationId: string, branchId: string) {
   const accounts = await prisma.account.findMany({
     where: { organizationId, kind: { in: [...MONEY_KINDS] } },
-    select: { id: true, code: true, name: true, kind: true },
+    select: { id: true, code: true, name: true, kind: true, accountNumber: true, bankName: true, bankBranch: true },
     orderBy: { code: "asc" },
   });
   if (accounts.length === 0) {
@@ -722,6 +729,9 @@ export async function cashBankBalances(organizationId: string, branchId: string)
     code: account.code,
     name: account.name,
     kind: account.kind,
+    accountNumber: account.accountNumber,
+    bankName: account.bankName,
+    bankBranch: account.bankBranch,
     balance: decimalString(byId.get(account.id) ?? new Prisma.Decimal(0), 2),
   }));
 }
@@ -1121,26 +1131,50 @@ export async function postOpeningCash(input: Actor & { amount: string }) {
   }
 }
 
-export async function createBankAccount(
-  input: Actor & { name: string; openingAmount?: string },
+/** Letters, digits, spaces, dashes and slashes: how bank account numbers and mobile wallet numbers are written. */
+const ACCOUNT_NUMBER = /^[A-Za-z0-9 /-]{1,64}$/;
+
+/**
+ * Adds a bank or a mobile banking account: an account of its own (banks numbered in one range, mobile accounts in another) with
+ * the bank, branch and number people look for. An opening amount is Dr the account / Cr Opening Balance Equity.
+ */
+export async function createMoneyAccount(
+  input: Actor & { name: string; kind?: "BANK" | "MOBILE"; accountNumber?: string; bankName?: string; bankBranch?: string; openingAmount?: string },
 ) {
-  const requestHash = hashPayload({ name: input.name, openingAmount: input.openingAmount ?? "0.00" });
+  const kind = input.kind ?? "BANK";
+  const requestHash = hashPayload({
+    name: input.name,
+    kind,
+    accountNumber: input.accountNumber ?? null,
+    bankName: input.bankName ?? null,
+    bankBranch: input.bankBranch ?? null,
+    openingAmount: input.openingAmount ?? "0.00",
+  });
   try {
     const data = await runTx(async (tx) => {
       const existing = await begin(tx, input.organizationId, input.idempotencyKey, requestHash);
       if (existing) {
         return { id: existing.entityId, replayed: true, number: null as string | null };
       }
+      if (kind !== "BANK" && kind !== "MOBILE") {
+        throw new PostingError("Only a bank or a mobile banking account can be added.");
+      }
       const name = input.name.trim();
       if (!name) {
-        throw new PostingError("Enter a bank name.");
+        throw new PostingError(kind === "BANK" ? "Enter a bank name." : "Enter a name for the account.");
       }
+      const accountNumber = input.accountNumber?.trim() || null;
+      if (accountNumber && !ACCOUNT_NUMBER.test(accountNumber)) {
+        throw new PostingError("An account number is up to 64 letters, digits, spaces, dashes or slashes.");
+      }
+      const bankName = input.bankName?.trim().slice(0, 191) || null;
+      const bankBranch = input.bankBranch?.trim().slice(0, 191) || null;
       const duplicate = await tx.bankAccount.findFirst({
         where: { organizationId: input.organizationId, name },
         select: { id: true },
       });
       if (duplicate) {
-        throw new PostingError("That bank name already exists.", 409);
+        throw new PostingError("That name already exists.", 409);
       }
       const group = await tx.accountGroup.findFirst({
         where: { organizationId: input.organizationId, code: GROUP.ASSET },
@@ -1153,9 +1187,10 @@ export async function createBankAccount(
       if (!opening || opening.isNeg()) {
         throw new PostingError("Enter an opening amount of 0.00 or more.");
       }
-      const code = await nextAccountCode(tx, input.organizationId, 1201, 1299);
+      const range = MONEY_ACCOUNT_RANGES[kind];
+      const code = await nextAccountCode(tx, input.organizationId, range.from, range.to);
       const account = await tx.account.create({
-        data: { organizationId: input.organizationId, groupId: group.id, code, name, kind: "BANK" },
+        data: { organizationId: input.organizationId, groupId: group.id, code, name, kind, accountNumber, bankName, bankBranch },
         select: { id: true, code: true },
       });
       const bank = await tx.bankAccount.create({
@@ -1169,7 +1204,7 @@ export async function createBankAccount(
           organizationId: input.organizationId,
           branchId: input.branchId,
           businessDate: occurredDate(businessDate()),
-          description: `Bank opening ${name} ${number}`,
+          description: `${kind === "BANK" ? "Bank" : "Mobile account"} opening ${name} ${number}`,
           createdById: input.userId,
           doc: { type: "BANK_OPENING", id: account.id },
           lines: [
@@ -1190,4 +1225,12 @@ export async function createBankAccount(
     }
     throw error;
   }
+}
+
+/** The name the bank form and older callers know it by. */
+export const createBankAccount = createMoneyAccount;
+
+/** Whether this branch's opening cash was already entered (it is entered once; the branch is its document). */
+export async function openingCashEntered(organizationId: string, branchId: string) {
+  return (await prisma.journal.count({ where: { organizationId, docType: "CASH_OPENING", docId: branchId, kind: "POSTING" } })) > 0;
 }

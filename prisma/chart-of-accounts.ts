@@ -25,6 +25,12 @@ export type ChartAccount = {
   oldNames?: readonly string[];
 };
 
+/** The number ranges of the accounts the owner adds: banks, and mobile banking (bKash, Nagad, ...). The next free number in the range is used. */
+export const MONEY_ACCOUNT_RANGES = {
+  BANK: { from: 1201, to: 1249 },
+  MOBILE: { from: 1251, to: 1279 },
+} as const;
+
 export const accounts: readonly ChartAccount[] = [
   { code: "1100", name: "Cash in Hand", groupCode: "1000", role: "CASH", kind: "CASH", oldNames: ["Cash"] },
   // The default bank account: card and bank sales and receipts land here unless a specific bank account is chosen.

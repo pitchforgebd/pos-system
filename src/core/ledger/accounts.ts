@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
 import { RuleError } from "@/core/errors/rule-error";
+import { MONEY_ACCOUNT_RANGES as RANGES } from "../../../prisma/chart-of-accounts.ts";
 import { prisma } from "@/lib/db/client";
 
 import type { AccountRole } from "./roles";
@@ -9,6 +10,9 @@ type Db = Prisma.TransactionClient;
 
 /** The kinds of account that hold money. A cash drawer, a bank account and a mobile wallet are told apart by kind, not by number. */
 export const MONEY_KINDS = ["CASH", "BANK", "MOBILE"] as const;
+
+/** The number ranges banks and mobile banking accounts are numbered in (defined with the chart). */
+export const MONEY_ACCOUNT_RANGES = RANGES;
 
 // Which account plays which role does not change while a transaction runs, so it is looked up once per transaction and
 // remembered for the rest of it. The shared client outside a transaction is not remembered: it lives forever and the owner can

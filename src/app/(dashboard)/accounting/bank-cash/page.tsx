@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { BankForm } from "@/components/accounting/forms";
+import { BankForm, OpeningCashForm } from "@/components/accounting/forms";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { getSession } from "@/modules/auth/current-session";
-import { cashBankBalances, cashFlow } from "@/modules/accounting/books";
+import { cashBankBalances, cashFlow, openingCashEntered } from "@/modules/accounting/books";
 
 export const metadata = { title: "Bank & Cash" };
 
@@ -21,28 +21,42 @@ export default async function BankCashPage({ searchParams }: { searchParams: Pro
   }
   const query = await searchParams;
   const range = dated(query.from, query.to);
-  const [balances, flow] = await Promise.all([
+  const [balances, flow, openingDone] = await Promise.all([
     cashBankBalances(session.organizationId, session.branchId),
     cashFlow(session.organizationId, session.branchId, range ? query.from : undefined, range ? query.to : undefined),
+    openingCashEntered(session.organizationId, session.branchId),
   ]);
   const cash = balances.find((row) => row.kind === "CASH");
   // The bank figure on this page is the default bank account, as before; each account has its own row in the table below.
   const bank = balances.find((row) => row.kind === "BANK");
+  const canPost = session.permissions.has("accounting.post");
+  const typeLabel = { CASH: "Cash", BANK: "Bank", MOBILE: "Mobile banking" } as const;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Bank & Cash"
-        description="Cash in hand is account 1100. The pooled bank is 1200. Each added bank gets its own code from 1201. An opening amount debits that bank and credits owner capital."
+        description="Cash in hand and the default bank are set up with the books. Add each bank and each mobile banking account (bKash, Nagad, ...) you use: it gets a number of its own and its own ledger. Opening amounts go against Opening Balance Equity, not the owner's capital."
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Accounting", href: "/accounting" }, { label: "Bank & Cash" }]}
       />
-      {session.permissions.has("accounting.post") ? <BankForm /> : null}
+      {canPost && !openingDone ? (
+        <section className="space-y-2">
+          <h2 className="text-lg font-semibold">Opening cash</h2>
+          <OpeningCashForm />
+        </section>
+      ) : null}
+      {canPost ? (
+        <section className="space-y-2">
+          <h2 className="text-lg font-semibold">Add a bank or mobile account</h2>
+          <BankForm />
+        </section>
+      ) : null}
       <div className="grid gap-3 sm:grid-cols-2">
-        <Link href="/accounting/statements?accountCode=1100" className="rounded-xl bg-[#0f8f78] px-4 py-4 text-white">
+        <Link href={`/accounting/statements?accountCode=${cash?.code ?? ""}`} className="rounded-xl bg-[#0f8f78] px-4 py-4 text-white">
           <span className="text-xs font-semibold tracking-wide">CASH IN HAND</span>
           <span className="mt-3 block text-2xl font-semibold">{cash?.balance ?? "0.00"}</span>
         </Link>
-        <Link href="/accounting/statements?accountCode=1200" className="rounded-xl bg-[#5b4bdb] px-4 py-4 text-white">
+        <Link href={`/accounting/statements?accountCode=${bank?.code ?? ""}`} className="rounded-xl bg-[#5b4bdb] px-4 py-4 text-white">
           <span className="text-xs font-semibold tracking-wide">CASH AT BANK</span>
           <span className="mt-3 block text-2xl font-semibold">{bank?.balance ?? "0.00"}</span>
         </Link>
@@ -74,6 +88,9 @@ export default async function BankCashPage({ searchParams }: { searchParams: Pro
         columns={[
           { key: "code", header: "Code", cell: (row) => row.code },
           { key: "name", header: "Account", cell: (row) => row.name },
+          { key: "kind", header: "Type", cell: (row) => typeLabel[row.kind as keyof typeof typeLabel] ?? row.kind },
+          { key: "bank", header: "Bank / branch", cell: (row) => [row.bankName, row.bankBranch].filter(Boolean).join(" · ") || "—" },
+          { key: "number", header: "Number", cell: (row) => row.accountNumber ?? "—" },
           { key: "balance", header: "Balance", cell: (row) => row.balance },
           {
             key: "ledger",

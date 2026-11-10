@@ -65,6 +65,8 @@
 | 4 | Vendor opening বাকি | Dr OPENING_EQUITY / Cr AP(P) | — |
 | 5 | ক্যাশ/ব্যাংক opening | Dr MONEY / Cr OPENING_EQUITY | — |
 
+**ব্যাংক/মোবাইল অ্যাকাউন্ট যোগ (P02 টাস্ক ১১):** `POST /api/v1/accounting/banks` — `kind` (BANK/MOBILE), নাম (একই নাম দুবার নয়, ধরন যাই হোক → 409), ব্যাংক, শাখা, নম্বর (≤ ৬৪ অক্ষর: অক্ষর/অঙ্ক/স্পেস/`-`/`/`), opening। কোড ব্যাপ্তি `prisma/chart-of-accounts.ts`-এর `MONEY_ACCOUNT_RANGES` থেকে (ব্যাংক ১২০১–১২৪৯, মোবাইল ১২৫১–১২৭৯; কোডে সংখ্যা লেখা হয় না), পরের খালি নম্বর। প্রতিটির লেজার `/accounting/statements?accountCode=…` — তারিখ না দিলে চলতি অর্থবছরের শুরু থেকে আজ। ক্যাশ opening ফর্ম ব্যাংক-ও-ক্যাশ পেজে, ব্রাঞ্চে একবার হলে ফর্ম আর দেখায় না।
+
 **opening-এর নিয়ম:** #3–#5 সবই একই দিনে (ঢাকার আজ) পোস্ট হয় এবং **ব্রাঞ্চ ছাড়া নেওয়া হয় না** (ব্রাঞ্চ না থাকলে জার্নাল বাদ পড়ে ব্যালান্স মিলত না; তাই কাস্টমার/Vendor তৈরিতে opening থাকলে ব্রাঞ্চ বাধ্যতামূলক)। ক্যাশ opening প্রতি ব্রাঞ্চে একবার (ব্রাঞ্চই ডকুমেন্ট, দ্বিতীয়বার 409), `POST /api/v1/accounting/opening-cash`। মালিকের মূলধন (3100) শুধু মালিক টাকা দিলে/তুললে নড়ে।
 | 6 | Adjustment + | Dr INVENTORY / Cr INVENTORY_GAIN (avg) | IN `ADJUSTMENT` |
 | 7 | Adjustment − | Dr INVENTORY_LOSS / Cr INVENTORY (avg) | OUT `ADJUSTMENT` |
