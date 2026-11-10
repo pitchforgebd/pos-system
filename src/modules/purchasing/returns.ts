@@ -152,7 +152,7 @@ export async function postPurchaseReturn(
       }
       const refundAccount = await moneyAccountFor(tx, input.organizationId, { method: input.refundMethod ?? "CASH" });
       const journalLines: JournalLineInput[] = [
-        ...(applied.gt(0) ? [{ role: "AP" as const, debit: applied, credit: zero() }] : []),
+        ...(applied.gt(0) ? [{ role: "AP" as const, debit: applied, credit: zero(), party: { type: "VENDOR" as const, id: purchase.supplierId } }] : []),
         ...(refund.gt(0) ? [{ accountId: refundAccount, debit: refund, credit: zero() }] : []),
         ...(total.gt(0) ? [{ role: "INVENTORY" as const, debit: zero(), credit: total }] : []),
       ];
@@ -164,6 +164,7 @@ export async function postPurchaseReturn(
           description: `Purchase return ${number}`,
           createdById: input.userId,
           lines: journalLines,
+          doc: { type: "PURCHASE_RETURN", id: purchaseReturn.id },
         });
         await tx.purchaseReturn.update({ where: { id: purchaseReturn.id }, data: { journalId } });
       }

@@ -156,7 +156,7 @@ export async function postSaleReturn(
       const journalLines: JournalLineInput[] = [
         ...(salesTotal.gt(0) ? [{ role: "SALES" as const, debit: salesTotal, credit: zero() }] : []),
         ...(vatTotal.gt(0) ? [{ role: "OUTPUT_VAT" as const, debit: vatTotal, credit: zero() }] : []),
-        ...(split.applied.gt(0) ? [{ role: "AR" as const, debit: zero(), credit: split.applied }] : []),
+        ...(split.applied.gt(0) ? [{ role: "AR" as const, debit: zero(), credit: split.applied, party: sale.customerId ? { type: "CUSTOMER" as const, id: sale.customerId } : undefined }] : []),
         ...(split.refund.gt(0) ? [{ role: "CASH" as const, debit: zero(), credit: split.refund }] : []),
         ...(cost.gt(0)
           ? [
@@ -173,6 +173,7 @@ export async function postSaleReturn(
           description: `Sale return ${number}`,
           createdById: input.userId,
           lines: journalLines,
+          doc: { type: "SALE_RETURN", id: saleReturn.id },
         });
         await tx.saleReturn.update({ where: { id: saleReturn.id }, data: { journalId } });
       }

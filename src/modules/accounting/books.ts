@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { Prisma } from "@prisma/client";
 import { runTx } from "@/core/tx/run";
 import { RuleError } from "@/core/errors/rule-error";
@@ -7,7 +9,7 @@ import { businessDate, dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
-import { PostingError, postBalancedJournal } from "@/modules/accounting/post";
+import { PostingError, postBalancedJournal, type DocType } from "@/modules/accounting/post";
 import { allocateNumber } from "@/modules/documents/numbers";
 import { hashPayload, isKeyRace, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { decimalString, money, parseMoney, zero } from "@/core/money";
@@ -92,7 +94,10 @@ export async function postJournal(input: Actor & { businessDate: string; descrip
       }
       const parsed = parseLines(input.lines);
       const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: input.businessDate });
+      const entryId = randomUUID();
       const journalId = await postBalancedJournal(tx, {
+        id: entryId,
+        doc: { type: "JOURNAL", id: entryId },
         organizationId: input.organizationId,
         branchId: input.branchId,
         businessDate: occurredDate(input.businessDate),
@@ -175,7 +180,14 @@ export async function reverseJournal(input: Actor & { journalId: string; busines
       const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: input.businessDate });
       const lines = journal.lines
         .filter((line) => new Prisma.Decimal(line.debit).gt(0) || new Prisma.Decimal(line.credit).gt(0))
-        .map((line) => ({ accountCode: line.account.code, debit: new Prisma.Decimal(line.credit), credit: new Prisma.Decimal(line.debit) }));
+        .map((line) => ({
+          accountId: line.accountId,
+          debit: new Prisma.Decimal(line.credit),
+          credit: new Prisma.Decimal(line.debit),
+          party: line.partyType && line.partyId ? { type: line.partyType, id: line.partyId } : undefined,
+          shiftId: line.shiftId,
+          assetId: line.assetId,
+        }));
       const total = money(lines.reduce((sum, line) => sum.plus(line.debit), zero()));
       const journalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
@@ -186,6 +198,9 @@ export async function reverseJournal(input: Actor & { journalId: string; busines
         lines,
         number,
         reversalOfId: journal.id,
+        // the same document as the journal it undoes (a journal from before documents were recorded stands for itself)
+        doc: journal.docType && journal.docId ? { type: journal.docType as DocType, id: journal.docId } : { type: "JOURNAL", id: journal.id },
+        kind: "REVERSAL",
       });
       await tx.voucher.create({
         data: {
@@ -255,7 +270,9 @@ export async function postExpense(
       }
       const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "EXP", businessDate: input.businessDate });
       const paidFrom = await moneyAccountFor(tx, input.organizationId, { method: input.method });
+      const docId = randomUUID();
       const journalId = await postBalancedJournal(tx, {
+        doc: { type: "EXPENSE", id: docId },
         organizationId: input.organizationId,
         branchId: input.branchId,
         businessDate: occurredDate(input.businessDate),
@@ -271,6 +288,7 @@ export async function postExpense(
         data: {
           organizationId: input.organizationId,
           branchId: input.branchId,
+          id: docId,
           accountId: account.id,
           number,
           amount,
@@ -324,7 +342,9 @@ export async function postContra(input: Actor & { businessDate: string; directio
       const bankAccount = await accountFor(tx, input.organizationId, "BANK:DEFAULT");
       const debitAccount = input.direction === "CASH_TO_BANK" ? bankAccount : cashAccount;
       const creditAccount = input.direction === "CASH_TO_BANK" ? cashAccount : bankAccount;
+      const docId = randomUUID();
       const journalId = await postBalancedJournal(tx, {
+        doc: { type: "CONTRA", id: docId },
         organizationId: input.organizationId,
         branchId: input.branchId,
         businessDate: occurredDate(input.businessDate),
@@ -341,6 +361,7 @@ export async function postContra(input: Actor & { businessDate: string; directio
           organizationId: input.organizationId,
           branchId: input.branchId,
           number,
+          id: docId,
           voucherType: "CONTRA",
           amount,
           businessDate: occurredDate(input.businessDate),
@@ -801,7 +822,9 @@ export async function postIncome(
       }
       const moneyAccount = await resolveMoneyAccount(tx, input.organizationId, input.method, input.bankCode);
       const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: input.businessDate });
+      const docId = randomUUID();
       const journalId = await postBalancedJournal(tx, {
+        doc: { type: "INCOME", id: docId },
         organizationId: input.organizationId,
         branchId: input.branchId,
         businessDate: occurredDate(input.businessDate),
@@ -817,6 +840,7 @@ export async function postIncome(
         data: {
           organizationId: input.organizationId,
           branchId: input.branchId,
+          id: docId,
           accountId: account.id,
           category: input.category?.trim() || account.code,
           amount,
@@ -864,7 +888,9 @@ export async function postCapital(
       const moneyAccount = await resolveMoneyAccount(tx, input.organizationId, input.method, input.bankCode);
       const equityAccount = await accountFor(tx, input.organizationId, input.capitalType === "ADDED" ? "CAPITAL" : "DRAWINGS");
       const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: input.businessDate });
+      const docId = randomUUID();
       const journalId = await postBalancedJournal(tx, {
+        doc: { type: "CAPITAL", id: docId },
         organizationId: input.organizationId,
         branchId: input.branchId,
         businessDate: occurredDate(input.businessDate),
@@ -886,6 +912,7 @@ export async function postCapital(
         data: {
           organizationId: input.organizationId,
           branchId: input.branchId,
+          id: docId,
           capitalType: input.capitalType,
           ownerName,
           amount,
@@ -931,7 +958,9 @@ export async function postLoan(
       }
       const moneyAccount = await resolveMoneyAccount(tx, input.organizationId, input.method, input.bankCode);
       const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: input.businessDate });
+      const docId = randomUUID();
       const journalId = await postBalancedJournal(tx, {
+        doc: { type: "LOAN", id: docId },
         organizationId: input.organizationId,
         branchId: input.branchId,
         businessDate: occurredDate(input.businessDate),
@@ -1003,7 +1032,9 @@ export async function postCashVoucher(
       }
       const moneyAccount = await resolveMoneyAccount(tx, input.organizationId, input.method, input.bankCode);
       const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: input.businessDate });
+      const docId = randomUUID();
       const journalId = await postBalancedJournal(tx, {
+        doc: { type: "VOUCHER", id: docId },
         organizationId: input.organizationId,
         branchId: input.branchId,
         businessDate: occurredDate(input.businessDate),
@@ -1026,6 +1057,7 @@ export async function postCashVoucher(
           organizationId: input.organizationId,
           branchId: input.branchId,
           number,
+          id: docId,
           voucherType: input.voucherType,
           amount,
           businessDate: occurredDate(input.businessDate),
@@ -1096,6 +1128,7 @@ export async function createBankAccount(
           businessDate: occurredDate(businessDate()),
           description: `Bank opening ${name} ${number}`,
           createdById: input.userId,
+          doc: { type: "BANK_OPENING", id: account.id },
           lines: [
             { accountId: account.id, debit: opening, credit: zero() },
             { role: "CAPITAL" as const, debit: zero(), credit: opening },

@@ -153,6 +153,9 @@ test("phase 06 purchases and supplier balances", async () => {
       const credit = journal.lines.reduce((sum, line) => sum + Number(line.credit), 0);
       assert.equal(debit, credit);
     }
+    // I2: every receivable and payable line these postings wrote names its party.
+    const { partyLineViolations } = await import("../../core/posting/invariants.ts");
+    assert.deepEqual(await partyLineViolations(prisma, org.id), []);
   } finally {
     const { cleanupOrg } = await import("../../tests/helpers/cleanup.ts");
     for (const id of [org.id, other.id]) {

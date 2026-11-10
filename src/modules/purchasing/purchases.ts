@@ -4,6 +4,8 @@ import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
+import { randomUUID } from "node:crypto";
+
 import { moneyAccountFor } from "@/core/ledger/accounts";
 import { postBalancedJournal } from "@/modules/accounting/post";
 import { allocateNumber } from "@/modules/documents/numbers";
@@ -207,8 +209,9 @@ export async function postPurchase(
         createdById: input.userId,
         lines: [
           { role: "INVENTORY", debit: subtotal, credit: new Prisma.Decimal(0) },
-          { role: "AP", debit: new Prisma.Decimal(0), credit: subtotal },
+          { role: "AP", debit: new Prisma.Decimal(0), credit: subtotal, party: { type: "VENDOR" as const, id: supplier.id } },
         ],
+        doc: { type: "PURCHASE", id: purchase.id },
       });
       await tx.purchase.update({ where: { id: purchase.id }, data: { journalId: purchaseJournalId } });
       await tx.supplierLedger.create({
@@ -282,19 +285,22 @@ async function settleSupplier(
     documentType: "PAY",
     businessDate: input.businessDate,
   });
+  const paymentId = randomUUID();
   const journalId = await postBalancedJournal(tx, {
     organizationId: input.organizationId,
     branchId: input.branchId,
     businessDate: occurredDate(input.businessDate),
     description: `Supplier payment ${number}`,
     createdById: input.userId,
+    doc: { type: "SUPPLIER_PAYMENT", id: paymentId },
     lines: [
-      { role: "AP", debit: input.amount, credit: new Prisma.Decimal(0) },
+      { role: "AP", debit: input.amount, credit: new Prisma.Decimal(0), party: { type: "VENDOR" as const, id: input.supplierId } },
       { accountId: await moneyAccountFor(tx, input.organizationId, { method: input.method }), debit: new Prisma.Decimal(0), credit: input.amount },
     ],
   });
   const payment = await tx.supplierPayment.create({
     data: {
+      id: paymentId,
       organizationId: input.organizationId,
       branchId: input.branchId,
       supplierId: input.supplierId,

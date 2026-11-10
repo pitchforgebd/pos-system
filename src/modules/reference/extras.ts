@@ -261,6 +261,7 @@ export async function postDirectReturn(input: Actor & { productId: string; quant
         businessDate: day(input.businessDate),
         description: "Direct return",
         createdById: input.userId,
+        doc: { type: "DIRECT_RETURN", id },
         lines: [
           { role: "SALES", debit: moneyRefund, credit: new Prisma.Decimal(0) },
           { accountId: cashAccount, debit: new Prisma.Decimal(0), credit: moneyRefund },
@@ -365,15 +366,17 @@ export async function redeemLoyalty(input: Actor & { customerId: string; points:
         throw new StockRuleError("The customer does not have those points.");
       }
       const taka = points.mul(rate).toDecimalPlaces(2);
+      const redeemId = randomUUID();
       const journalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
         businessDate: day(input.businessDate),
         description: "Loyalty redeem",
         createdById: input.userId,
+        doc: { type: "LOYALTY_REDEEM", id: redeemId },
         lines: [
           { role: "LOYALTY", debit: taka, credit: new Prisma.Decimal(0) },
-          { role: "AR", debit: new Prisma.Decimal(0), credit: taka },
+          { role: "AR", debit: new Prisma.Decimal(0), credit: taka, party: { type: "CUSTOMER" as const, id: input.customerId } },
         ],
       });
       await tx.customerLedger.create({
@@ -390,6 +393,7 @@ export async function redeemLoyalty(input: Actor & { customerId: string; points:
       });
       const entry = await tx.loyaltyTransaction.create({
         data: {
+          id: redeemId,
           organizationId: input.organizationId,
           customerId: input.customerId,
           entryType: "REDEEM",

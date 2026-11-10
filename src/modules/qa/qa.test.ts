@@ -214,6 +214,9 @@ test("phase 18 checks money, numbers, permissions, and the sale path", async () 
     assert.equal(raced.some((result) => !result.ok && result.message === "Insufficient stock."), true);
     const lastBalance = await prisma.stockBalance.findFirst({ where: { productId: last.product.id } });
     assert.equal(lastBalance?.quantity.toFixed(4), "0.0000");
+    // I2: every receivable and payable line these postings wrote names its party.
+    const { partyLineViolations } = await import("../../core/posting/invariants.ts");
+    assert.deepEqual(await partyLineViolations(prisma, org.id), []);
   } finally {
     const { cleanupOrg } = await import("../../tests/helpers/cleanup.ts");
     await cleanupOrg(org.id);

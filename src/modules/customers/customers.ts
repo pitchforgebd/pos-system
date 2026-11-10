@@ -315,9 +315,10 @@ export async function createCustomer(input: {
           description: `Customer opening ${created.name}`,
           createdById: input.actorId,
           lines: [
-            { role: "AR", debit: opening, credit: new Prisma.Decimal(0) },
+            { role: "AR", debit: opening, credit: new Prisma.Decimal(0), party: { type: "CUSTOMER" as const, id: created.id } },
             { role: "CAPITAL", debit: new Prisma.Decimal(0), credit: opening },
           ],
+          doc: { type: "CUSTOMER_OPENING", id: created.id },
         });
       }
     }

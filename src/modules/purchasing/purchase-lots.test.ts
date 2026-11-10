@@ -93,6 +93,9 @@ test("a purchase of an expiry-tracked product creates its lots", async () => {
     // A product that does not expire ignores the lot fields' absence.
     assert.equal((await buy([{ productId: salt.id, quantity: "5", unitCost: "5.00" }])).ok, true);
     assert.equal(await prisma.expiryBatch.count({ where: { organizationId: org.id, productId: salt.id } }), 0);
+    // I2: every receivable and payable line these postings wrote names its party.
+    const { partyLineViolations } = await import("../../core/posting/invariants.ts");
+    assert.deepEqual(await partyLineViolations(prisma, org.id), []);
   } finally {
     const { cleanupOrg } = await import("../../tests/helpers/cleanup.ts");
     await cleanupOrg(org.id);

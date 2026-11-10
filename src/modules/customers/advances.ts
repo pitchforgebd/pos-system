@@ -4,6 +4,8 @@ import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
+import { randomUUID } from "node:crypto";
+
 import { moneyAccountFor } from "@/core/ledger/accounts";
 import { postBalancedJournal } from "@/modules/accounting/post";
 import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } from "@/core/idempotency";
@@ -69,19 +71,22 @@ export async function postCustomerAdvance(
       if (!amount || amount.lte(0)) {
         throw new StockRuleError("Enter an advance amount greater than zero.");
       }
+      const advanceId = randomUUID();
       const journalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
         businessDate: occurredDate(input.businessDate),
         description: "Customer advance",
         createdById: input.userId,
+        doc: { type: "CUSTOMER_ADVANCE", id: advanceId },
         lines: [
           { accountId: await moneyAccountFor(tx, input.organizationId, { method: input.method }), debit: amount, credit: new Prisma.Decimal(0) },
-          { role: "AR", debit: new Prisma.Decimal(0), credit: amount },
+          { role: "AR", debit: new Prisma.Decimal(0), credit: amount, party: { type: "CUSTOMER" as const, id: input.customerId } },
         ],
       });
       const advance = await tx.customerAdvance.create({
         data: {
+          id: advanceId,
           organizationId: input.organizationId,
           branchId: input.branchId,
           customerId: input.customerId,

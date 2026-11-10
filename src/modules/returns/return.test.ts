@@ -237,6 +237,9 @@ test("phase 08 returns cannot exceed the eligible quantity", async () => {
       const creditAmount = journal.lines.reduce((sum, line) => sum + Number(line.credit), 0);
       assert.equal(debit, creditAmount);
     }
+    // I2: every receivable and payable line these postings wrote names its party.
+    const { partyLineViolations } = await import("../../core/posting/invariants.ts");
+    assert.deepEqual(await partyLineViolations(prisma, org.id), []);
   } finally {
     const { cleanupOrg } = await import("../../tests/helpers/cleanup.ts");
     await cleanupOrg(org.id);

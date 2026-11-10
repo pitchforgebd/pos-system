@@ -268,7 +268,7 @@ export async function postSale(
       const journalLines: JournalLineInput[] = [
         ...(payment.gt(0) && method !== "WALLET" ? [{ accountId: tenderAccount, debit: payment, credit: zero() }] : []),
         ...(due.gt(0) || (method === "WALLET" && payment.gt(0))
-          ? [{ role: "AR" as const, debit: method === "WALLET" ? money(due.plus(payment)) : due, credit: zero() }]
+          ? [{ role: "AR" as const, debit: method === "WALLET" ? money(due.plus(payment)) : due, credit: zero(), party: customer ? { type: "CUSTOMER" as const, id: customer.id } : undefined }]
           : []),
         ...(salesCredit.gt(0) ? [{ role: "SALES" as const, debit: zero(), credit: salesCredit }] : []),
         ...(vatTotal.gt(0) ? [{ role: "OUTPUT_VAT" as const, debit: zero(), credit: vatTotal }] : []),
@@ -288,6 +288,7 @@ export async function postSale(
           description: `Sale ${number}`,
           createdById: input.userId,
           lines: journalLines,
+          doc: { type: "SALE", id: sale.id },
         });
         await tx.sale.update({ where: { id: sale.id }, data: { journalId } });
       }

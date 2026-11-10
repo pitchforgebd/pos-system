@@ -224,6 +224,9 @@ test("phase 10 posts customer due and advance without inventing points", async (
       method: "CASH",
     });
     assert.equal(blocked.ok, false);
+    // I2: every receivable and payable line these postings wrote names its party.
+    const { partyLineViolations } = await import("../../core/posting/invariants.ts");
+    assert.deepEqual(await partyLineViolations(prisma, org.id), []);
   } finally {
     const { cleanupOrg } = await import("../../tests/helpers/cleanup.ts");
     await cleanupOrg(org.id);

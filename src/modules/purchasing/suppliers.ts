@@ -147,8 +147,9 @@ export async function createSupplier(input: {
         createdById: input.actorId,
         lines: [
           { role: "CAPITAL", debit: opening, credit: new Prisma.Decimal(0) },
-          { role: "AP", debit: new Prisma.Decimal(0), credit: opening },
+          { role: "AP", debit: new Prisma.Decimal(0), credit: opening, party: { type: "VENDOR" as const, id: created.id } },
         ],
+        doc: { type: "SUPPLIER_OPENING", id: created.id },
       });
     }
   }
