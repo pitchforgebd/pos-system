@@ -98,8 +98,8 @@ test("converting a quotation creates exactly one sale, even when asked twice at 
     }
     assert.equal(await prisma.sale.count({ where: { organizationId: org.id } }), 1);
     // I2: every receivable and payable line these postings wrote names its party.
-    const { partyLineViolations } = await import("../../core/posting/invariants.ts");
-    assert.deepEqual(await partyLineViolations(prisma, org.id), []);
+    const { assertBooksReconcile } = await import("../../core/reconcile/index.ts");
+    await assertBooksReconcile(org.id);
   } finally {
     const { cleanupOrg } = await import("../../tests/helpers/cleanup.ts");
     await cleanupOrg(org.id);

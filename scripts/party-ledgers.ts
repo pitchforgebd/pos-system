@@ -5,7 +5,8 @@
 //   node --experimental-strip-types --import ./src/test/register.mjs scripts/party-ledgers.ts repair
 //
 // It works on the database DATABASE_URL points at, and never on a live one: it refuses an https APP_URL. `repair` writes only
-// the missing party and document labels and one visible journal per customer whose advance sat on the receivable.
+// the missing party and document labels, one visible journal per customer whose advance sat on the receivable, and one per
+// opening balance that was posted against Owner Capital, and the allocation rows of old receipts and payments.
 import { comparePartyLedgers, repairLegacyParties } from "../src/core/parties/legacy.ts";
 import { partyLineViolations } from "../src/core/posting/invariants.ts";
 import { runTx } from "../src/core/tx/run.ts";
@@ -44,7 +45,7 @@ for (const org of organizations) {
     }
     await report("before", org.id);
     const done = await runTx((tx) => repairLegacyParties(tx, { organizationId: org.id, userId: user.id, branchId: branch.id }));
-    console.log(`  repaired: ${done.linesStamped} line(s) given their party, ${done.journalsDocumented} journal(s) given their document, ${done.advancesMoved} advance(s) moved to Customer Advance, ${done.allocationsReplayed} receipt(s)/payment(s) given their invoice allocations`);
+    console.log(`  repaired: ${done.linesStamped} line(s) given their party, ${done.journalsDocumented} journal(s) given their document, ${done.advancesMoved} advance(s) moved to Customer Advance, ${done.openingsReclassed} opening(s) moved from Owner Capital to Opening Balance Equity, ${done.allocationsReplayed} receipt(s)/payment(s) given their invoice allocations`);
     outOfLine += await report("after ", org.id);
   } else {
     outOfLine += await report("check ", org.id);

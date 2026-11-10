@@ -6,7 +6,8 @@ import test from "node:test";
 
 import { prisma } from "../../lib/db/client.ts";
 import { addDays, businessDate as today } from "../time/business-date.ts";
-import { concurrentlySettled, factories, withTestOrg } from "../../tests/helpers/index.ts";
+import { concurrentlySettled, factories, stockedProduct, withTestOrg } from "../../tests/helpers/index.ts";
+import { assertBooksReconcile } from "../reconcile/index.ts";
 import { postCustomerPayment } from "../../modules/customers/dues.ts";
 import { createCustomer } from "../../modules/customers/customers.ts";
 import { postPurchase, postSupplierPayment } from "../../modules/purchasing/purchases.ts";
@@ -21,14 +22,7 @@ import { allocationViolations, billPayment, invoicePayment } from "./index.ts";
 type T = Parameters<Parameters<typeof withTestOrg>[0]>[0];
 const actor = (t: T) => ({ organizationId: t.org.id, branchId: t.branch.id, userId: t.owner.id, ip: "127.0.0.1", userAgent: "test" });
 
-async function stocked(t: T) {
-  const product = await factories(t).product({ sellingPrice: "10.00", purchasePrice: "6.00", wholesalePrice: "10.00", minimumPrice: "1.00" });
-  await prisma.stockBalance.create({ data: { organizationId: t.org.id, productId: product.id, branchId: t.branch.id, warehouseId: t.warehouse.id, quantity: "1000.0000" } });
-  await prisma.stockLedger.create({
-    data: { organizationId: t.org.id, productId: product.id, branchId: t.branch.id, warehouseId: t.warehouse.id, quantity: "1000.0000", direction: "IN", movementType: "OPENING", referenceType: "test", referenceId: product.id, unitCost: "6.00", userId: t.owner.id },
-  });
-  return product;
-}
+const stocked = (t: T) => stockedProduct(t);
 
 async function creditSale(t: T, productId: string, customerId: string, units: number, daysAgo: number, extra: Record<string, unknown> = {}) {
   const sold = await postSale({ ...actor(t), idempotencyKey: randomUUID(), businessDate: addDays(today(), -daysAgo), customerId, lines: [{ productId, quantity: String(units) }], ...extra } as Parameters<typeof postSale>[0]);
@@ -64,6 +58,7 @@ test("a receipt settles the oldest invoice first: 120 against invoices of 100, 5
     assert.equal((await invoicePayment(prisma, t.org.id, two)).status, "PAID");
     assert.deepEqual([(await invoicePayment(prisma, t.org.id, three)).status, (await invoicePayment(prisma, t.org.id, three)).owed.toFixed(2)], ["PARTIAL", "10.00"]);
     assert.deepEqual(await allocationViolations(prisma, t.org.id), []);
+    await assertBooksReconcile(t.org.id, prisma, { strictInventory: true });
     const view = await getSale(t.org.id, t.branch.id, three);
     assert.deepEqual([view?.paymentStatus, view?.owed, view?.received], ["PARTIAL", "10.00", "70.00"], "the invoice page shows the status");
   });
@@ -163,6 +158,7 @@ test("a payment to a vendor settles the oldest bill first, and a bill paid at pu
     const partial = await billPayment(prisma, t.org.id, two);
     assert.deepEqual([partial.status, partial.owed.toFixed(2)], ["PARTIAL", "30.00"]);
     assert.deepEqual(await allocationViolations(prisma, t.org.id), []);
+    await assertBooksReconcile(t.org.id, prisma, { strictInventory: true });
   });
 });
 
@@ -178,6 +174,7 @@ test("two receipts at the same moment never settle more than the invoice owes (I
     const status = await invoicePayment(prisma, t.org.id, invoice);
     assert.deepEqual([status.allocated.toFixed(2), status.owed.toFixed(2)], ["80.00", "20.00"]);
     assert.deepEqual(await allocationViolations(prisma, t.org.id), []);
+    await assertBooksReconcile(t.org.id, prisma, { strictInventory: true });
   });
 });
 

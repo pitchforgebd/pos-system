@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import test from "node:test";
 
 import { partyBalance } from "../../core/parties/index.ts";
-import { partyLineViolations } from "../../core/posting/invariants.ts";
+import { assertBooksReconcile } from "../../core/reconcile/index.ts";
 import { prisma } from "../../lib/db/client.ts";
 import { withTestOrg } from "../../tests/helpers/index.ts";
 import { createCustomer } from "../customers/customers.ts";
@@ -40,7 +40,7 @@ test("a customer's opening due is Dr receivable (the customer) / Cr Opening Bala
     const journal = await prisma.journal.findFirstOrThrow({ where: { organizationId: t.org.id, docType: "CUSTOMER_OPENING" } });
     assert.equal(journal.docId, created.customer.id);
     assert.equal(journal.businessDate.toISOString().slice(0, 10), (await import("../../core/time/business-date.ts")).businessDate());
-    assert.deepEqual(await partyLineViolations(prisma, t.org.id), []);
+    await assertBooksReconcile(t.org.id);
   });
 });
 
@@ -55,7 +55,7 @@ test("a vendor's opening payable is Dr Opening Balance Equity / Cr payable (the 
     assert.equal(owed.toFixed(2), "90.00");
     assert.equal(await balanceOf(t, "OPENING_EQUITY"), 90);
     assert.equal(await balanceOf(t, "CAPITAL"), 0);
-    assert.deepEqual(await partyLineViolations(prisma, t.org.id), []);
+    await assertBooksReconcile(t.org.id);
   });
 });
 

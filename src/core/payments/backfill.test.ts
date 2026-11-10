@@ -7,7 +7,8 @@ import test from "node:test";
 import { prisma } from "../../lib/db/client.ts";
 import { runTx } from "../tx/run.ts";
 import { addDays, businessDate as today } from "../time/business-date.ts";
-import { factories, withTestOrg } from "../../tests/helpers/index.ts";
+import { factories, stockedProduct, withTestOrg } from "../../tests/helpers/index.ts";
+import { assertBooksReconcile } from "../reconcile/index.ts";
 import { createCustomer } from "../../modules/customers/customers.ts";
 import { postCustomerPayment } from "../../modules/customers/dues.ts";
 import { postPurchase, postSupplierPayment } from "../../modules/purchasing/purchases.ts";
@@ -35,8 +36,7 @@ async function settled(t: T) {
 test("customers: replaying old receipts gives the same settlement as posting them today (opening first, oldest first)", async () => {
   await withTestOrg(async (t) => {
     await prisma.organization.update({ where: { id: t.org.id }, data: { backdateDays: 10 } });
-    const product = await factories(t).product({ sellingPrice: "10.00", purchasePrice: "6.00", wholesalePrice: "10.00", minimumPrice: "1.00" });
-    await prisma.stockBalance.create({ data: { organizationId: t.org.id, productId: product.id, branchId: t.branch.id, warehouseId: t.warehouse.id, quantity: "1000.0000" } });
+    const product = await stockedProduct(t);
     const made = await createCustomer({ ...actor(t), actorId: t.owner.id, name: "Old customer", openingBalance: "60.00" });
     assert.equal(made.ok, true);
     const customerId = made.ok ? made.customer.id : "";
@@ -56,6 +56,7 @@ test("customers: replaying old receipts gives the same settlement as posting the
     assert.deepEqual(await settled(t), live);
     assert.equal(await runTx((tx) => backfillAllocations(tx, t.org.id)), 0, "nothing left to do the second time");
     assert.deepEqual(await allocationViolations(prisma, t.org.id), []);
+    await assertBooksReconcile(t.org.id, prisma, { strictInventory: true });
   });
 });
 
@@ -79,5 +80,6 @@ test("vendors: a payment made together with a purchase is not replayed as a paym
     assert.equal(await runTx((tx) => backfillAllocations(tx, t.org.id)), 1, "only the standalone payment");
     assert.deepEqual(await settled(t), live);
     assert.deepEqual(await allocationViolations(prisma, t.org.id), []);
+    await assertBooksReconcile(t.org.id, prisma, { strictInventory: true });
   });
 });

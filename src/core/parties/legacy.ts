@@ -10,14 +10,15 @@ type Db = Prisma.TransactionClient;
 // Databases written before P02 kept a customer's or vendor's balance in customer_ledgers / supplier_ledgers and wrote no party
 // on the journal lines. The balance now comes from the journal only (I8), so such a database is brought over once, here. Nothing
 // is edited except the missing party and document labels on lines and journals that were posted without them; where an advance
-// sat on the receivable it is moved to Customer Advance by a new, visible journal; receipts and payments that settled invoices get their
+// sat on the receivable it is moved to Customer Advance by a new, visible journal, and an opening balance posted against Owner Capital
+// is moved to Opening Balance Equity the same way; receipts and payments that settled invoices get their
 // allocation rows. Safe to run again: it finds nothing left to do.
 
 const ZERO = new Prisma.Decimal(0);
 const dec = (value: unknown) => new Prisma.Decimal(String(value ?? 0));
 const two = (value: Prisma.Decimal) => value.toFixed(2);
 
-export type RepairResult = { linesStamped: number; journalsDocumented: number; advancesMoved: number; allocationsReplayed: number };
+export type RepairResult = { linesStamped: number; journalsDocumented: number; advancesMoved: number; openingsReclassed: number; allocationsReplayed: number };
 
 /** The documents whose journal says who a receivable or payable line is about, as (journal, party) rows. */
 const customerDocs = Prisma.sql`
@@ -133,14 +134,49 @@ async function moveHeldAdvances(tx: Db, input: { organizationId: string; userId:
   return moved;
 }
 
+/**
+ * Before LV-2 a customer's or vendor's opening balance was posted against Owner Capital, which put money in or out of the owner's
+ * capital that the owner never moved. Each such opening gets one new, visible journal that moves its capital amount to Opening
+ * Balance Equity; the old journal is not edited. The move is tied to the opening it belongs to, so it is made once.
+ */
+async function reclassOpenings(tx: Db, input: { organizationId: string; userId: string; branchId: string }) {
+  const rows = await tx.$queryRaw<{ journalId: string; branchId: string | null; net: Prisma.Decimal | string }[]>`
+    SELECT j.id AS journalId, j.branchId AS branchId, SUM(l.credit - l.debit) AS net
+    FROM journals j
+    JOIN journal_lines l ON l.journalId = j.id
+    JOIN account_roles r ON r.organizationId = l.organizationId AND r.accountId = l.accountId AND r.role = 'CAPITAL'
+    WHERE j.organizationId = ${input.organizationId} AND j.kind = 'POSTING' AND j.docType IN ('CUSTOMER_OPENING', 'SUPPLIER_OPENING')
+      AND NOT EXISTS (SELECT 1 FROM journals x WHERE x.docType = 'OPENING_RECLASS' AND x.docId = j.id)
+    GROUP BY j.id, j.branchId
+    HAVING SUM(l.credit - l.debit) <> 0
+    ORDER BY j.id`;
+  for (const row of rows) {
+    const net = dec(row.net);
+    const amount = net.abs();
+    await post(tx, {
+      organizationId: input.organizationId,
+      branchId: row.branchId ?? input.branchId,
+      businessDate: new Date(`${businessDate()}T00:00:00.000Z`),
+      description: "Opening balance moved from Owner Capital to Opening Balance Equity",
+      createdById: input.userId,
+      doc: { type: "OPENING_RECLASS", id: row.journalId },
+      lines: net.gt(0)
+        ? [{ role: "CAPITAL", debit: amount, credit: ZERO }, { role: "OPENING_EQUITY", debit: ZERO, credit: amount }]
+        : [{ role: "OPENING_EQUITY", debit: amount, credit: ZERO }, { role: "CAPITAL", debit: ZERO, credit: amount }],
+    });
+  }
+  return rows.length;
+}
+
 /** Brings the party data of an older database over to the journal (see the note at the top). */
 export async function repairLegacyParties(db: Db, input: { organizationId: string; userId: string; branchId: string }): Promise<RepairResult> {
   const linesStamped = await stampLines(db, input.organizationId);
   const journalsDocumented = await documentJournals(db, input.organizationId);
   const advancesMoved = await moveHeldAdvances(db, input);
+  const openingsReclassed = await reclassOpenings(db, input);
   // Receipts and payments made before allocations existed get the rows the new code would have written (so old invoices show PAID/PARTIAL).
   const allocationsReplayed = await backfillAllocations(db, input.organizationId);
-  return { linesStamped, journalsDocumented, advancesMoved, allocationsReplayed };
+  return { linesStamped, journalsDocumented, advancesMoved, openingsReclassed, allocationsReplayed };
 }
 
 export type PartyMismatch = {

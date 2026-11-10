@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import test from "node:test";
 
 import { partyBalance } from "../../core/parties/index.ts";
-import { partyLineViolations } from "../../core/posting/invariants.ts";
+import { assertBooksReconcile } from "../../core/reconcile/index.ts";
 import { businessDate as today } from "../../core/time/business-date.ts";
 import { prisma } from "../../lib/db/client.ts";
 import { concurrentlySettled, factories, withTestOrg } from "../../tests/helpers/index.ts";
@@ -51,7 +51,7 @@ test("an advance goes to the Customer Advance account with the customer on the l
     const line = await prisma.journalLine.findFirstOrThrow({ where: { organizationId: t.org.id, credit: { gt: 0 }, journal: { docType: "CUSTOMER_ADVANCE" } }, include: { account: { include: { roles: true } } } });
     assert.deepEqual(line.account.roles.map((r) => r.role), ["CUSTOMER_ADVANCE"]);
     assert.equal(line.partyId, customer.id);
-    assert.deepEqual(await partyLineViolations(prisma, t.org.id), []);
+    await assertBooksReconcile(t.org.id);
   });
 });
 
@@ -68,7 +68,7 @@ test("buying from the wallet lowers the advance and leaves the receivable at zer
     const roles = journal.lines.map((l) => l.account.roles[0]?.role).sort();
     assert.ok(!roles.includes("AR"), "no receivable line: the wallet paid for it directly");
     assert.ok(roles.includes("CUSTOMER_ADVANCE"));
-    assert.deepEqual(await partyLineViolations(prisma, t.org.id), []);
+    await assertBooksReconcile(t.org.id);
   });
 });
 
@@ -110,7 +110,7 @@ test("a customer with a debt and an advance can pay the whole debt: the advance 
     assert.equal(paid.ok, true, JSON.stringify(paid));
     assert.equal(await owes(t, customer.id), "0.00");
     assert.equal(await wallet(t, customer.id), "40.00", "the advance is still there");
-    assert.deepEqual(await partyLineViolations(prisma, t.org.id), []);
+    await assertBooksReconcile(t.org.id);
   });
 });
 

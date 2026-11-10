@@ -154,8 +154,8 @@ test("phase 06 purchases and supplier balances", async () => {
       assert.equal(debit, credit);
     }
     // I2: every receivable and payable line these postings wrote names its party.
-    const { partyLineViolations } = await import("../../core/posting/invariants.ts");
-    assert.deepEqual(await partyLineViolations(prisma, org.id), []);
+    const { assertBooksReconcile } = await import("../../core/reconcile/index.ts");
+    await assertBooksReconcile(org.id);
   } finally {
     const { cleanupOrg } = await import("../../tests/helpers/cleanup.ts");
     for (const id of [org.id, other.id]) {

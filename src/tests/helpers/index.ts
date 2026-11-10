@@ -6,3 +6,4 @@ export type { OrgTablePlan } from "./cleanup.ts";
 export { factories } from "./factories.ts";
 export { TEST_PASSWORD, testOrg, withTestOrg } from "./test-org.ts";
 export type { TestOrg, TestOrgOptions } from "./test-org.ts";
+export { stockedProduct } from "./stock.ts";

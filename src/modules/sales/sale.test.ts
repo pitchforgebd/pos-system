@@ -199,6 +199,8 @@ test("phase 07 sales post stock, invoice, and a balanced journal", async () => {
         userId: user.id,
       },
     });
+    // the stock on hand follows its movements (I4), so the unit received is on hand too
+    await prisma.stockBalance.updateMany({ where: { organizationId: org.id, productId: product.id }, data: { quantity: { increment: "1.0000" } } });
     const mixed = await postSale({
       ...actor,
       idempotencyKey: randomUUID(),
@@ -209,7 +211,7 @@ test("phase 07 sales post stock, invoice, and a balanced journal", async () => {
     });
     assert.equal(mixed.ok, true);
     const afterMixed = await prisma.stockBalance.findFirst({ where: { productId: product.id } });
-    assert.equal(afterMixed?.quantity.toFixed(4), "2.0000");
+    assert.equal(afterMixed?.quantity.toFixed(4), "3.0000");
 
     const journals = await prisma.journal.findMany({ where: { organizationId: org.id }, include: { lines: true } });
     assert.equal(journals.length, 3);
@@ -218,9 +220,9 @@ test("phase 07 sales post stock, invoice, and a balanced journal", async () => {
       const creditAmount = journal.lines.reduce((sum, line) => sum + Number(line.credit), 0);
       assert.equal(debit, creditAmount);
     }
-    // I2: every receivable and payable line these postings wrote names its party.
-    const { partyLineViolations } = await import("../../core/posting/invariants.ts");
-    assert.deepEqual(await partyLineViolations(prisma, org.id), []);
+    // The books agree with themselves and with the stock (I1, I2, I4, I7, I8, I15).
+    const { assertBooksReconcile } = await import("../../core/reconcile/index.ts");
+    await assertBooksReconcile(org.id);
   } finally {
     const { cleanupOrg } = await import("../../tests/helpers/cleanup.ts");
     await cleanupOrg(org.id);

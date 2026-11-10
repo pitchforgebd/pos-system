@@ -127,3 +127,27 @@ test("repairing twice changes nothing the second time", async () => {
     assert.equal(await prisma.journal.count({ where: { organizationId: t.org.id } }), journals);
   });
 });
+
+test("an opening balance the old code posted against Owner Capital is moved to Opening Balance Equity by a visible journal, once", async () => {
+  await withTestOrg(async (t) => {
+    await legacyShop(t);
+    const net = async (role: string) => {
+      const sums = await prisma.journalLine.aggregate({ where: { organizationId: t.org.id, account: { roles: { some: { role: role as never } } } }, _sum: { debit: true, credit: true } });
+      return Number(sums._sum.credit ?? 0) - Number(sums._sum.debit ?? 0);
+    };
+    assert.equal(await net("CAPITAL"), 20, "Rahim's opening credited 50, Old Mill's opening debited 30");
+    assert.equal(await net("OPENING_EQUITY"), 0);
+
+    const first = await repairLegacyParties(prisma, { organizationId: t.org.id, userId: t.owner.id, branchId: t.branch.id });
+    assert.equal(first.openingsReclassed, 2);
+    assert.equal(await net("CAPITAL"), 0, "the owner put nothing in or took nothing out");
+    assert.equal(await net("OPENING_EQUITY"), 20);
+    const reclass = await prisma.journal.findMany({ where: { organizationId: t.org.id, docType: "OPENING_RECLASS" } });
+    const openings = await prisma.journal.findMany({ where: { organizationId: t.org.id, docType: { in: ["CUSTOMER_OPENING", "SUPPLIER_OPENING"] } } });
+    assert.deepEqual(reclass.map((row) => row.docId).sort(), openings.map((row) => row.id).sort(), "each move names the opening it moves");
+
+    const second = await repairLegacyParties(prisma, { organizationId: t.org.id, userId: t.owner.id, branchId: t.branch.id });
+    assert.equal(second.openingsReclassed, 0);
+    assert.equal(await prisma.journal.count({ where: { organizationId: t.org.id, docType: "OPENING_RECLASS" } }), 2);
+  });
+});

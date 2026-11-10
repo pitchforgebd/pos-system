@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 
-import { partyLineViolations } from "../../core/posting/invariants.ts";
+import { assertBooksReconcile } from "../../core/reconcile/index.ts";
 import { prisma } from "../../lib/db/client.ts";
 import { factories, withTestOrg } from "../../tests/helpers/index.ts";
 import { getSupplier } from "./suppliers.ts";
@@ -51,6 +51,6 @@ test("a purchase return against an unpaid bill reduces the payable, on a line th
     assert.equal(line.partyType, "VENDOR");
     assert.equal(line.partyId, supplier.id);
     assert.equal(line.debit.toFixed(2), "20.00");
-    assert.deepEqual(await partyLineViolations(prisma, t.org.id), []);
+    await assertBooksReconcile(t.org.id);
   });
 });

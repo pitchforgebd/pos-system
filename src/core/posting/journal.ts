@@ -37,6 +37,7 @@ export type DocType =
   | "BANK_OPENING"
   | "CASH_OPENING"
   | "LEGACY_ADVANCE"
+  | "OPENING_RECLASS"
   | "DIRECT_RETURN"
   | "LOYALTY_REDEEM";
 
