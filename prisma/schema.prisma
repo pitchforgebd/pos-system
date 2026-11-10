@@ -288,6 +288,7 @@ model Organization {
   stockAdjustments     StockAdjustment[]
   damageRecords        DamageRecord[]
   expiryBatches        ExpiryBatch[]
+  priceLevels          PriceLevel[]
   stockDocuments       StockDocument[]
   stockReservations    StockReservation[]
   openingStocks        OpeningStock[]
@@ -701,6 +702,10 @@ model Product {
   trackSerial       Boolean
   reorderLevel      Decimal      @default(0) @db.Decimal(18, 4)
   warrantyAvailable Boolean      @default(false)
+  /// A service or other non-stock item: sold with no stock movement (service charge, transport).
+  isService         Boolean      @default(false)
+  /// The generic (active ingredient) name, searched with the name and SKU.
+  genericName       String?      @db.VarChar(191)
   status            RecordStatus @default(ACTIVE)
   createdById       String?      @db.Char(36)
   updatedById       String?      @db.Char(36)
@@ -857,22 +862,50 @@ model ProductBarcode {
   @@map("product_barcodes")
 }
 
+/// What a product (or one variant of it) sells for at a price level, from a minimum quantity: Wholesale 10+ bags 950, 50+ bags 920.
 model ProductPrice {
   id             String   @id @default(uuid()) @db.Char(36)
   organizationId String   @db.Char(36)
   productId      String   @db.Char(36)
   variantId      String?  @db.Char(36)
-  label          String   @db.VarChar(64)
-  amount         Decimal  @db.Decimal(18, 2)
+  /// The variant's id, or an empty string for the product itself (MySQL unique indexes do not treat NULL as one value).
+  variantScope   String   @default("") @db.VarChar(36)
+  priceLevelId   String   @db.Char(36)
+  /// The price applies from this quantity up (the largest step not above the quantity wins).
+  minQty         Decimal  @default(1) @db.Decimal(18, 4)
+  price          Decimal  @db.Decimal(18, 2)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   product      Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
   variant      ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  priceLevel   PriceLevel      @relation(fields: [priceLevelId], references: [id], onDelete: Restrict)
 
+  @@unique([organizationId, productId, variantScope, priceLevelId, minQty])
   @@index([organizationId, productId])
+  @@index([priceLevelId])
   @@map("product_prices")
+}
+
+/// A price list: Retail (the default), Wholesale, Dealer, and any the owner adds (D6).
+model PriceLevel {
+  id             String       @id @default(uuid()) @db.Char(36)
+  organizationId String       @db.Char(36)
+  name           String       @db.VarChar(64)
+  /// The level used when nothing else is chosen, and the one a price falls back to. Exactly one per organization.
+  isDefault      Boolean      @default(false)
+  sortOrder      Int          @default(0)
+  status         RecordStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  prices        ProductPrice[]
+  customerTypes CustomerType[]
+
+  @@unique([organizationId, name])
+  @@map("price_levels")
 }
 
 model StockBalance {
@@ -1153,11 +1186,14 @@ model CustomerType {
   id             String       @id @default(uuid()) @db.Char(36)
   organizationId String       @db.Char(36)
   name           String       @db.VarChar(191)
+  /// The price level customers of this type buy at (a Dealer type buys at Dealer prices). Empty: the default level.
+  priceLevelId   String?      @db.Char(36)
   status         RecordStatus @default(ACTIVE)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  priceLevel   PriceLevel?  @relation(fields: [priceLevelId], references: [id], onDelete: Restrict)
   customers    Customer[]
 
   @@index([organizationId, name])

@@ -1,8 +1,12 @@
 import { Prisma } from "@prisma/client";
 
+import { RuleError } from "@/core/errors/rule-error";
+import { runTx } from "@/core/tx/run";
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
 import { decimalString, parseMoney } from "@/core/money";
+import { setPrices, syncBasePrices } from "@/modules/pricing";
+import { setVariantValues } from "@/modules/catalog/variations";
 
 export type ProductInput = {
   organizationId: string;
@@ -24,6 +28,10 @@ export type ProductInput = {
   trackSerial: boolean;
   reorderLevel: string;
   warrantyAvailable: boolean;
+  /** A service or other non-stock item (service charge, transport): sold with no stock movement. */
+  isService?: boolean;
+  /** The generic (active ingredient) name. */
+  genericName?: string | null;
   barcode?: string;
   ip: string;
   userAgent: string | null;
@@ -99,6 +107,8 @@ const productSelect = {
   trackSerial: true,
   reorderLevel: true,
   warrantyAvailable: true,
+  isService: true,
+  genericName: true,
   status: true,
   brand: { select: { id: true, name: true } },
   category: { select: { id: true, name: true } },
@@ -124,6 +134,8 @@ function present(row: {
   trackSerial: boolean;
   reorderLevel: Prisma.Decimal;
   warrantyAvailable: boolean;
+  isService: boolean;
+  genericName: string | null;
   status: "ACTIVE" | "INACTIVE";
   brand: { id: string; name: string } | null;
   category: { id: string; name: string } | null;
@@ -148,6 +160,8 @@ function present(row: {
     trackSerial: row.trackSerial,
     reorderLevel: decimalString(row.reorderLevel, 4),
     warrantyAvailable: row.warrantyAvailable,
+    isService: row.isService,
+    genericName: row.genericName,
     status: row.status,
     brand: row.brand,
     category: row.category,
@@ -364,6 +378,16 @@ export async function listCatalogTable(
   };
 }
 
+/**
+ * What a product cost is business-confidential (D20): without products.cost the list purchase price is left out of what the API
+ * returns. (The detail read leaves out the average cost and margin the same way.)
+ */
+export function hideCost<T extends { purchasePrice?: unknown }>(product: T): Omit<T, "purchasePrice"> {
+  const copy = { ...product };
+  delete copy.purchasePrice;
+  return copy;
+}
+
 export async function listProducts(organizationId: string, search?: string) {
   const rows = await prisma.product.findMany({
     where: {
@@ -425,17 +449,21 @@ export async function createProduct(input: ProductInput) {
         unitId: input.unitId || null,
         ...money,
         vatType: input.vatType?.trim() || null,
-        trackStock: input.trackStock,
-        trackExpiry: input.trackExpiry,
+        isService: input.isService ?? false,
+        genericName: input.genericName?.trim() || null,
+        // a service has no stock, no expiry and no serial
+        trackStock: input.isService ? false : input.trackStock,
+        trackExpiry: input.isService ? false : input.trackExpiry,
         // an expiry-tracked product always has lots (batches): there is no separate flag to set (L7)
-        trackBatch: input.trackExpiry,
-        trackSerial: input.trackSerial,
+        trackBatch: input.isService ? false : input.trackExpiry,
+        trackSerial: input.isService ? false : input.trackSerial,
         warrantyAvailable: input.warrantyAvailable,
         createdById: input.actorId,
         barcodes: input.barcode ? { create: { organizationId: input.organizationId, barcode: input.barcode.trim() } } : undefined,
       },
       select: productSelect,
     });
+    await syncBasePrices(prisma, { organizationId: input.organizationId, productId: row.id, sellingPrice: money.sellingPrice, wholesalePrice: money.wholesalePrice });
     await writeAudit({
       organizationId: input.organizationId,
       userId: input.actorId,
@@ -459,7 +487,7 @@ export async function createProduct(input: ProductInput) {
 export async function updateProduct(input: ProductInput & { productId: string }) {
   const current = await prisma.product.findFirst({
     where: { id: input.productId, organizationId: input.organizationId, deletedAt: null },
-    select: { id: true, sku: true, name: true },
+    select: { id: true, sku: true, name: true, purchasePrice: true, sellingPrice: true, wholesalePrice: true, minimumPrice: true },
   });
   if (!current) {
     return { ok: false as const, status: 404 as const, message: "That record was not found." };
@@ -485,15 +513,26 @@ export async function updateProduct(input: ProductInput & { productId: string })
         unitId: input.unitId || null,
         ...money,
         vatType: input.vatType?.trim() || null,
-        trackStock: input.trackStock,
-        trackExpiry: input.trackExpiry,
+        isService: input.isService ?? false,
+        genericName: input.genericName?.trim() || null,
+        // a service has no stock, no expiry and no serial
+        trackStock: input.isService ? false : input.trackStock,
+        trackExpiry: input.isService ? false : input.trackExpiry,
         // an expiry-tracked product always has lots (batches): there is no separate flag to set (L7)
-        trackBatch: input.trackExpiry,
-        trackSerial: input.trackSerial,
+        trackBatch: input.isService ? false : input.trackExpiry,
+        trackSerial: input.isService ? false : input.trackSerial,
         warrantyAvailable: input.warrantyAvailable,
         updatedById: input.actorId,
       },
       select: productSelect,
+    });
+    await syncBasePrices(prisma, { organizationId: input.organizationId, productId: row.id, sellingPrice: money.sellingPrice, wholesalePrice: money.wholesalePrice });
+    // a price change is audited with the old and the new price
+    const priceFields = (value: { purchasePrice: Prisma.Decimal; sellingPrice: Prisma.Decimal; wholesalePrice: Prisma.Decimal; minimumPrice: Prisma.Decimal }) => ({
+      purchasePrice: decimalString(value.purchasePrice, 2),
+      sellingPrice: decimalString(value.sellingPrice, 2),
+      wholesalePrice: decimalString(value.wholesalePrice, 2),
+      minimumPrice: decimalString(value.minimumPrice, 2),
     });
     await writeAudit({
       organizationId: input.organizationId,
@@ -502,8 +541,8 @@ export async function updateProduct(input: ProductInput & { productId: string })
       module: "products",
       entityType: "product",
       entityId: row.id,
-      before: { sku: current.sku, name: current.name },
-      after: { sku: row.sku, name: row.name },
+      before: { sku: current.sku, name: current.name, ...priceFields(current) },
+      after: { sku: row.sku, name: row.name, ...priceFields(row) },
       ip: input.ip,
       userAgent: input.userAgent,
     });
@@ -555,6 +594,8 @@ export async function addVariant(input: {
   sku: string;
   price?: string;
   barcode?: string;
+  /** What describes the variant: one value of each variation it uses. */
+  values?: Array<{ headId: string; valueId: string }>;
 }) {
   const product = await prisma.product.findFirst({
     where: { id: input.productId, organizationId: input.organizationId, deletedAt: null },
@@ -568,23 +609,38 @@ export async function addVariant(input: {
     return { ok: false as const, status: 422 as const, message: "Enter a price with up to two decimals." };
   }
   try {
-    const row = await prisma.productVariant.create({
-      data: {
-        organizationId: input.organizationId,
-        productId: product.id,
-        sku: input.sku.trim(),
-        price,
-        barcodes: input.barcode
-          ? { create: { organizationId: input.organizationId, productId: product.id, barcode: input.barcode.trim() } }
-          : undefined,
-      },
-      select: { id: true, sku: true, price: true },
+    // the variant, its values and its own price are one unit: a refused value leaves no variant behind
+    const outcome = await runTx(async (tx) => {
+      const row = await tx.productVariant.create({
+        data: {
+          organizationId: input.organizationId,
+          productId: product.id,
+          sku: input.sku.trim(),
+          price,
+          barcodes: input.barcode
+            ? { create: { organizationId: input.organizationId, productId: product.id, barcode: input.barcode.trim() } }
+            : undefined,
+        },
+        select: { id: true, sku: true, price: true },
+      });
+      const refused = await setVariantValues(tx, { organizationId: input.organizationId, variantId: row.id, values: input.values ?? [] });
+      if (refused) {
+        throw new RuleError(refused.message, refused.status);
+      }
+      if (price) {
+        // a variant's own price is a row of the price list (its Retail price from quantity 1)
+        await setPrices(tx, { organizationId: input.organizationId, productId: product.id, variantId: row.id, prices: [{ level: "Retail", minQty: "1", price: price.toFixed(2) }] });
+      }
+      return row;
     });
     return {
       ok: true as const,
-      variant: { id: row.id, sku: row.sku, price: row.price ? decimalString(row.price, 2) : null },
+      variant: { id: outcome.id, sku: outcome.sku, price: outcome.price ? decimalString(outcome.price, 2) : null },
     };
   } catch (error) {
+    if (error instanceof RuleError) {
+      return { ok: false as const, status: error.status, message: error.message };
+    }
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return { ok: false as const, status: 409 as const, message: "That SKU or barcode already exists." };
     }

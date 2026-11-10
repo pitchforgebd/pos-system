@@ -9,7 +9,7 @@ type PreviewRow = { rowNumber: number; sku: string; name: string; status: string
 type ResultRow = { rowNumber: number; status: string; message: string };
 
 export function ProductImportForm({ canExport }: { canExport: boolean }) {
-  const [csv, setCsv] = useState("sku,name,purchasePrice,sellingPrice,wholesalePrice,minimumPrice,reorderLevel,barcode\n");
+  const [csv, setCsv] = useState("sku,name,purchasePrice,sellingPrice,wholesalePrice,minimumPrice,reorderLevel,barcode,genericName,vatType,vatRate,isService,dealerPrice\n");
   const [preview, setPreview] = useState<PreviewRow[]>([]);
   const [result, setResult] = useState<ResultRow[]>([]);
   const { submit, pending, message } = useSubmit();
@@ -90,7 +90,7 @@ export function OpeningImportForm() {
         <input name="businessDate" type="date" required aria-label="Opening date" className="h-10 rounded-md border border-border bg-surface px-3 text-sm" value={openingDate} onChange={(event) => setOpeningDate(event.target.value)} />
       </label>
       <textarea aria-label="Opening stock CSV" className="min-h-32 rounded-md border border-border bg-surface px-3 py-2 font-mono text-sm" value={csv} onChange={(event) => setCsv(event.target.value)} />
-      <p className="text-sm text-muted">Rack is kept in the file and is not stored. Unit cost is not posted to accounting.</p>
+      <p className="text-sm text-muted">Rack is kept in the file and is not stored. The rows that import become one opening-stock document with one journal, valued at the unit cost in the file.</p>
       {message ? <p className="text-sm text-error">{message}</p> : null}
       <Button type="submit" loading={pending}>
         Import opening stock

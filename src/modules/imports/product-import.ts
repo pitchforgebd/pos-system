@@ -7,9 +7,44 @@ import { safeImportName } from "@/modules/imports/files";
 import { hashPayload, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { decimalString } from "@/core/money";
 import { StockRuleError } from "@/modules/inventory/stock";
+import { setPrices } from "@/modules/pricing";
+
+/** VAT, service and dealer-price cells of one row: the values, or the reason the row cannot be imported. */
+function extras(record: Record<string, string>):
+  | { ok: true; vatType: string | null; vatValue: string | null; isService: boolean; genericName: string | null; dealerPrice: string | null }
+  | { ok: false; message: string } {
+  const vatType = (record.vatType ?? "").trim().toUpperCase();
+  if (vatType !== "" && vatType !== "NONE" && vatType !== "INCLUSIVE" && vatType !== "EXCLUSIVE") {
+    return { ok: false, message: "VAT type must be INCLUSIVE, EXCLUSIVE or empty." };
+  }
+  const vatRate = (record.vatRate ?? "").trim();
+  if (vatRate !== "" && (!/^\d{1,3}(\.\d{1,2})?$/.test(vatRate) || Number(vatRate) > 100)) {
+    return { ok: false, message: "VAT rate is a percentage with up to two decimals." };
+  }
+  if ((vatType === "INCLUSIVE" || vatType === "EXCLUSIVE") && vatRate === "") {
+    return { ok: false, message: "Give the VAT rate when the VAT type is set." };
+  }
+  const service = (record.isService ?? "").trim().toLowerCase();
+  if (!["", "yes", "no", "true", "false", "1", "0"].includes(service)) {
+    return { ok: false, message: "isService is yes or no." };
+  }
+  const dealerPrice = (record.dealerPrice ?? "").trim();
+  if (dealerPrice !== "" && !/^\d{1,16}(\.\d{1,2})?$/.test(dealerPrice)) {
+    return { ok: false, message: "Enter the dealer price with up to two decimals." };
+  }
+  const withVat = vatType === "INCLUSIVE" || vatType === "EXCLUSIVE";
+  return {
+    ok: true,
+    vatType: withVat ? vatType : null,
+    vatValue: withVat ? vatRate : null,
+    isService: ["yes", "true", "1"].includes(service),
+    genericName: (record.genericName ?? "").trim() || null,
+    dealerPrice: dealerPrice === "" ? null : dealerPrice,
+  };
+}
 
 const required = ["sku", "name", "purchasePrice", "sellingPrice", "wholesalePrice", "minimumPrice"];
-const optional = ["reorderLevel", "barcode"];
+const optional = ["reorderLevel", "barcode", "genericName", "vatType", "vatRate", "isService", "dealerPrice"];
 const rowLimit = 500;
 
 type Actor = { organizationId: string; userId: string; ip: string; userAgent: string | null };
@@ -126,16 +161,24 @@ export async function confirmProductImport(input: Actor & { idempotencyKey: stri
     } else {
       seen.add(sku);
       const existing = await prisma.product.findFirst({ where: { organizationId: input.organizationId, liveSku: sku }, select: { id: true } });
+      const more = extras(record);
       if (existing) {
         status = "SKIPPED";
         message = "That SKU already exists.";
+      } else if (!more.ok) {
+        message = more.message;
       } else {
         const created = await createProduct({
           organizationId: input.organizationId,
           actorId: input.userId,
           sku,
           name: record.name,
-          purchasePrice: record.purchasePrice ?? "",
+          // a blank cost (a file exported by someone who may not see costs) is a cost not known yet
+          purchasePrice: record.purchasePrice?.trim() ? record.purchasePrice : "0.00",
+          genericName: more.genericName,
+          vatType: more.vatType,
+          vatValue: more.vatValue,
+          isService: more.isService,
           sellingPrice: record.sellingPrice ?? "",
           wholesalePrice: record.wholesalePrice ?? "",
           minimumPrice: record.minimumPrice ?? "",
@@ -149,6 +192,17 @@ export async function confirmProductImport(input: Actor & { idempotencyKey: stri
           userAgent: input.userAgent,
         });
         if (created.ok) {
+          if (more.dealerPrice) {
+            await setPrices(prisma, {
+              organizationId: input.organizationId,
+              productId: created.product.id,
+              prices: [
+                { level: "Retail", minQty: "1", price: created.product.sellingPrice },
+                { level: "Wholesale", minQty: "1", price: created.product.wholesalePrice },
+                { level: "Dealer", minQty: "1", price: more.dealerPrice },
+              ],
+            });
+          }
           status = "IMPORTED";
           message = `${sku}: Imported.`;
         } else {
@@ -192,7 +246,8 @@ export async function latestProductImport(organizationId: string) {
   return summary(organizationId, batch.id);
 }
 
-export async function exportProducts(organizationId: string) {
+/** The product file: what the importer reads back. Without products.cost the cost column is left blank (D20). */
+export async function exportProducts(organizationId: string, options: { includeCost?: boolean } = {}) {
   const count = await prisma.product.count({ where: { organizationId, deletedAt: null } });
   if (count > 2000) {
     return { ok: false as const, status: 422 as const, message: "Export is limited to 2000 products." };
@@ -208,7 +263,12 @@ export async function exportProducts(organizationId: string) {
       wholesalePrice: true,
       minimumPrice: true,
       reorderLevel: true,
+      genericName: true,
+      vatType: true,
+      vatValue: true,
+      isService: true,
       barcodes: { take: 1, select: { barcode: true } },
+      prices: { where: { variantScope: "", priceLevel: { name: "Dealer" } }, orderBy: { minQty: "asc" }, take: 1, select: { price: true } },
     },
   });
   const csv = toCsv(
@@ -216,12 +276,17 @@ export async function exportProducts(organizationId: string) {
     rows.map((row) => [
       row.sku,
       row.name,
-      decimalString(row.purchasePrice, 2),
+      options.includeCost ? decimalString(row.purchasePrice, 2) : "",
       decimalString(row.sellingPrice, 2),
       decimalString(row.wholesalePrice, 2),
       decimalString(row.minimumPrice, 2),
       decimalString(row.reorderLevel, 4),
       row.barcodes[0]?.barcode ?? "",
+      row.genericName ?? "",
+      row.vatType ?? "",
+      row.vatValue ? decimalString(row.vatValue, 2) : "",
+      row.isService ? "yes" : "no",
+      row.prices[0] ? decimalString(row.prices[0].price, 2) : "",
     ]),
   );
   return { ok: true as const, csv };

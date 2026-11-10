@@ -30,6 +30,8 @@ export default async function BarcodeReportPage() {
           { key: "date", header: "Date", cell: (row) => row.businessDate },
           { key: "barcode", header: "Barcode", cell: (row) => row.barcode },
           { key: "product", header: "Product", cell: (row) => row.product },
+          { key: "level", header: "Price level", cell: (row) => row.level },
+          { key: "format", header: "Layout", cell: (row) => (row.format === "LABEL_38X25" ? "38 × 25 mm" : row.format === "A4" ? "A4 sheet" : row.format) },
           { key: "copies", header: "Copies", cell: (row) => row.copies },
           { key: "user", header: "Printed by", cell: (row) => row.user },
         ]}

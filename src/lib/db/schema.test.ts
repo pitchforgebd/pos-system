@@ -118,6 +118,7 @@ const frozenPermissions = [
   "products.delete",
   "products.import",
   "products.export",
+  "products.cost",
   "inventory.view",
   "inventory.adjust",
   "inventory.transfer",
@@ -181,7 +182,7 @@ test("schema does not add deferred or rejected structures", () => {
   }
   assert.equal(schema.includes("discountType"), false);
   assert.equal(schema.includes("warrantyText"), false);
-  assert.equal(schema.includes("genericName"), false);
+  // genericName was deferred until P04 (D-list): it is the generic name of a product, searched with the name and SKU.
   assert.equal(schema.includes("Decimal(18, 2)"), true);
   assert.equal(schema.includes("Decimal(18, 4)"), true);
 });

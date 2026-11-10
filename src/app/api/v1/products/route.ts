@@ -2,7 +2,7 @@ import { z } from "zod";
 import { defineRoute } from "@/core/http/define-route";
 
 import { clientIp, jsonError, jsonOk } from "@/lib/api/http";
-import { createProduct, listProducts } from "@/modules/catalog/products";
+import { createProduct, hideCost, listProducts } from "@/modules/catalog/products";
 
 const productSchema = z.object({
   sku: z.string().trim().min(1).max(64),
@@ -22,6 +22,8 @@ const productSchema = z.object({
   trackSerial: z.boolean().default(false),
   reorderLevel: z.string().default("0"),
   warrantyAvailable: z.boolean().default(false),
+  isService: z.boolean().default(false),
+  genericName: z.string().trim().max(191).nullable().optional(),
   barcode: z.string().trim().min(1).max(64).optional(),
 });
 
@@ -29,7 +31,8 @@ export const GET = defineRoute({
   permission: "products.view",
   handler: async ({ request, session }) => {
     const search = new URL(request.url).searchParams.get("search")?.trim() || undefined;
-    return jsonOk(await listProducts(session.organizationId, search));
+    const rows = await listProducts(session.organizationId, search);
+    return jsonOk(session.permissions.has("products.cost") ? rows : rows.map((row) => hideCost(row)));
   },
 });
 
@@ -51,6 +54,6 @@ export const POST = defineRoute({
       const code = result.status === 409 ? "CONFLICT" : result.status === 404 ? "NOT_FOUND" : "BUSINESS_RULE";
       return jsonError(code, result.message, result.status);
     }
-    return jsonOk(result.product, "Operation completed", 201);
+    return jsonOk(session.permissions.has("products.cost") ? result.product : hideCost(result.product), "Operation completed", 201);
   },
 });

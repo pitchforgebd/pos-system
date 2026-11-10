@@ -118,11 +118,7 @@ export function NavLinks({
       </>
     );
     if (!href) {
-      return (
-        <span className={className} title="This screen is still on the reference list.">
-          {body}
-        </span>
-      );
+      return <span className={className}>{body}</span>;
     }
     return (
       <Link href={href} aria-current={active(href) ? "page" : undefined} onClick={onNavigate} className={className}>

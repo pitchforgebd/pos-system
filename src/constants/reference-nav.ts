@@ -33,6 +33,7 @@ export const referenceNavigation: ReferenceEntry[] = [
     children: [
       { label: "Settings", href: "/settings" },
       { label: "Roles", href: "/roles" },
+      { label: "Price Levels", href: "/settings/price-levels" },
       { label: "Courier Settings", href: "/settings/courier" },
       { label: "Shipments", href: "/settings/courier" },
     ],

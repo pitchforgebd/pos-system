@@ -10,6 +10,7 @@ export const permissionCodes = [
   "products.delete",
   "products.import",
   "products.export",
+  "products.cost",
   "inventory.view",
   "inventory.adjust",
   "inventory.transfer",

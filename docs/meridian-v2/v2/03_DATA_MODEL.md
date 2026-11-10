@@ -61,6 +61,8 @@ note          VARCHAR(500) NULL
 | `price_levels` (id, name: Retail/Wholesale/Dealer/…, isDefault) | পাইকারি লেবেল |
 | `product_prices` (productId, variantId NULL, priceLevelId, price, minQty ডিফল্ট ১) unique(product, variant, level, minQty) | লেভেল + পরিমাণভিত্তিক দাম |
 | `customer_types.priceLevelId` | কাস্টমার টাইপ → দাম লেভেল |
+
+**P04-এ যা হয়েছে:** `price_levels` (Retail ডিফল্ট, Wholesale, Dealer; মালিক আরও যোগ করেন), `product_prices` নতুন আকারে (`variantScope`, `priceLevelId`, `minQty`, `price`; unique org+পণ্য+variantScope+লেভেল+minQty) — বিদ্যমান `sellingPrice`/`wholesalePrice`/ভ্যারিয়েন্টের নিজস্ব দাম ব্যাকফিল হয়েছে; পণ্যের `sellingPrice`/`wholesalePrice` কলাম Retail/Wholesale-এর প্রথম ধাপের সাথে সিঙ্কে থাকে (বাকি সিস্টেম এখনো ওগুলো পড়ে; বিক্রি `resolvePrice`-এ যাবে P06-এ)। `products.isService`, `products.genericName` যোগ। **VAT:** নতুন `vatRate`/`vatMode` কলাম বানানো হয়নি — বিদ্যমান `vatType` (INCLUSIVE/EXCLUSIVE/খালি) ও `vatValue` (হার %) বিক্রি ইতিমধ্যে ব্যবহার করে, তাই সেগুলোই বৈধ মানসহ থাকল; নাম বদল P06-তে বিক্রি `resolvePrice`-এ গেলে। **মূল্য নির্বাচন:** লেভেল (নামে/কাস্টমার টাইপ থেকে/ডিফল্ট) → সবচেয়ে বড় `minQty ≤ পরিমাণ`; ভ্যারিয়েন্টের নিজস্ব দাম সেই লেভেলে পণ্যের দামের আগে; লেভেলে না থাকলে ডিফল্ট লেভেল; `minimumPrice`-এর নিচে নামে না (`floored`)। **D20:** `products.cost` পারমিশন ছাড়া পণ্যের ক্রয়মূল্য, avg cost, মার্জিন, স্টক মূল্য API/পেজ/এক্সপোর্টে আসে না। বারকোড: একাধিক, শপের নিজের EAN-13 (প্রিফিক্স 200, পরপর নম্বর, চেক ডিজিট; একই মুহূর্তে বানালেও আলাদা), লেবেল A4 বা ৩৮×২৫mm, লেভেলের দামসহ; প্রতিটি প্রিন্ট অডিটে (লেভেল, সাইজ, কপি)।
 | `product_barcodes` (আছে) — variant সহ, unique(org, code) | ফিচার ১১ |
 
 ## ৬. ক্রয় (P05)

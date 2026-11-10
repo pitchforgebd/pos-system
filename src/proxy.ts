@@ -5,7 +5,6 @@ import { plannedSections } from "@/constants/navigation";
 import { decidePageAccess } from "@/modules/access/route-access";
 import { SESSION_COOKIE } from "@/modules/auth/constants";
 import { loadSession } from "@/modules/auth/session";
-import { concreteScreenPaths, resolveScreen } from "@/lib/screens/registry";
 
 const knownSections = new Set<string>([
   "dashboard",
@@ -16,8 +15,6 @@ const knownSections = new Set<string>([
   ...Object.keys(plannedSections),
 ]);
 
-const openPaths = new Set(["/dashboard", "/missing", "/login", "/forgot-password", "/reset-password"]);
-const concretePaths = new Set(concreteScreenPaths());
 
 const missingDocument = `<!DOCTYPE html>
 <html lang="en">
@@ -51,15 +48,6 @@ const forbiddenDocument = `<!DOCTYPE html>
 </body>
 </html>`;
 
-const liveDetail = /^\/(purchases|suppliers|sales|customers|quotations|requisitions|shifts)\/[0-9a-f-]{36}$|^\/(accounting\/journals|inventory\/take-off)\/[0-9a-f-]{36}$/i;
-
-function isKnownScreen(pathname: string) {
-  if (openPaths.has(pathname) || concretePaths.has(pathname) || liveDetail.test(pathname)) {
-    return true;
-  }
-  const match = resolveScreen(pathname.split("/").filter(Boolean));
-  return Boolean(match && !(match.spec.kind === "detail" && !match.record));
-}
 
 const publicPaths = new Set(["/login", "/forgot-password", "/reset-password", "/api/health"]);
 
@@ -86,7 +74,9 @@ export async function proxy(request: NextRequest) {
     return continueWithPath(request);
   }
   const segment = pathname.split("/").filter(Boolean)[0];
-  const known = Boolean(segment && knownSections.has(segment) && isKnownScreen(pathname));
+  // A path is served when its first segment is a section of the application. Every page below a section is a real page (there are no
+  // sample screens any more); a path with no page gets the application's own "not found" from the router.
+  const known = Boolean(segment && knownSections.has(segment));
   if (!known) {
     return new NextResponse(missingDocument, {
       status: 404,

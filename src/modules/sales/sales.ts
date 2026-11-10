@@ -154,14 +154,17 @@ export async function postSale(
         const inclusive = (resolved.vatType ?? "").toUpperCase() === "INCLUSIVE";
         const salesAmount = inclusive ? money(afterDiscount.minus(vat)) : afterDiscount;
         const payable = inclusive ? afterDiscount : money(afterDiscount.plus(vat));
-        const unitCost = await currentUnitCost(tx, {
-          organizationId: input.organizationId,
-          productId: resolved.productId,
-          variantId: resolved.variantId,
-          branchId: input.branchId,
-          warehouseId: warehouse.id,
-        });
+        const unitCost = resolved.stocked
+          ? await currentUnitCost(tx, {
+              organizationId: input.organizationId,
+              productId: resolved.productId,
+              variantId: resolved.variantId,
+              branchId: input.branchId,
+              warehouseId: warehouse.id,
+            })
+          : zero();
         priced.push({
+          stocked: resolved.stocked,
           productId: resolved.productId,
           variantId: resolved.variantId,
           quantity,
@@ -251,6 +254,9 @@ export async function postSale(
         select: { id: true, invoice: { select: { number: true } } },
       });
       for (const line of priced) {
+        if (!line.stocked) {
+          continue; // a service has no stock to move
+        }
         await applyMovement(tx, {
           organizationId: input.organizationId,
           productId: line.productId,
@@ -391,7 +397,7 @@ async function resolveLineProduct(tx: Prisma.TransactionClient, organizationId: 
   }
   const product = await tx.product.findFirst({
     where: { id: productId, organizationId, deletedAt: null, status: "ACTIVE" },
-    select: { id: true, sellingPrice: true, minimumPrice: true, vatType: true, vatValue: true, trackSerial: true },
+    select: { id: true, sellingPrice: true, minimumPrice: true, vatType: true, vatValue: true, trackSerial: true, trackStock: true },
   });
   if (!product) {
     throw new StockRuleError("That record was not found.", 404);
@@ -418,6 +424,8 @@ async function resolveLineProduct(tx: Prisma.TransactionClient, organizationId: 
     vatType: product.vatType,
     vatValue: product.vatValue,
     trackSerial: product.trackSerial,
+    /** False for a service or other non-stock item: it is sold with no stock movement and no cost of goods. */
+    stocked: product.trackStock,
   };
 }
 

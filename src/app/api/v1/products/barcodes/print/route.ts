@@ -7,6 +7,8 @@ import { recordBarcodePrint } from "@/modules/catalog/barcodes";
 const bodySchema = z.object({
   barcodeId: z.string().uuid(),
   copies: z.number().int(),
+  level: z.string().trim().min(1).max(64).optional(),
+  format: z.enum(["A4", "LABEL_38X25"]).optional(),
 });
 
 export const POST = defineRoute({
@@ -21,6 +23,8 @@ export const POST = defineRoute({
       userId: session.userId,
       barcodeId: parsed.data.barcodeId,
       copies: parsed.data.copies,
+      level: parsed.data.level,
+      format: parsed.data.format,
       ip: clientIp(request),
       userAgent: request.headers.get("user-agent"),
     });

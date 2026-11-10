@@ -6,7 +6,7 @@ import { exportProducts } from "@/modules/imports/product-import";
 export const GET = defineRoute({
   permission: "products.export",
   handler: async ({ request, session }) => {
-    const result = await exportProducts(session.organizationId);
+    const result = await exportProducts(session.organizationId, { includeCost: session.permissions.has("products.cost") });
     if (!result.ok) {
       return jsonError("BUSINESS_RULE", result.message, result.status);
     }

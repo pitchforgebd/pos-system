@@ -28,7 +28,7 @@ export default async function OpeningStockPage() {
     <div className="space-y-6">
       <PageHeader
         title="Opening Stock"
-        description="Posts an opening-stock invoice and an OPENING ledger row together. Unit cost is stored and not posted to accounting."
+        description="Stock the shop started with. Each line is a stock movement and one journal together (Dr Inventory / Cr Opening Balance Equity), valued at the unit cost entered."
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Inventory", href: "/inventory" }, { label: "Opening stock" }]}
       />
       <InboundForm

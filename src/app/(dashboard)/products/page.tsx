@@ -51,6 +51,8 @@ export default async function ProductsPage({
   if (!session) {
     redirect("/login");
   }
+  // What a product cost is only shown to someone who may see it (D20).
+  const canSeeCost = session.permissions.has("products.cost");
   const params = await searchParams;
   const q = clean(params.q);
   const status = params.status === "ACTIVE" || params.status === "INACTIVE" ? params.status : "";
@@ -106,7 +108,7 @@ export default async function ProductsPage({
             <table className="w-full min-w-[960px] border-collapse text-sm">
               <thead className="bg-surface-muted text-left text-xs text-muted">
                 <tr>
-                  {["#", "Product info", "Image", "P. Price", "S. Price", "Stock in", "Stock out", "Total return", "Current stock", "Stock value (avg cost)", "Total S. value", "Action"].map((header) => (
+                  {["#", "Product info", "Image", ...(canSeeCost ? ["P. Price"] : []), "S. Price", "Stock in", "Stock out", "Total return", "Current stock", ...(canSeeCost ? ["Stock value (avg cost)"] : []), "Total S. value", "Action"].map((header) => (
                     <th key={header} className="px-2 py-2 font-medium">
                       {header}
                     </th>
@@ -125,7 +127,9 @@ export default async function ProductsPage({
                   <tr key={row.id} className="border-t border-border">
                     <td className="px-2 py-2">{start + index}</td>
                     <td className="px-2 py-2">
-                      <span className="block font-medium">{row.name}</span>
+                      <Link href={`/products/${row.id}`} className="block font-medium underline-offset-2 hover:underline">
+                        {row.name}
+                      </Link>
                       <span className="text-xs text-muted">{row.sku}</span>
                       <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] ${row.status === "ACTIVE" ? "bg-success-subtle text-success" : "bg-error-subtle text-error"}`}>
                         {row.status === "ACTIVE" ? "Active" : "Deactive"}
@@ -140,13 +144,13 @@ export default async function ProductsPage({
                         <span className="text-xs text-muted">—</span>
                       )}
                     </td>
-                    <td className="px-2 py-2">{row.purchasePrice}</td>
+                    {canSeeCost ? <td className="px-2 py-2">{row.purchasePrice}</td> : null}
                     <td className="px-2 py-2">{row.sellingPrice}</td>
                     <td className="px-2 py-2">{row.stockIn}</td>
                     <td className="px-2 py-2">{row.stockOut}</td>
                     <td className="px-2 py-2">{row.totalReturn}</td>
                     <td className="px-2 py-2">{row.currentStock}</td>
-                    <td className="px-2 py-2">{row.stockValue}</td>
+                    {canSeeCost ? <td className="px-2 py-2">{row.stockValue}</td> : null}
                     <td className="px-2 py-2">{row.sellingValue}</td>
                     <td className="px-2 py-2">
                       <Link href="/inventory/ledger" className="text-info">

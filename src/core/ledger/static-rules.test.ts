@@ -17,8 +17,6 @@ const files = readdirSync(srcRoot, { recursive: true, encoding: "utf8" })
   .map((entry) => entry.split(sep).join("/"))
   .sort();
 
-// Display-only sample data of the reference screens; nothing here is ever posted.
-const SAMPLE_DATA = ["lib/mock/", "lib/screens/"];
 const ALLOWED = new Set(["core/ledger/groups.ts"]);
 // The one 4-digit string that is not an account: MySQL's deadlock error number.
 const NOT_AN_ACCOUNT = new Set(["1213"]);
@@ -32,7 +30,7 @@ function hits(file: string) {
 
 test("no source file writes an account or group number as a string", () => {
   const offenders = files
-    .filter((file) => !ALLOWED.has(file) && !SAMPLE_DATA.some((prefix) => file.startsWith(prefix)))
+    .filter((file) => !ALLOWED.has(file))
     .flatMap((file) => {
       const found = hits(file);
       return found.length > 0 ? [`${file}: ${[...new Set(found)].join(", ")}`] : [];
@@ -51,7 +49,6 @@ test("the group numbers in code are exactly the groups of the chart", () => {
 
 test("code does not build account numbers from pieces either (no startsWith or regex on a code)", () => {
   const offenders = files
-    .filter((file) => !SAMPLE_DATA.some((prefix) => file.startsWith(prefix)))
     .filter((file) => /code:\s*\{\s*startsWith|code\.startsWith\(|\.code\)\.test\(|\^12|\/\^1[0-9]/.test(readFileSync(join(srcRoot, file), "utf8")));
   assert.deepEqual(offenders, []);
 });
