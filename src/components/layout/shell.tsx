@@ -12,12 +12,14 @@ import { Drawer } from "@/components/ui/drawer";
 export function AppShell({
   children,
   allowed,
+  badges,
   session,
   lang,
   logoUrl,
 }: {
   children: ReactNode;
   allowed: readonly string[];
+  badges?: Record<string, number>;
   lang: UiLang;
   logoUrl: string;
   session: {
@@ -55,6 +57,7 @@ export function AppShell({
       </a>
       <Sidebar
         allowed={allowed}
+        badges={badges}
         collapsed={menuCollapsed}
         lang={lang}
         logoUrl={logoUrl}
@@ -74,7 +77,7 @@ export function AppShell({
         </main>
       </div>
       <Drawer open={menuOpen} onOpenChange={(open) => setMenuPath(open ? pathname : null)} title="Menu" side="left">
-        <NavLinks allowed={allowed} lang={lang} onNavigate={() => setMenuPath(null)} variant="canvas" />
+        <NavLinks allowed={allowed} lang={lang} badges={badges} onNavigate={() => setMenuPath(null)} variant="canvas" />
       </Drawer>
     </div>
   );

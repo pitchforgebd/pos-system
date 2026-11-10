@@ -7,6 +7,7 @@ import { occurredDate } from "@/lib/format/date";
 import { allocateNumber } from "@/modules/documents/numbers";
 import { writeAudit } from "@/modules/auth/audit";
 import { hashPayload, idempotentTransaction, isKeyRace, readIdempotency, saveIdempotency } from "@/core/idempotency";
+import { pageInfo, type ListQuery, type Paged } from "@/core/list";
 import { decimalString, parseQuantity } from "@/core/money";
 import { postWithStock, type MovedStock, type StockMove } from "@/core/posting/stock";
 import type { DocType, PostLine } from "@/core/posting/journal";
@@ -528,7 +529,87 @@ export async function listTakeOffs(organizationId: string, branchId: string, tak
   });
 }
 
+/** One take-off with what it took, for the print page. */
+export async function getTakeOff(organizationId: string, branchId: string, id: string) {
+  const doc = await prisma.stockDocument.findFirst({
+    where: { id, organizationId, branchId, type: "TAKE_OFF" },
+    include: { warehouse: { select: { name: true } } },
+  });
+  if (!doc) {
+    return null;
+  }
+  const moves = await prisma.stockLedger.findMany({
+    where: { organizationId, referenceType: "stock_document", referenceId: doc.id },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, quantity: true, unitCost: true, totalCost: true, product: { select: { sku: true, name: true } } },
+  });
+  return {
+    id: doc.id,
+    number: doc.number ?? "",
+    businessDate: day(doc.businessDate),
+    warehouseName: doc.warehouse.name,
+    purpose: doc.takeOffPurpose,
+    recipient: doc.recipient ?? "",
+    approvedBy: doc.approvedBy ?? "",
+    note: doc.note ?? "",
+    total: decimalString(moves.reduce((total, move) => total.plus(move.totalCost ?? ZERO), ZERO), 2),
+    items: moves.map((move) => ({
+      id: move.id,
+      sku: move.product.sku,
+      name: move.product.name,
+      quantity: decimalString(move.quantity, 4),
+      unitCost: decimalString(move.unitCost ?? ZERO, 4),
+      totalCost: decimalString(move.totalCost ?? ZERO, 2),
+    })),
+  };
+}
+
 // --- transfer ---
+
+export type TransferRow = { id: string; number: string; date: string; from: string; to: string; items: number; value: string; direction: "OUT" | "IN" | "INTERNAL" };
+
+/** Transfers that leave or reach the branch, newest first, paged, with what they were worth at the source's average cost (U12). */
+export async function listTransfers(organizationId: string, branchId: string, query: ListQuery): Promise<Paged<TransferRow>> {
+  const where = { organizationId, OR: [{ fromBranchId: branchId }, { toBranchId: branchId }] };
+  const total = await prisma.stockTransfer.count({ where });
+  const rows = await prisma.stockTransfer.findMany({
+    where,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    skip: query.skip,
+    take: query.take,
+    select: {
+      id: true,
+      number: true,
+      createdAt: true,
+      fromBranchId: true,
+      toBranchId: true,
+      fromBranch: { select: { name: true } },
+      toBranch: { select: { name: true } },
+      fromWarehouse: { select: { name: true } },
+      toWarehouse: { select: { name: true } },
+      _count: { select: { items: true } },
+    },
+  });
+  const moved = rows.length === 0 ? [] : await prisma.stockLedger.groupBy({
+    by: ["referenceId"],
+    where: { organizationId, referenceType: "stock_transfer", movementType: "TRANSFER_OUT", referenceId: { in: rows.map((row) => row.id) } },
+    _sum: { totalCost: true },
+  });
+  const worth = new Map(moved.map((row) => [row.referenceId, row._sum.totalCost ?? ZERO]));
+  return {
+    rows: rows.map((row) => ({
+      id: row.id,
+      number: row.number ?? "",
+      date: dateOnly(row.createdAt),
+      from: `${row.fromBranch.name} / ${row.fromWarehouse.name}`,
+      to: `${row.toBranch.name} / ${row.toWarehouse.name}`,
+      items: row._count.items,
+      value: decimalString(worth.get(row.id) ?? ZERO, 2),
+      direction: row.fromBranchId === row.toBranchId ? ("INTERNAL" as const) : row.fromBranchId === branchId ? ("OUT" as const) : ("IN" as const),
+    })),
+    page: pageInfo(total, query, rows.length),
+  };
+}
 
 export async function postTransfer(input: {
   organizationId: string;

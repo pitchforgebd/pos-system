@@ -143,7 +143,6 @@ export async function confirmProductImport(input: Actor & { idempotencyKey: stri
           barcode: record.barcode || undefined,
           trackStock: true,
           trackExpiry: false,
-          trackBatch: false,
           trackSerial: false,
           warrantyAvailable: false,
           ip: input.ip,

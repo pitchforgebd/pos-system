@@ -129,7 +129,6 @@ export async function seedDemoContent() {
       minimumPrice: item.purchase,
       trackStock: true,
       trackExpiry: false,
-      trackBatch: false,
       trackSerial: false,
       reorderLevel: "5",
       warrantyAvailable: false,

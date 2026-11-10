@@ -176,27 +176,28 @@ export async function stockSummary(organizationId: string, branchId: string) {
   };
 }
 
+/**
+ * Whether the stock on hand of a branch equals the sum of its movements, for every product, variant and warehouse (I4). One SQL
+ * aggregate, so it stays fast with a long ledger. A product that has movements but no balance row, or the reverse, does not match.
+ */
 export async function ledgerMatchesBalance(organizationId: string, branchId: string) {
-  const balances = await prisma.stockBalance.findMany({
-    where: { organizationId, branchId },
-    select: { productId: true, variantScope: true, warehouseId: true, quantity: true },
-  });
-  const ledgers = await prisma.stockLedger.findMany({
-    where: { organizationId, branchId },
-    select: { productId: true, variantId: true, warehouseId: true, quantity: true, direction: true },
-  });
-  for (const balance of balances) {
-    let summed = new Prisma.Decimal(0);
-    for (const ledger of ledgers) {
-      const scope = ledger.variantId ?? "";
-      if (ledger.productId !== balance.productId || scope !== balance.variantScope || ledger.warehouseId !== balance.warehouseId) {
-        continue;
-      }
-      summed = ledger.direction === "IN" ? summed.plus(ledger.quantity) : summed.minus(ledger.quantity);
-    }
-    if (!summed.eq(balance.quantity)) {
-      return false;
-    }
-  }
-  return true;
+  const [row] = await prisma.$queryRaw<Array<{ off: bigint }>>`
+    SELECT COUNT(*) AS off FROM (
+      SELECT k.productId
+      FROM (
+        SELECT productId, variantScope, warehouseId FROM stock_balances WHERE organizationId = ${organizationId} AND branchId = ${branchId}
+        UNION
+        SELECT productId, COALESCE(variantId, ''), COALESCE(warehouseId, '') FROM stock_ledgers WHERE organizationId = ${organizationId} AND branchId = ${branchId}
+      ) k
+      LEFT JOIN stock_balances b
+        ON b.organizationId = ${organizationId} AND b.branchId = ${branchId} AND b.productId = k.productId AND b.variantScope = k.variantScope AND b.warehouseId = k.warehouseId
+      LEFT JOIN (
+        SELECT productId, COALESCE(variantId, '') AS variantScope, COALESCE(warehouseId, '') AS warehouseId,
+               SUM(CASE WHEN direction = 'IN' THEN quantity ELSE -quantity END) AS net
+        FROM stock_ledgers WHERE organizationId = ${organizationId} AND branchId = ${branchId}
+        GROUP BY productId, COALESCE(variantId, ''), COALESCE(warehouseId, '')
+      ) m ON m.productId = k.productId AND m.variantScope = k.variantScope AND m.warehouseId = k.warehouseId
+      WHERE COALESCE(b.quantity, 0) <> COALESCE(m.net, 0)
+    ) off`;
+  return Number(row?.off ?? 0) === 0;
 }

@@ -78,6 +78,7 @@ export const referenceNavigation: ReferenceEntry[] = [
   { kind: "link", label: "Stock Alert Quantity", href: "/inventory/alerts" },
   { kind: "link", label: "Product Transfer", href: "/inventory/transfers" },
   { kind: "link", label: "Product Ledger Table", href: "/inventory/ledger" },
+  { kind: "link", label: "Take-off (goods out without a sale)", href: "/inventory/take-off" },
   {
     kind: "group",
     label: "Damage Products",

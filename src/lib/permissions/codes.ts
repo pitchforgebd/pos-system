@@ -16,6 +16,7 @@ export const permissionCodes = [
   "inventory.damage",
   "inventory.expiry",
   "inventory.opening",
+  "inventory.takeoff",
   "sales.view",
   "sales.create",
   "sales.edit",

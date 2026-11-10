@@ -9,7 +9,7 @@ import { addDays, businessDate as today } from "../../core/time/business-date.ts
 import { prisma } from "../../lib/db/client.ts";
 import { factories, withTestOrg } from "../../tests/helpers/index.ts";
 import { postSale } from "../sales/sales.ts";
-import { postAdjustment, postDamage, postOpeningStock, postOwnStock, postTakeOff, postTransfer, writeOffExpiry } from "./documents.ts";
+import { getTakeOff, listTakeOffs, listTransfers, postAdjustment, postDamage, postOpeningStock, postOwnStock, postTakeOff, postTransfer, writeOffExpiry } from "./documents.ts";
 
 // P03 task 4: every stock document is a stock movement and a journal made together, valued at the average cost, and the books
 // agree with the stock afterwards. These tests drive each document type through its public function.
@@ -210,5 +210,36 @@ test("opening, a sale, damage, take-off and an adjustment together: the inventor
     assert.equal((await postAdjustment({ ...who(t), ...key(), productId: product.id, quantity: "2", direction: "OUT", reason: "count" })).ok, true);
     assert.equal(await onHand(t, product.id), "33.0000");
     await assertBooksReconcile(t.org.id, prisma, { strictInventory: true });
+  });
+});
+
+test("a take-off can be listed and printed: its lines, their cost and the total", async () => {
+  await withTestOrg(async (t) => {
+    const product = await withStock(t, "10", "6.0000");
+    const done = await postTakeOff({ ...who(t), ...key(), businessDate: today(), purpose: "GIFT", recipient: "Karim", approvedBy: "Owner", note: "festival", lines: [{ productId: product.id, quantity: "3" }] } as Parameters<typeof postTakeOff>[0]);
+    assert.equal(done.ok, true, JSON.stringify(done));
+    const list = await listTakeOffs(t.org.id, t.branch.id);
+    assert.deepEqual([list.length, list[0].purpose, list[0].recipient, list[0].value], [1, "GIFT", "Karim", "18.00"]);
+    const slip = await getTakeOff(t.org.id, t.branch.id, done.ok ? done.id : "");
+    assert.deepEqual([slip?.total, slip?.items.length, slip?.items[0].unitCost, slip?.items[0].totalCost, slip?.note], ["18.00", 1, "6.0000", "18.00", "festival"]);
+    assert.equal(await getTakeOff(t.org.id, "00000000-0000-4000-8000-000000000000", done.ok ? done.id : ""), null, "another branch cannot see it");
+  });
+});
+
+test("the transfer list shows what left or reached the branch, with its value at the source's average cost", async () => {
+  await withTestOrg(async (t) => {
+    const product = await withStock(t, "10", "6.0000");
+    const other = await secondBranch(t);
+    const done = await postTransfer({
+      organizationId: t.org.id, userId: t.owner.id, fromBranchId: t.branch.id, toBranchId: other.branch.id, fromWarehouseId: t.warehouse.id, toWarehouseId: other.warehouse.id,
+      lines: [{ productId: product.id, quantity: "4" }], ...key(), ip: "127.0.0.1", userAgent: "test",
+    });
+    assert.equal(done.ok, true);
+    const { listQuery } = await import("../../core/list/index.ts");
+    const sent = await listTransfers(t.org.id, t.branch.id, listQuery({}));
+    assert.deepEqual(sent.rows.map((r) => [r.direction, r.items, r.value]), [["OUT", 1, "24.00"]]);
+    const received = await listTransfers(t.org.id, other.branch.id, listQuery({}));
+    assert.deepEqual(received.rows.map((r) => r.direction), ["IN"]);
+    assert.equal((await listTransfers(t.org.id, "00000000-0000-4000-8000-000000000000", listQuery({}))).page.total, 0);
   });
 });

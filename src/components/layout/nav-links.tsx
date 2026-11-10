@@ -80,11 +80,14 @@ export function NavLinks({
   variant = "sidebar",
   allowed,
   lang = "en",
+  badges,
 }: {
   onNavigate?: () => void;
   variant?: "sidebar" | "canvas";
   allowed?: readonly string[];
   lang?: UiLang;
+  /** A count shown beside a link (by its href), for example the low-stock rows beside Stock Alert Quantity. */
+  badges?: Record<string, number>;
 }) {
   const pathname = usePathname();
   const granted = new Set(allowed ?? []);
@@ -107,6 +110,11 @@ export function NavLinks({
       <>
         {!nested ? <Icon label={label} /> : <span className="size-1.5 rounded-full bg-current opacity-60" aria-hidden="true" />}
         <span className="truncate">{translateNav(lang, label)}</span>
+        {href && badges?.[href] ? (
+          <span className="ml-auto rounded-full bg-red-600 px-1.5 text-[11px] font-semibold text-white" title="Needs attention">
+            {badges[href]}
+          </span>
+        ) : null}
       </>
     );
     if (!href) {

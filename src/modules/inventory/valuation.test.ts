@@ -28,3 +28,32 @@ test("the stock list and summary value the stock at the average cost, and the bo
     assert.equal((Number(sums._sum.debit) - Number(sums._sum.credit)).toFixed(2), summary.stockValue, "the inventory account is what the stock summary says");
   });
 });
+
+test("ledgerMatchesBalance is one aggregate: true when the stock equals its movements, false when it does not, in either direction", async () => {
+  await withTestOrg(async (t) => {
+    const { ledgerMatchesBalance } = await import("./stock.ts");
+    const who = { organizationId: t.org.id, branchId: t.branch.id, userId: t.owner.id, warehouseId: t.warehouse.id, ip: "127.0.0.1", userAgent: "test" };
+    const product = await factories(t).product();
+    assert.equal(await ledgerMatchesBalance(t.org.id, t.branch.id), true, "nothing at all matches");
+    assert.equal((await postOpeningStock({ ...who, idempotencyKey: randomUUID(), businessDate: today(), lines: [{ productId: product.id, quantity: "5", unitCost: "2" }] })).ok, true);
+    assert.equal(await ledgerMatchesBalance(t.org.id, t.branch.id), true);
+    await prisma.stockBalance.updateMany({ where: { organizationId: t.org.id, productId: product.id }, data: { quantity: "6" } });
+    assert.equal(await ledgerMatchesBalance(t.org.id, t.branch.id), false, "stock above its movements");
+    await prisma.stockBalance.updateMany({ where: { organizationId: t.org.id, productId: product.id }, data: { quantity: "5" } });
+    await prisma.stockBalance.deleteMany({ where: { organizationId: t.org.id, productId: product.id } });
+    assert.equal(await ledgerMatchesBalance(t.org.id, t.branch.id), false, "movements with no stock row");
+  });
+});
+
+test("an expiry-tracked product always has batches: the batch flag follows trackExpiry", async () => {
+  await withTestOrg(async (t) => {
+    const { createProduct } = await import("../catalog/products.ts");
+    const made = await createProduct({
+      organizationId: t.org.id, actorId: t.owner.id, name: "Milk", sku: "MILK-1", purchasePrice: "1.00", sellingPrice: "2.00", wholesalePrice: "2.00", minimumPrice: "1.00",
+      trackStock: true, trackExpiry: true, trackSerial: false, reorderLevel: "0", warrantyAvailable: false, ip: "127.0.0.1", userAgent: "test",
+    } as Parameters<typeof createProduct>[0]);
+    assert.equal(made.ok, true, JSON.stringify(made));
+    const row = await prisma.product.findFirstOrThrow({ where: { organizationId: t.org.id, sku: "MILK-1" } });
+    assert.deepEqual([row.trackExpiry, row.trackBatch], [true, true]);
+  });
+});

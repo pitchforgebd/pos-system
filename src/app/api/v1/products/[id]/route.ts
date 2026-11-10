@@ -19,7 +19,6 @@ const productSchema = z.object({
   vatValue: z.string().nullable().optional(),
   trackStock: z.boolean().default(true),
   trackExpiry: z.boolean().default(false),
-  trackBatch: z.boolean().default(false),
   trackSerial: z.boolean().default(false),
   reorderLevel: z.string().default("0"),
   warrantyAvailable: z.boolean().default(false),

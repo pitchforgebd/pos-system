@@ -21,7 +21,6 @@ export type ProductInput = {
   vatValue?: string | null;
   trackStock: boolean;
   trackExpiry: boolean;
-  trackBatch: boolean;
   trackSerial: boolean;
   reorderLevel: string;
   warrantyAvailable: boolean;
@@ -428,7 +427,8 @@ export async function createProduct(input: ProductInput) {
         vatType: input.vatType?.trim() || null,
         trackStock: input.trackStock,
         trackExpiry: input.trackExpiry,
-        trackBatch: input.trackBatch,
+        // an expiry-tracked product always has lots (batches): there is no separate flag to set (L7)
+        trackBatch: input.trackExpiry,
         trackSerial: input.trackSerial,
         warrantyAvailable: input.warrantyAvailable,
         createdById: input.actorId,
@@ -487,7 +487,8 @@ export async function updateProduct(input: ProductInput & { productId: string })
         vatType: input.vatType?.trim() || null,
         trackStock: input.trackStock,
         trackExpiry: input.trackExpiry,
-        trackBatch: input.trackBatch,
+        // an expiry-tracked product always has lots (batches): there is no separate flag to set (L7)
+        trackBatch: input.trackExpiry,
         trackSerial: input.trackSerial,
         warrantyAvailable: input.warrantyAvailable,
         updatedById: input.actorId,

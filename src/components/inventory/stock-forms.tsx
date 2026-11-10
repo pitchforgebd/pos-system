@@ -212,3 +212,74 @@ export function ExpiryWriteOffForm({ batches }: { batches: { id: string; label: 
     </form>
   );
 }
+
+const PURPOSES = [
+  ["SAMPLE", "Sample for a customer"],
+  ["DEMO", "Demonstration"],
+  ["FIELD_TRIAL", "Field trial"],
+  ["OWN_USE", "Owner's own use (a drawing)"],
+  ["GIFT", "Gift"],
+] as const;
+
+/** Take-off: goods leave the warehouse without a sale. The owner's own use is a drawing; the other reasons are an expense. */
+export function TakeOffForm({ products }: { products: ProductOption[] }) {
+  const { submit, pending, message } = useSubmit();
+
+  return (
+    <form
+      className="grid max-w-xl gap-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const element = event.currentTarget;
+        const form = new FormData(element);
+        const text = (name: string) => String(form.get(name) || "").trim() || undefined;
+        void submit(
+          {
+            url: "/api/v1/inventory/take-off",
+            body: {
+              businessDate: form.get("businessDate"),
+              purpose: form.get("purpose"),
+              recipient: form.get("recipient"),
+              approvedBy: form.get("approvedBy"),
+              note: text("note"),
+              lines: [{ productId: form.get("productId"), quantity: form.get("quantity"), lot: text("lot") }],
+            },
+          },
+          { onSuccess: () => element.reset() },
+        );
+      }}
+    >
+      <Input name="businessDate" type="date" required aria-label="Date" />
+      <label className="grid gap-1 text-sm">
+        Product
+        <select name="productId" required className="h-10 rounded-md border border-border bg-surface px-2">
+          {products.map((product) => (
+            <option key={product.id} value={product.id}>
+              {product.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <Input name="quantity" required placeholder="Quantity" aria-label="Quantity" />
+      <Input name="lot" placeholder="Lot (for an expiry-tracked product)" aria-label="Lot" />
+      <label className="grid gap-1 text-sm">
+        Why
+        <select name="purpose" required className="h-10 rounded-md border border-border bg-surface px-2">
+          {PURPOSES.map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <Input name="recipient" required placeholder="Given to" aria-label="Given to" />
+      <Input name="approvedBy" required placeholder="Approved by" aria-label="Approved by" />
+      <Input name="note" placeholder="Note" aria-label="Note" />
+      <p className="text-sm text-muted">The goods leave stock at their average cost. Nothing is sold and no customer is charged.</p>
+      {message ? <p className="text-sm text-error">{message}</p> : null}
+      <Button type="submit" loading={pending}>
+        Save take-off
+      </Button>
+    </form>
+  );
+}

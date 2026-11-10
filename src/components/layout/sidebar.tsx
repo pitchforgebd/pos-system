@@ -5,6 +5,7 @@ import type { UiLang } from "@/lib/i18n/nav";
 
 export function Sidebar({
   allowed,
+  badges,
   collapsed = false,
   lang,
   logoUrl,
@@ -12,6 +13,7 @@ export function Sidebar({
   branchName,
 }: {
   allowed: readonly string[];
+  badges?: Record<string, number>;
   collapsed?: boolean;
   lang: UiLang;
   logoUrl: string;
@@ -28,7 +30,7 @@ export function Sidebar({
         {branchName}
       </p>
       <div className="flex-1 overflow-y-auto pb-6">
-        <NavLinks allowed={allowed} lang={lang} />
+        <NavLinks allowed={allowed} lang={lang} badges={badges} />
       </div>
     </aside>
   );
