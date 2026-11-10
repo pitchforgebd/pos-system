@@ -30,7 +30,7 @@
 
 ## DoD
 
-- [ ] `documents.ts`-এ সরাসরি স্টক/জার্নাল লেখা নেই; সব `post()` দিয়ে (I18 স্ট্যাটিক টেস্ট)
-- [ ] staging-এ রিকনসিলিয়েশন: GL 1400 = স্টক মূল্য ✔
-- [ ] লো-স্টক ও Take-off স্ক্রিন কাজ করে
-- [ ] typecheck, lint, test সবুজ; কমিট `v2(P03)`
+- [x] `documents.ts`-এ সরাসরি স্টক/জার্নাল লেখা নেই; সব `post()` দিয়ে (I18 স্ট্যাটিক টেস্ট) — `src/modules/inventory/static-rules.test.ts` সবুজ; সব ডকুমেন্ট `postWithStock` দিয়ে
+- [x] staging-এ রিকনসিলিয়েশন: GL 1400 = স্টক মূল্য ✔ — P14-এর আগে staging নেই, তাই লোকাল `meridian_practice`-এ: `scripts/stock-books.ts repair` ("v2 opening adjustment") এর পরে `scripts/reconcile.ts` ০ finding, ০ warning (I6 সহ, কঠোর); প্রোডাকশন বিল্ডে take-off বানানোর পরেও একই
+- [x] লো-স্টক ও Take-off স্ক্রিন কাজ করে — প্রোডাকশন বিল্ডে `/inventory`, `/inventory/alerts` (SQL ফিল্টার, পেজিনেশন, রিঅর্ডার তালিকা, মেয়াদ সতর্কতা, সাইডবার ব্যাজ), `/inventory/take-off` (ফর্ম→201, তালিকা, প্রিন্ট স্লিপ, বেশি পরিমাণে 422), `/inventory/transfers` যাচাই; সার্ভার লগ পরিষ্কার
+- [x] typecheck, lint, test সবুজ; কমিট `v2(P03)` — ২৯৬/২৯৬ খালি `meridian_ci` ও dev ডাটাবেসে; ৫০০-অপারেশনের ফাজ টেস্টসহ

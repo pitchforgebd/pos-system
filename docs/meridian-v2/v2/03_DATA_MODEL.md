@@ -51,6 +51,8 @@ note          VARCHAR(500) NULL
 | `stock_documents` (একটি সাধারণ হেডার: type OPENING/OWN/ADJUST/DAMAGE/EXPIRY/TAKE_OFF/TRANSFER, number, businessDate, reason, takeOffPurpose, expenseAccountId NULL) | ছড়ানো টেবিলের বদলে একটি; পুরনোগুলো migration-এ এখানে আনা |
 | movement type enum + `TAKE_OFF` | ফিচার ৮ |
 
+**P03-এ যা হয়েছে:** সব ডকুমেন্ট `core/posting/stock`-এর `postWithStock` দিয়ে — স্টক মুভমেন্ট ও জার্নাল একসাথে, মূল্য গড় cost-এ, I3 প্রতি ব্রাঞ্চে যাচাই (জার্নাল লাইনে নিজের `branchId` থাকতে পারে; একই ব্রাঞ্চের দুই গুদামের ট্রান্সফারে হিসাব বদলায় না, জার্নালও নেই)। `stock_documents`-এ নম্বর `STK-<অর্থবছর>-<n>` (নতুন `STK` ডকুমেন্ট টাইপ); পুরনো `opening_stocks`, `own_stock_invoices`, `stock_adjustments`, `damage_records` সারি একই id-তে `stock_documents`-এ কপি হয়েছে — **পুরনো টেবিলগুলো মোছা হয়নি** (মালিকের অনুমতির অপেক্ষায়, `customer_ledgers`-এর মতো)। ট্রান্সফার `stock_transfers`-এই থাকে। `expiry_batches` গুদামভিত্তিক, লট প্রতি একটি সারি (upsert একটি SQL-এ)। IMEI/serial শুধু স্টক-ইনে (ক্রয়, opening, own stock) যোগ হয়, প্রতি ইউনিটে একটি; বিক্রিতে একটি শর্তসাপেক্ষ update (`IN_STOCK`, ওই গুদামে), `count = 1` না হলে বাতিল। `products.trackBatch` কলাম আছে কিন্তু আর ইনপুট নয় — `trackExpiry`-র সাথে একই মানে বসে (L7); কলামটি সরানো মালিকের কথার অপেক্ষায়। পুরনো ডাটাবেসের স্টক মেলাতে `scripts/stock-books.ts check|repair` ("v2 opening adjustment" জার্নাল, ব্রাঞ্চ প্রতি একটি)।
+
 ## ৫. ক্যাটালগ ও দাম (P04)
 
 | টেবিল/কলাম | উদ্দেশ্য |

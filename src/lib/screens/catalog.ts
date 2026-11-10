@@ -343,6 +343,16 @@ export const catalogScreens: ScreenSpec[] = [
     ],
   },
   {
+    path: "/inventory/take-off",
+    title: "Take-off",
+    description: "Goods out of the warehouse without a sale. This screen is live: it posts stock and the books.",
+    cta: "Open take-off",
+    ctaHref: "/inventory/take-off",
+    kind: "list",
+    columns: [text("id", "Number"), date("date", "Date"), text("purpose", "Why"), text("recipient", "Given to")],
+    rows: [],
+  },
+  {
     path: "/inventory/expiry",
     title: "Expired products",
     description: "Sample lots. Expiry status is display text, not a date engine.",

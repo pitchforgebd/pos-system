@@ -51,7 +51,7 @@ const forbiddenDocument = `<!DOCTYPE html>
 </body>
 </html>`;
 
-const liveDetail = /^\/(purchases|suppliers|sales|customers|quotations|requisitions|shifts)\/[0-9a-f-]{36}$|^\/accounting\/journals\/[0-9a-f-]{36}$/i;
+const liveDetail = /^\/(purchases|suppliers|sales|customers|quotations|requisitions|shifts)\/[0-9a-f-]{36}$|^\/(accounting\/journals|inventory\/take-off)\/[0-9a-f-]{36}$/i;
 
 function isKnownScreen(pathname: string) {
   if (openPaths.has(pathname) || concretePaths.has(pathname) || liveDetail.test(pathname)) {
