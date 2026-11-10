@@ -4,6 +4,7 @@ import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
+import { moneyAccountFor } from "@/core/ledger/accounts";
 import { postBalancedJournal } from "@/modules/accounting/post";
 import { allocateNumber } from "@/modules/documents/numbers";
 import { documentSorts, listQuery, pageInfo, type ListQuery, type Paged } from "@/core/list";
@@ -205,8 +206,8 @@ export async function postPurchase(
         description: `Purchase ${number}`,
         createdById: input.userId,
         lines: [
-          { accountCode: "1400", debit: subtotal, credit: new Prisma.Decimal(0) },
-          { accountCode: "2100", debit: new Prisma.Decimal(0), credit: subtotal },
+          { role: "INVENTORY", debit: subtotal, credit: new Prisma.Decimal(0) },
+          { role: "AP", debit: new Prisma.Decimal(0), credit: subtotal },
         ],
       });
       await tx.purchase.update({ where: { id: purchase.id }, data: { journalId: purchaseJournalId } });
@@ -288,8 +289,8 @@ async function settleSupplier(
     description: `Supplier payment ${number}`,
     createdById: input.userId,
     lines: [
-      { accountCode: "2100", debit: input.amount, credit: new Prisma.Decimal(0) },
-      { accountCode: input.method === "CASH" ? "1100" : "1200", debit: new Prisma.Decimal(0), credit: input.amount },
+      { role: "AP", debit: input.amount, credit: new Prisma.Decimal(0) },
+      { accountId: await moneyAccountFor(tx, input.organizationId, { method: input.method }), debit: new Prisma.Decimal(0), credit: input.amount },
     ],
   });
   const payment = await tx.supplierPayment.create({

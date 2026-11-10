@@ -4,6 +4,7 @@ import { ChartAccountTable } from "@/components/accounting/chart-table";
 import { CapitalForm } from "@/components/accounting/forms";
 import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
+import { GROUP } from "@/core/ledger/groups";
 import { EmptyState } from "@/components/ui/states";
 import { listCapitalRows } from "@/modules/accounting/unposted";
 import { getSession } from "@/modules/auth/current-session";
@@ -29,9 +30,9 @@ export default async function CapitalPage() {
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Accounting", href: "/accounting" }, { label: "Capital" }]}
       />
       {session.permissions.has("accounting.post") && session.branchId ? (
-        <CapitalForm moneyAccounts={accounts.filter((account) => account.status === "ACTIVE" && (account.code === "1100" || account.code.startsWith("12"))).map((account) => ({ code: account.code, label: `${account.code} · ${account.name}` }))} />
+        <CapitalForm moneyAccounts={accounts.filter((account) => account.status === "ACTIVE" && ["CASH", "BANK", "MOBILE"].includes(account.kind)).map((account) => ({ code: account.code, kind: account.kind, label: `${account.code} · ${account.name}` }))} />
       ) : null}
-      <ChartAccountTable rows={accounts.filter((account) => account.groupCode === "3000")} />
+      <ChartAccountTable rows={accounts.filter((account) => account.groupCode === GROUP.EQUITY)} />
       <DataTable
         caption="Capital documents"
         columns={[

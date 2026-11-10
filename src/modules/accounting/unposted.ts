@@ -20,7 +20,7 @@ export async function listIncomeRows(organizationId: string, branchId: string) {
 
 export async function listLoanMovements(organizationId: string, branchId: string) {
   const rows = await prisma.journalLine.findMany({
-    where: { organizationId, account: { code: "2200" }, journal: { status: "POSTED", branchId } },
+    where: { organizationId, account: { roles: { some: { role: "LOAN" } } }, journal: { status: "POSTED", branchId } },
     orderBy: { journal: { businessDate: "desc" } },
     take: 100,
     select: { id: true, debit: true, credit: true, journal: { select: { number: true, description: true, businessDate: true } } },

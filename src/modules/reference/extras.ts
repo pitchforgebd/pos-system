@@ -6,6 +6,7 @@ import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
+import { moneyAccountFor } from "@/core/ledger/accounts";
 import { postBalancedJournal } from "@/modules/accounting/post";
 import { decimalString, parseQuantity } from "@/core/money";
 import { applyMovement, resolveWarehouse, StockRuleError } from "@/modules/inventory/stock";
@@ -252,7 +253,7 @@ export async function postDirectReturn(input: Actor & { productId: string; quant
       }
       const moneyRefund = refund.toDecimalPlaces(2);
       const cost = unitCost.mul(quantity).toDecimalPlaces(2);
-      const cash = input.method === "BANK" ? "1200" : "1100";
+      const cashAccount = await moneyAccountFor(tx, input.organizationId, { method: input.method });
       const id = randomUUID();
       const journalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
@@ -261,10 +262,10 @@ export async function postDirectReturn(input: Actor & { productId: string; quant
         description: "Direct return",
         createdById: input.userId,
         lines: [
-          { accountCode: "4100", debit: moneyRefund, credit: new Prisma.Decimal(0) },
-          { accountCode: cash, debit: new Prisma.Decimal(0), credit: moneyRefund },
-          { accountCode: "1400", debit: cost, credit: new Prisma.Decimal(0) },
-          { accountCode: "5100", debit: new Prisma.Decimal(0), credit: cost },
+          { role: "SALES", debit: moneyRefund, credit: new Prisma.Decimal(0) },
+          { accountId: cashAccount, debit: new Prisma.Decimal(0), credit: moneyRefund },
+          { role: "INVENTORY", debit: cost, credit: new Prisma.Decimal(0) },
+          { role: "COGS", debit: new Prisma.Decimal(0), credit: cost },
         ],
       });
       await applyMovement(tx, {
@@ -364,15 +365,6 @@ export async function redeemLoyalty(input: Actor & { customerId: string; points:
         throw new StockRuleError("The customer does not have those points.");
       }
       const taka = points.mul(rate).toDecimalPlaces(2);
-      const group = await tx.accountGroup.findFirst({ where: { organizationId: input.organizationId, code: "6000" }, select: { id: true } });
-      if (!group) {
-        throw new StockRuleError("The expense group is missing.");
-      }
-      await tx.account.upsert({
-        where: { organizationId_code: { organizationId: input.organizationId, code: "6500" } },
-        update: {},
-        create: { organizationId: input.organizationId, groupId: group.id, code: "6500", name: "Loyalty discount" },
-      });
       const journalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
@@ -380,8 +372,8 @@ export async function redeemLoyalty(input: Actor & { customerId: string; points:
         description: "Loyalty redeem",
         createdById: input.userId,
         lines: [
-          { accountCode: "6500", debit: taka, credit: new Prisma.Decimal(0) },
-          { accountCode: "1300", debit: new Prisma.Decimal(0), credit: taka },
+          { role: "LOYALTY", debit: taka, credit: new Prisma.Decimal(0) },
+          { role: "AR", debit: new Prisma.Decimal(0), credit: taka },
         ],
       });
       await tx.customerLedger.create({

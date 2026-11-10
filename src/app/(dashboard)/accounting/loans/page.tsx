@@ -30,9 +30,9 @@ export default async function LoansPage() {
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Accounting", href: "/accounting" }, { label: "Loan" }]}
       />
       {session.permissions.has("accounting.post") && session.branchId ? (
-        <LoanForm moneyAccounts={accounts.filter((account) => account.status === "ACTIVE" && (account.code === "1100" || account.code.startsWith("12"))).map((account) => ({ code: account.code, label: `${account.code} · ${account.name}` }))} />
+        <LoanForm moneyAccounts={accounts.filter((account) => account.status === "ACTIVE" && ["CASH", "BANK", "MOBILE"].includes(account.kind)).map((account) => ({ code: account.code, kind: account.kind, label: `${account.code} · ${account.name}` }))} />
       ) : null}
-      <ChartAccountTable rows={accounts.filter((account) => account.code === "2200")} />
+      <ChartAccountTable rows={accounts.filter((account) => account.roles.includes("LOAN"))} />
       <DataTable
         caption="Loan movements"
         columns={[

@@ -25,8 +25,9 @@ export default async function BankCashPage({ searchParams }: { searchParams: Pro
     cashBankBalances(session.organizationId, session.branchId),
     cashFlow(session.organizationId, session.branchId, range ? query.from : undefined, range ? query.to : undefined),
   ]);
-  const cash = balances.find((row) => row.code === "1100");
-  const bank = balances.find((row) => row.code === "1200");
+  const cash = balances.find((row) => row.kind === "CASH");
+  // The bank figure on this page is the default bank account, as before; each account has its own row in the table below.
+  const bank = balances.find((row) => row.kind === "BANK");
 
   return (
     <div className="space-y-6">

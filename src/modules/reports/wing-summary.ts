@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
+import { GROUP } from "@/core/ledger/groups";
 import { moneyText } from "@/core/money";
 
 export type WingSummary = {
@@ -61,11 +62,11 @@ async function netProfit(organizationId: string, branchId: string | null, branch
     const group = groups.get(row.accountId);
     const debit = new Prisma.Decimal(row._sum.debit ?? 0);
     const credit = new Prisma.Decimal(row._sum.credit ?? 0);
-    if (group === "4000") {
+    if (group === GROUP.REVENUE) {
       revenue = revenue.plus(credit.minus(debit));
-    } else if (group === "5000") {
+    } else if (group === GROUP.COST_OF_SALES) {
       cost = cost.plus(debit.minus(credit));
-    } else if (group === "6000") {
+    } else if (group === GROUP.EXPENSE) {
       expenses = expenses.plus(debit.minus(credit));
     }
   }
@@ -332,8 +333,8 @@ async function reportBoards(organizationId: string, branchId: string | null, bra
         AND direction = 'IN'
         AND unitCost IS NOT NULL
     `,
-    bookBalance(organizationId, branchId, branchIds, "1100"),
-    bookBalance(organizationId, branchId, branchIds, "12"),
+    bookBalance(organizationId, branchId, branchIds, ["CASH"]),
+    bookBalance(organizationId, branchId, branchIds, ["BANK", "MOBILE"]),
   ]);
   let dueCustomers = 0;
   let customersDue = new Prisma.Decimal(0);
@@ -405,9 +406,9 @@ async function reportBoards(organizationId: string, branchId: string | null, bra
   };
 }
 
-async function bookBalance(organizationId: string, branchId: string | null, branchIds: string[], code: "1100" | "12") {
+async function bookBalance(organizationId: string, branchId: string | null, branchIds: string[], kinds: ("CASH" | "BANK" | "MOBILE")[]) {
   const accounts = await prisma.account.findMany({
-    where: { organizationId, status: "ACTIVE", ...(code === "1100" ? { code: "1100" } : { code: { startsWith: "12" } }) },
+    where: { organizationId, status: "ACTIVE", kind: { in: kinds } },
     select: { id: true },
   });
   if (accounts.length === 0) {

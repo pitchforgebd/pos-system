@@ -2,6 +2,8 @@ import { Prisma } from "@prisma/client";
 import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
+import { GROUP } from "@/core/ledger/groups";
+import type { AccountRole } from "@/core/ledger/roles";
 import { decimalString, moneyText } from "@/core/money";
 import { alertStatus } from "@/modules/inventory/stock";
 
@@ -184,13 +186,15 @@ export async function supplierReport(organizationId: string) {
   };
 }
 
-async function accountMovement(scope: ReportScope, code: string) {
-  const account = await prisma.account.findFirst({
-    where: { organizationId: scope.organizationId, code },
-    select: { id: true, code: true, name: true },
-  });
+async function accountMovement(scope: ReportScope, role: AccountRole) {
+  const account = (
+    await prisma.accountRole.findUnique({
+      where: { organizationId_role: { organizationId: scope.organizationId, role } },
+      select: { account: { select: { id: true, code: true, name: true } } },
+    })
+  )?.account;
   if (!account) {
-    return { code, debit: "0.00", credit: "0.00", count: 0, rows: [] as { id: string; businessDate: string; reference: string; debit: string; credit: string }[] };
+    return { code: "", debit: "0.00", credit: "0.00", count: 0, rows: [] as { id: string; businessDate: string; reference: string; debit: string; credit: string }[] };
   }
   const where = {
     organizationId: scope.organizationId,
@@ -222,11 +226,11 @@ async function accountMovement(scope: ReportScope, code: string) {
 }
 
 export function cashReport(scope: ReportScope) {
-  return accountMovement(scope, "1100");
+  return accountMovement(scope, "CASH");
 }
 
 export function bankReport(scope: ReportScope) {
-  return accountMovement(scope, "1200");
+  return accountMovement(scope, "BANK:DEFAULT");
 }
 
 export async function trialBalance(scope: ReportScope) {
@@ -314,12 +318,12 @@ export async function profitAndLoss(scope: ReportScope) {
   for (const row of sums) {
     const account = byId.get(row.accountId);
     const group = account?.group.code;
-    const amount = group === "4000" ? dec(row._sum.credit).minus(dec(row._sum.debit)) : dec(row._sum.debit).minus(dec(row._sum.credit));
-    if (group === "4000") {
+    const amount = group === GROUP.REVENUE ? dec(row._sum.credit).minus(dec(row._sum.debit)) : dec(row._sum.debit).minus(dec(row._sum.credit));
+    if (group === GROUP.REVENUE) {
       revenue = revenue.plus(amount);
-    } else if (group === "5000") {
+    } else if (group === GROUP.COST_OF_SALES) {
       cost = cost.plus(amount);
-    } else if (group === "6000") {
+    } else if (group === GROUP.EXPENSE) {
       expenses = expenses.plus(amount);
     } else {
       continue;

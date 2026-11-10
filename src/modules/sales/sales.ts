@@ -4,7 +4,8 @@ import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
-import { postBalancedJournal } from "@/modules/accounting/post";
+import { moneyAccountFor } from "@/core/ledger/accounts";
+import { postBalancedJournal, type JournalLineInput } from "@/modules/accounting/post";
 import { outstandingReceivable } from "@/modules/customers/customers";
 import { allocateNumber } from "@/modules/documents/numbers";
 import { documentSorts, listQuery, pageInfo, type ListQuery, type Paged } from "@/core/list";
@@ -108,7 +109,7 @@ export async function postSale(
       if (payment.gt(0) && method !== "CASH" && method !== "BANK" && method !== "CARD" && method !== "WALLET") {
         throw new StockRuleError("Use cash, bank, card, or wallet.");
       }
-      const tenderAccount = method === "CASH" ? "1100" : "1200";
+      const tenderAccount = await moneyAccountFor(tx, input.organizationId, { method });
       const priced = [];
       for (const line of input.lines) {
         const quantity = parseQuantity(line.quantity);
@@ -264,18 +265,18 @@ export async function postSale(
           businessDate: occurredDate(input.businessDate),
         });
       }
-      const journalLines = [
-        ...(payment.gt(0) && method !== "WALLET" ? [{ accountCode: tenderAccount, debit: payment, credit: zero() }] : []),
+      const journalLines: JournalLineInput[] = [
+        ...(payment.gt(0) && method !== "WALLET" ? [{ accountId: tenderAccount, debit: payment, credit: zero() }] : []),
         ...(due.gt(0) || (method === "WALLET" && payment.gt(0))
-          ? [{ accountCode: "1300", debit: method === "WALLET" ? money(due.plus(payment)) : due, credit: zero() }]
+          ? [{ role: "AR" as const, debit: method === "WALLET" ? money(due.plus(payment)) : due, credit: zero() }]
           : []),
-        ...(salesCredit.gt(0) ? [{ accountCode: "4100", debit: zero(), credit: salesCredit }] : []),
-        ...(vatTotal.gt(0) ? [{ accountCode: "2300", debit: zero(), credit: vatTotal }] : []),
-        ...(charges.gt(0) ? [{ accountCode: "4200", debit: zero(), credit: charges }] : []),
+        ...(salesCredit.gt(0) ? [{ role: "SALES" as const, debit: zero(), credit: salesCredit }] : []),
+        ...(vatTotal.gt(0) ? [{ role: "OUTPUT_VAT" as const, debit: zero(), credit: vatTotal }] : []),
+        ...(charges.gt(0) ? [{ role: "CHARGE_INCOME" as const, debit: zero(), credit: charges }] : []),
         ...(cogs.gt(0)
           ? [
-              { accountCode: "5100", debit: cogs, credit: zero() },
-              { accountCode: "1400", debit: zero(), credit: cogs },
+              { role: "COGS" as const, debit: cogs, credit: zero() },
+              { role: "INVENTORY" as const, debit: zero(), credit: cogs },
             ]
           : []),
       ];

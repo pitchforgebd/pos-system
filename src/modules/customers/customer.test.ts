@@ -32,16 +32,8 @@ test("phase 10 posts customer due and advance without inventing points", async (
       passwordHash: await hashPassword("correct-password"),
     },
   });
-  const asset = await prisma.accountGroup.create({ data: { organizationId: org.id, code: "1000", name: "Assets" } });
-  const equity = await prisma.accountGroup.create({ data: { organizationId: org.id, code: "3000", name: "Equity" } });
-  await prisma.account.createMany({
-    data: [
-      { organizationId: org.id, groupId: asset.id, code: "1100", name: "Cash" },
-      { organizationId: org.id, groupId: asset.id, code: "1200", name: "Bank" },
-      { organizationId: org.id, groupId: asset.id, code: "1300", name: "Accounts Receivable" },
-      { organizationId: org.id, groupId: equity.id, code: "3100", name: "Owner Capital" },
-    ],
-  });
+  const { ensureChart } = await import("../../core/ledger/chart.ts");
+  await ensureChart(prisma, org.id);
   const actor = {
     organizationId: org.id,
     branchId: branch.id,

@@ -5,6 +5,7 @@ import { CashVoucherForm, ContraForm } from "@/components/accounting/forms";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
+import { GROUP } from "@/core/ledger/groups";
 import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
 import { listAccounts, listVouchers } from "@/modules/accounting/books";
@@ -26,10 +27,10 @@ export default async function VouchersPage({ searchParams }: { searchParams: Pro
     listVouchers(session.organizationId, session.branchId),
   ]);
   const moneyAccounts = accounts
-    .filter((account) => account.status === "ACTIVE" && (account.code === "1100" || account.code.startsWith("12")))
-    .map((account) => ({ code: account.code, label: `${account.code} · ${account.name}` }));
+    .filter((account) => account.status === "ACTIVE" && ["CASH", "BANK", "MOBILE"].includes(account.kind))
+    .map((account) => ({ code: account.code, kind: account.kind, label: `${account.code} · ${account.name}` }));
   const voucherAccounts = accounts
-    .filter((account) => account.status === "ACTIVE" && ["2000", "3000", "4000", "6000"].includes(account.groupCode) && !["1300", "1400", "2100", "4100", "5100"].includes(account.code) && !account.code.startsWith("12") && account.code !== "1100")
+    .filter((account) => account.status === "ACTIVE" && account.kind === "OTHER" && [GROUP.LIABILITY, GROUP.EQUITY, GROUP.REVENUE, GROUP.EXPENSE].some((code) => code === account.groupCode) && !account.roles.some((role) => ["CASH", "AR", "INVENTORY", "AP", "SALES", "COGS"].includes(role)))
     .map((account) => ({ code: account.code, label: `${account.code} · ${account.name}` }));
   const vouchers = voucherRows.filter((row) => {
     if (type && row.voucherType !== type) {

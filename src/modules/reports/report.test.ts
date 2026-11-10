@@ -28,20 +28,9 @@ test("phase 14 reports sum posted rows and keep the trial balance equal", async 
   const branch = await prisma.branch.create({ data: { organizationId: org.id, name: "Main" } });
   const other = await prisma.branch.create({ data: { organizationId: org.id, name: "Other" } });
   const warehouse = await prisma.warehouse.create({ data: { organizationId: org.id, branchId: branch.id, name: "Main" } });
-  const revenue = await prisma.accountGroup.create({ data: { organizationId: org.id, code: "4000", name: "Revenue" } });
-  const cost = await prisma.accountGroup.create({ data: { organizationId: org.id, code: "5000", name: "Cost of Sales" } });
-  const expense = await prisma.accountGroup.create({ data: { organizationId: org.id, code: "6000", name: "Expenses" } });
-  const asset = await prisma.accountGroup.create({ data: { organizationId: org.id, code: "1000", name: "Assets" } });
-  const accounts = await Promise.all(
-    [
-      ["4100", "Sales", revenue.id],
-      ["5100", "COGS", cost.id],
-      ["6100", "Rent", expense.id],
-      ["1100", "Cash", asset.id],
-    ].map(([code, name, groupId]) =>
-      prisma.account.create({ data: { organizationId: org.id, code, name, groupId } }),
-    ),
-  );
+  const { ensureChart } = await import("../../core/ledger/chart.ts");
+  await ensureChart(prisma, org.id);
+  const accounts = await prisma.account.findMany({ where: { organizationId: org.id } });
   const byCode = new Map(accounts.map((account) => [account.code, account.id]));
   const customer = await prisma.customer.create({ data: { organizationId: org.id, name: "Pantry", openingBalance: "100.00" } });
   const supplier = await prisma.supplier.create({ data: { organizationId: org.id, name: "Mill", openingPayable: "100.00" } });

@@ -4,7 +4,8 @@ import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
-import { postBalancedJournal } from "@/modules/accounting/post";
+import { moneyAccountFor } from "@/core/ledger/accounts";
+import { postBalancedJournal, type JournalLineInput } from "@/modules/accounting/post";
 import { allocateNumber } from "@/modules/documents/numbers";
 import { hashPayload, idempotentTransaction, isKeyRace, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { decimalString, money, parseQuantity, zero } from "@/core/money";
@@ -149,11 +150,11 @@ export async function postPurchaseReturn(
           unitCost: line.unitCost,
         });
       }
-      const cashCode = input.refundMethod === "BANK" ? "1200" : "1100";
-      const journalLines = [
-        ...(applied.gt(0) ? [{ accountCode: "2100", debit: applied, credit: zero() }] : []),
-        ...(refund.gt(0) ? [{ accountCode: cashCode, debit: refund, credit: zero() }] : []),
-        ...(total.gt(0) ? [{ accountCode: "1400", debit: zero(), credit: total }] : []),
+      const refundAccount = await moneyAccountFor(tx, input.organizationId, { method: input.refundMethod ?? "CASH" });
+      const journalLines: JournalLineInput[] = [
+        ...(applied.gt(0) ? [{ role: "AP" as const, debit: applied, credit: zero() }] : []),
+        ...(refund.gt(0) ? [{ accountId: refundAccount, debit: refund, credit: zero() }] : []),
+        ...(total.gt(0) ? [{ role: "INVENTORY" as const, debit: zero(), credit: total }] : []),
       ];
       if (journalLines.length > 0) {
         const journalId = await postBalancedJournal(tx, {

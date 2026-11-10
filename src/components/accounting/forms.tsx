@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSubmit } from "@/lib/client/use-submit";
 
-type AccountOption = { code: string; label: string };
+/** `kind` is CASH, BANK, MOBILE or OTHER, sent for the cash and bank pickers so the form never looks at an account number. */
+type AccountOption = { code: string; label: string; kind?: string };
 type GroupOption = { code: string; name: string };
 
 export function JournalForm({ accounts }: { accounts: AccountOption[] }) {
@@ -204,7 +205,7 @@ function AccountSelect({ name, label, accounts }: { name: string; label: string;
 }
 
 function MethodSelect({ moneyAccounts }: { moneyAccounts: AccountOption[] }) {
-  const banks = moneyAccounts.filter((account) => account.code.startsWith("12"));
+  const banks = moneyAccounts.filter((account) => account.kind === "BANK" || account.kind === "MOBILE");
   return (
     <>
       <label className="grid gap-1 text-sm">

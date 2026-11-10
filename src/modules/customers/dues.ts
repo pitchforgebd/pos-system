@@ -4,6 +4,7 @@ import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
+import { moneyAccountFor } from "@/core/ledger/accounts";
 import { postBalancedJournal } from "@/modules/accounting/post";
 import { outstandingReceivable } from "@/modules/customers/customers";
 import { allocateNumber } from "@/modules/documents/numbers";
@@ -101,8 +102,8 @@ export async function postCustomerPayment(
         description: `Customer payment ${number}`,
         createdById: input.userId,
         lines: [
-          { accountCode: input.method === "CASH" ? "1100" : "1200", debit: amount, credit: new Prisma.Decimal(0) },
-          { accountCode: "1300", debit: new Prisma.Decimal(0), credit: amount },
+          { accountId: await moneyAccountFor(tx, input.organizationId, { method: input.method }), debit: amount, credit: new Prisma.Decimal(0) },
+          { role: "AR", debit: new Prisma.Decimal(0), credit: amount },
         ],
       });
       const payment = await tx.customerPayment.create({

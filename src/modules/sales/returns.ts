@@ -4,7 +4,7 @@ import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
-import { postBalancedJournal } from "@/modules/accounting/post";
+import { postBalancedJournal, type JournalLineInput } from "@/modules/accounting/post";
 import { outstandingReceivable } from "@/modules/customers/customers";
 import { allocateNumber } from "@/modules/documents/numbers";
 import { hashPayload, idempotentTransaction, isKeyRace, readIdempotency, saveIdempotency } from "@/core/idempotency";
@@ -153,15 +153,15 @@ export async function postSaleReturn(
           unitCost: line.unitCost,
         });
       }
-      const journalLines = [
-        ...(salesTotal.gt(0) ? [{ accountCode: "4100", debit: salesTotal, credit: zero() }] : []),
-        ...(vatTotal.gt(0) ? [{ accountCode: "2300", debit: vatTotal, credit: zero() }] : []),
-        ...(split.applied.gt(0) ? [{ accountCode: "1300", debit: zero(), credit: split.applied }] : []),
-        ...(split.refund.gt(0) ? [{ accountCode: "1100", debit: zero(), credit: split.refund }] : []),
+      const journalLines: JournalLineInput[] = [
+        ...(salesTotal.gt(0) ? [{ role: "SALES" as const, debit: salesTotal, credit: zero() }] : []),
+        ...(vatTotal.gt(0) ? [{ role: "OUTPUT_VAT" as const, debit: vatTotal, credit: zero() }] : []),
+        ...(split.applied.gt(0) ? [{ role: "AR" as const, debit: zero(), credit: split.applied }] : []),
+        ...(split.refund.gt(0) ? [{ role: "CASH" as const, debit: zero(), credit: split.refund }] : []),
         ...(cost.gt(0)
           ? [
-              { accountCode: "1400", debit: cost, credit: zero() },
-              { accountCode: "5100", debit: zero(), credit: cost },
+              { role: "INVENTORY" as const, debit: cost, credit: zero() },
+              { role: "COGS" as const, debit: zero(), credit: cost },
             ]
           : []),
       ];

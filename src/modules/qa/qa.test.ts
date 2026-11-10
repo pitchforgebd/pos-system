@@ -50,18 +50,8 @@ test("phase 18 checks money, numbers, permissions, and the sale path", async () 
     },
   });
   await prisma.userBranchAccess.create({ data: { organizationId: org.id, userId: user.id, branchId: branch.id } });
-  const asset = await prisma.accountGroup.create({ data: { organizationId: org.id, code: "1000", name: "Assets" } });
-  const revenue = await prisma.accountGroup.create({ data: { organizationId: org.id, code: "4000", name: "Revenue" } });
-  const cost = await prisma.accountGroup.create({ data: { organizationId: org.id, code: "5000", name: "Cost of Sales" } });
-  await prisma.account.createMany({
-    data: [
-      { organizationId: org.id, groupId: asset.id, code: "1100", name: "Cash" },
-      { organizationId: org.id, groupId: asset.id, code: "1300", name: "Accounts Receivable" },
-      { organizationId: org.id, groupId: asset.id, code: "1400", name: "Inventory" },
-      { organizationId: org.id, groupId: revenue.id, code: "4100", name: "Sales" },
-      { organizationId: org.id, groupId: cost.id, code: "5100", name: "COGS" },
-    ],
-  });
+  const { ensureChart } = await import("../../core/ledger/chart.ts");
+  await ensureChart(prisma, org.id);
   const actor = {
     organizationId: org.id,
     branchId: branch.id,
