@@ -7,6 +7,7 @@ import { writeAudit } from "@/modules/auth/audit";
 import { randomUUID } from "node:crypto";
 
 import { moneyAccountFor } from "@/core/ledger/accounts";
+import { allocatePayment } from "@/core/payments";
 import { postBalancedJournal } from "@/modules/accounting/post";
 import { outstandingReceivable } from "@/modules/customers/customers";
 import { allocateNumber } from "@/modules/documents/numbers";
@@ -58,13 +59,21 @@ async function lockCustomer(tx: Prisma.TransactionClient, organizationId: string
 }
 
 export async function postCustomerPayment(
-  input: Actor & { customerId: string; businessDate: string; amount: string; method: "CASH" | "BANK" },
+  input: Actor & {
+    customerId: string;
+    businessDate: string;
+    amount: string;
+    method: "CASH" | "BANK";
+    /** The invoices this receipt is for; what they do not cover settles the oldest debt first. */
+    allocations?: Array<{ invoiceId: string; amount: string }>;
+  },
 ) {
   const requestHash = hashPayload({
     customerId: input.customerId,
     businessDate: input.businessDate,
     amount: input.amount,
     method: input.method,
+    allocations: input.allocations ?? null,
   });
   try {
     const data = await idempotentTransaction(async (tx) => {
@@ -123,6 +132,14 @@ export async function postCustomerPayment(
           journalId,
         },
         select: { id: true, number: true },
+      });
+      await allocatePayment(tx, {
+        organizationId: input.organizationId,
+        kind: "CUSTOMER",
+        partyId: input.customerId,
+        journalId,
+        amount,
+        named: input.allocations?.map((row) => ({ documentId: row.invoiceId, amount: row.amount })),
       });
       await saveIdempotency(tx, {
         organizationId: input.organizationId,

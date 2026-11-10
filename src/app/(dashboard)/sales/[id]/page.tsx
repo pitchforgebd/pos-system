@@ -70,6 +70,9 @@ export default async function SaleDetailPage({ params, searchParams }: { params:
         Discount {sale.discountTotal}, VAT {sale.vatTotal}, charges {sale.chargesTotal}. Cash paid{" "}
         {sale.payments.map((payment) => payment.amount).join(", ") || "0.00"}. Journal {sale.journalBalanced ? "is balanced" : "is not balanced"}.
       </p>
+      <p className="text-sm text-muted">
+        Payment status {sale.paymentStatus}. Owed {sale.owed}, received since the sale {sale.received}.
+      </p>
     </div>
   );
 }

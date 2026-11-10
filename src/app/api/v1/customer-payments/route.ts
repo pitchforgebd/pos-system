@@ -11,6 +11,8 @@ const bodySchema = z.object({
   businessDate: isoDate,
   amount: z.string(),
   method: z.enum(["CASH", "BANK"]),
+  /** The invoices this receipt is for; the rest settles the oldest debt. */
+  allocations: z.array(z.object({ invoiceId: z.string().uuid(), amount: z.string() })).max(100).optional(),
 });
 
 export const GET = defineRoute({

@@ -7,6 +7,7 @@ import { writeAudit } from "@/modules/auth/audit";
 import { randomUUID } from "node:crypto";
 
 import { moneyAccountFor } from "@/core/ledger/accounts";
+import { allocatePayment, billPayment } from "@/core/payments";
 import { postBalancedJournal } from "@/modules/accounting/post";
 import { allocateNumber } from "@/modules/documents/numbers";
 import { documentSorts, listQuery, pageInfo, type ListQuery, type Paged } from "@/core/list";
@@ -310,17 +311,25 @@ async function settleSupplier(
       },
     });
   }
-  return payment;
+  return { ...payment, journalId };
 }
 
 export async function postSupplierPayment(
-  input: Actor & { supplierId: string; businessDate: string; amount: string; method: "CASH" | "BANK" },
+  input: Actor & {
+    supplierId: string;
+    businessDate: string;
+    amount: string;
+    method: "CASH" | "BANK";
+    /** The bills this payment is for; what they do not cover settles the oldest debt first. */
+    allocations?: Array<{ billId: string; amount: string }>;
+  },
 ) {
   const requestHash = hashPayload({
     supplierId: input.supplierId,
     businessDate: input.businessDate,
     amount: input.amount,
     method: input.method,
+    allocations: input.allocations ?? null,
   });
   try {
     const data = await idempotentTransaction(async (tx) => {
@@ -335,10 +344,11 @@ export async function postSupplierPayment(
       if (existing) {
         return { id: existing.entityId, replayed: true };
       }
-      const supplier = await tx.supplier.findFirst({
-        where: { id: input.supplierId, organizationId: input.organizationId, status: "ACTIVE" },
-        select: { id: true },
-      });
+      // One payment to a vendor at a time, so two of them cannot settle the same bill twice.
+      const locked = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM suppliers WHERE id = ${input.supplierId} AND organizationId = ${input.organizationId} AND status = 'ACTIVE' FOR UPDATE
+      `;
+      const supplier = locked[0];
       if (!supplier) {
         throw new StockRuleError("That record was not found.", 404);
       }
@@ -351,6 +361,14 @@ export async function postSupplierPayment(
         throw new StockRuleError("The payment is greater than the outstanding payable.");
       }
       const payment = await settleSupplier(tx, { ...input, supplierId: supplier.id, amount });
+      await allocatePayment(tx, {
+        organizationId: input.organizationId,
+        kind: "VENDOR",
+        partyId: supplier.id,
+        journalId: payment.journalId,
+        amount,
+        named: input.allocations?.map((row) => ({ documentId: row.billId, amount: row.amount })),
+      });
       await saveIdempotency(tx, {
         organizationId: input.organizationId,
         userId: input.userId,
@@ -444,9 +462,14 @@ export async function getPurchase(organizationId: string, branchId: string, id: 
   }
   const debit = row.journal?.lines.reduce((sum, line) => sum.plus(line.debit), new Prisma.Decimal(0)) ?? new Prisma.Decimal(0);
   const credit = row.journal?.lines.reduce((sum, line) => sum.plus(line.credit), new Prisma.Decimal(0)) ?? new Prisma.Decimal(0);
+  const payment = await billPayment(prisma, organizationId, row.id);
   return {
     id: row.id,
     number: row.number,
+    /** PAID, PARTIAL or UNPAID; what is still owed on the bill, and what payments have settled since. */
+    paymentStatus: payment.status,
+    owed: decimalString(payment.owed, 2),
+    paidLater: decimalString(payment.allocated, 2),
     status: row.status,
     businessDate: dateOnly(row.businessDate),
     supplier: row.supplier,

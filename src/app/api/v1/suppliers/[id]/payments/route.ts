@@ -10,6 +10,8 @@ const bodySchema = z.object({
   businessDate: isoDate,
   amount: z.string(),
   method: z.enum(["CASH", "BANK"]),
+  /** The bills this payment is for; the rest settles the oldest debt. */
+  allocations: z.array(z.object({ billId: z.string().uuid(), amount: z.string() })).max(100).optional(),
 });
 
 export const POST = defineRoute<undefined, { id: string }>({

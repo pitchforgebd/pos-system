@@ -5,6 +5,7 @@ import { dateOnly } from "@/core/time/business-date";
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
 import { moneyAccountFor } from "@/core/ledger/accounts";
+import { invoicePayment } from "@/core/payments";
 import { postBalancedJournal, type JournalLineInput } from "@/modules/accounting/post";
 import { customerWallet, outstandingReceivable } from "@/modules/customers/customers";
 import { allocateNumber } from "@/modules/documents/numbers";
@@ -521,9 +522,14 @@ export async function getSale(organizationId: string, branchId: string, id: stri
   }
   const debit = row.journal?.lines.reduce((sum, line) => sum.plus(line.debit), zero()) ?? zero();
   const credit = row.journal?.lines.reduce((sum, line) => sum.plus(line.credit), zero()) ?? zero();
+  const payment = await invoicePayment(prisma, organizationId, row.id);
   return {
     id: row.id,
     number: row.invoice?.number ?? null,
+    /** PAID, PARTIAL or UNPAID; what is still owed on the invoice, and what receipts have settled since. */
+    paymentStatus: payment.status,
+    owed: decimalString(payment.owed, 2),
+    received: decimalString(payment.allocated, 2),
     status: row.status,
     businessDate: dateOnly(row.businessDate),
     customerName: row.customer?.name ?? "Walk-in",

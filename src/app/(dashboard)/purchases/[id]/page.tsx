@@ -41,6 +41,9 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
         Discount {purchase.discountTotal}, VAT {purchase.vatTotal}, charges {purchase.chargesTotal}. Journal{" "}
         {purchase.journalBalanced ? "is balanced" : "is not balanced"}.
       </p>
+      <p className="text-sm text-muted">
+        Payment status {purchase.paymentStatus}. Owed {purchase.owed}, paid since the purchase {purchase.paidLater}.
+      </p>
     </div>
   );
 }
