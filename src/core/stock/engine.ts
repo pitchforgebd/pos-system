@@ -47,6 +47,8 @@ export type MovementInput = {
 };
 
 export type MovementResult = {
+  /** The id of the ledger row the movement wrote (a serial points at the movement that brought it in). */
+  ledgerId: string;
   /** The quantity on hand after the movement. */
   onHand: Prisma.Decimal;
   /** What one unit was valued at, four decimals. */
@@ -258,7 +260,8 @@ export async function applyMovement(tx: Prisma.TransactionClient, input: Movemen
     await consumeExpiryLots(tx, input, next, day);
   }
 
-  await tx.stockLedger.create({
+  const ledger = await tx.stockLedger.create({
+    select: { id: true },
     data: {
       organizationId: input.organizationId,
       productId: input.productId,
@@ -276,5 +279,5 @@ export async function applyMovement(tx: Prisma.TransactionClient, input: Movemen
       userId: input.userId,
     },
   });
-  return { onHand: next, unitCost, totalCost };
+  return { ledgerId: ledger.id, onHand: next, unitCost, totalCost };
 }

@@ -49,7 +49,7 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
           { key: "name", header: "Product", cell: (row) => row.name },
           { key: "warehouse", header: "Place", cell: (row) => row.warehouseName },
           { key: "quantity", header: "Current stock", cell: (row) => row.quantity },
-          { key: "purchase", header: "P. value", cell: (row) => row.purchaseValue },
+          { key: "value", header: "Stock value", cell: (row) => row.stockValue },
           { key: "sale", header: "S. value", cell: (row) => row.saleValue },
           { key: "alert", header: "Alert", cell: (row) => row.alert },
         ]}

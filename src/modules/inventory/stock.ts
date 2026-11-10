@@ -41,6 +41,7 @@ const balanceSelect = {
   productId: true,
   variantId: true,
   quantity: true,
+  averageCost: true,
   product: { select: { sku: true, name: true, reorderLevel: true, purchasePrice: true, sellingPrice: true, brandId: true, categoryId: true } },
   variant: { select: { sku: true } },
   warehouse: { select: { id: true, name: true } },
@@ -51,6 +52,7 @@ function presentBalance(row: {
   productId: string;
   variantId: string | null;
   quantity: Prisma.Decimal;
+  averageCost: Prisma.Decimal | null;
   product: {
     sku: string;
     name: string;
@@ -77,7 +79,9 @@ function presentBalance(row: {
     alert: alertStatus(quantity, new Prisma.Decimal(row.product.reorderLevel)),
     brandId: row.product.brandId,
     categoryId: row.product.categoryId,
-    purchaseValue: decimalString(quantity.mul(row.product.purchasePrice), 2),
+    // What the stock is worth in the books: the quantity at the moving-average cost (not the product's list purchase price).
+    averageCost: row.averageCost === null ? null : decimalString(row.averageCost, 4),
+    stockValue: decimalString(quantity.mul(row.averageCost ?? 0), 2),
     saleValue: decimalString(quantity.mul(row.product.sellingPrice), 2),
   };
 }
@@ -151,11 +155,11 @@ export async function listLedger(organizationId: string, branchId: string, searc
 
 export async function stockSummary(organizationId: string, branchId: string) {
   const [row] = await prisma.$queryRaw<
-    { quantity: Prisma.Decimal; purchaseValue: Prisma.Decimal; saleValue: Prisma.Decimal; rowCount: bigint }[]
+    { quantity: Prisma.Decimal; stockValue: Prisma.Decimal; saleValue: Prisma.Decimal; rowCount: bigint }[]
   >(Prisma.sql`
     SELECT
       COALESCE(SUM(sb.quantity), 0) AS quantity,
-      COALESCE(SUM(ROUND(sb.quantity * p.purchasePrice, 2)), 0) AS purchaseValue,
+      COALESCE(SUM(ROUND(sb.quantity * COALESCE(sb.averageCost, 0), 2)), 0) AS stockValue,
       COALESCE(SUM(ROUND(sb.quantity * p.sellingPrice, 2)), 0) AS saleValue,
       COUNT(sb.id) AS rowCount
     FROM stock_balances sb
@@ -166,7 +170,7 @@ export async function stockSummary(organizationId: string, branchId: string) {
   `);
   return {
     quantity: decimalString(new Prisma.Decimal(row?.quantity ?? 0), 4),
-    purchaseValue: decimalString(new Prisma.Decimal(row?.purchaseValue ?? 0), 2),
+    stockValue: decimalString(new Prisma.Decimal(row?.stockValue ?? 0), 2),
     saleValue: decimalString(new Prisma.Decimal(row?.saleValue ?? 0), 2),
     rows: Number(row?.rowCount ?? 0),
   };

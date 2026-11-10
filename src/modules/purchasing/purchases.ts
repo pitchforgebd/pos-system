@@ -13,6 +13,7 @@ import { allocateNumber } from "@/modules/documents/numbers";
 import { documentSorts, listQuery, pageInfo, type ListQuery, type Paged } from "@/core/list";
 import { hashPayload, idempotentTransaction, isKeyRace, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { decimalString, money, parseMoney, parseQuantity } from "@/core/money";
+import { addSerials, cleanSerials, requireSerialPerUnit } from "@/core/stock";
 import { addExpiryLots, applyMovement, resolveWarehouse, StockRuleError } from "@/modules/inventory/stock";
 import { outstandingPayable } from "@/modules/purchasing/suppliers";
 import { isIsoDate, occurredDate } from "@/lib/format/date";
@@ -28,6 +29,8 @@ export type PurchaseLine = {
   lot?: string;
   manufacturedOn?: string;
   expiresOn?: string;
+  /** For a serial-tracked product: one IMEI or serial for each unit. */
+  serials?: string[];
 };
 
 type Actor = {
@@ -158,10 +161,16 @@ export async function postPurchase(
       for (const line of priced) {
         const product = await tx.product.findFirst({
           where: { id: line.productId, organizationId: input.organizationId, deletedAt: null },
-          select: { trackExpiry: true },
+          select: { trackExpiry: true, trackSerial: true },
         });
         if (!product) {
           throw new StockRuleError("That record was not found.", 404);
+        }
+        const serials = cleanSerials(line.serials);
+        if (product.trackSerial) {
+          requireSerialPerUnit(line.quantity, serials);
+        } else if (serials.length > 0) {
+          throw new StockRuleError("This product does not track serial numbers.");
         }
         const lotDates = [line.manufacturedOn, line.expiresOn].filter((value): value is string => Boolean(value));
         if (lotDates.some((value) => !isIsoDate(value))) {
@@ -170,7 +179,7 @@ export async function postPurchase(
         if (product.trackExpiry && (!line.lot || !line.expiresOn)) {
           throw new StockRuleError("Expiry-tracked products need a lot and an expiry date.");
         }
-        await applyMovement(tx, {
+        const stocked = await applyMovement(tx, {
           organizationId: input.organizationId,
           productId: line.productId,
           variantId: line.variantId,
@@ -184,6 +193,9 @@ export async function postPurchase(
           userId: input.userId,
           unitCost: line.unitCost,
         });
+        if (serials.length > 0) {
+          await addSerials(tx, { organizationId: input.organizationId, productId: line.productId, variantId: line.variantId, warehouseId: warehouse.id, serials, inMovementId: stocked.ledgerId });
+        }
         // The received quantity becomes a lot, so selling and expiring it later can be tracked.
         if (product.trackExpiry && line.lot && line.expiresOn) {
           await addExpiryLots(tx, {

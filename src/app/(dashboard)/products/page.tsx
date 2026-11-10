@@ -106,7 +106,7 @@ export default async function ProductsPage({
             <table className="w-full min-w-[960px] border-collapse text-sm">
               <thead className="bg-surface-muted text-left text-xs text-muted">
                 <tr>
-                  {["#", "Product info", "Image", "P. Price", "S. Price", "Stock in", "Stock out", "Total return", "Current stock", "Total P. value", "Total S. value", "Action"].map((header) => (
+                  {["#", "Product info", "Image", "P. Price", "S. Price", "Stock in", "Stock out", "Total return", "Current stock", "Stock value (avg cost)", "Total S. value", "Action"].map((header) => (
                     <th key={header} className="px-2 py-2 font-medium">
                       {header}
                     </th>
@@ -146,7 +146,7 @@ export default async function ProductsPage({
                     <td className="px-2 py-2">{row.stockOut}</td>
                     <td className="px-2 py-2">{row.totalReturn}</td>
                     <td className="px-2 py-2">{row.currentStock}</td>
-                    <td className="px-2 py-2">{row.purchaseValue}</td>
+                    <td className="px-2 py-2">{row.stockValue}</td>
                     <td className="px-2 py-2">{row.sellingValue}</td>
                     <td className="px-2 py-2">
                       <Link href="/inventory/ledger" className="text-info">

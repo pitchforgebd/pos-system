@@ -29,7 +29,7 @@ export default async function SummaryPage() {
         {[
           ["Quantity", summary.quantity],
           ["Rows", String(summary.rows)],
-          ["Purchase value", summary.purchaseValue],
+          ["Stock value (avg cost)", summary.stockValue],
           ["Sale value", summary.saleValue],
         ].map(([label, amount]) => (
           <article key={label} className="rounded-xl bg-[#2457c5] p-4 text-white">
@@ -44,7 +44,7 @@ export default async function SummaryPage() {
           { key: "sku", header: "SKU", cell: (row) => row.sku },
           { key: "name", header: "Product", cell: (row) => row.name },
           { key: "quantity", header: "Current stock", cell: (row) => row.quantity },
-          { key: "purchase", header: "Total P. value", cell: (row) => row.purchaseValue },
+          { key: "value", header: "Stock value (avg cost)", cell: (row) => row.stockValue },
           { key: "sale", header: "Total S. value", cell: (row) => row.saleValue },
         ]}
         rows={rows}

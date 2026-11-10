@@ -59,6 +59,18 @@ export async function addSerial(input: Actor & { productId: string; serial: stri
   if (!product) {
     return { ok: false as const, status: 422 as const, code: "BUSINESS_RULE" as const, message: "Choose a product that tracks serial numbers." };
   }
+  // Serials are added when the stock comes in (purchase, opening). This is only for stock that is already on hand and has no serial
+  // recorded yet (older records): there must be more units in stock than serials in stock.
+  const onHand = await prisma.stockBalance.aggregate({ where: { organizationId: input.organizationId, productId: product.id }, _sum: { quantity: true } });
+  const recorded = await prisma.productSerial.count({ where: { organizationId: input.organizationId, productId: product.id, status: { in: ["IN_STOCK", "RESERVED"] } } });
+  if (recorded >= Number(onHand._sum.quantity ?? 0)) {
+    return {
+      ok: false as const,
+      status: 422 as const,
+      code: "BUSINESS_RULE" as const,
+      message: "Every unit in stock already has an IMEI or serial. Add serials when stock comes in (a purchase or an opening stock).",
+    };
+  }
   try {
     const row = await prisma.productSerial.create({
       data: { organizationId: input.organizationId, productId: product.id, serial, status: "IN_STOCK" },

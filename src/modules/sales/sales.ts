@@ -12,6 +12,7 @@ import { allocateNumber } from "@/modules/documents/numbers";
 import { documentSorts, listQuery, pageInfo, type ListQuery, type Paged } from "@/core/list";
 import { hashPayload, idempotentTransaction, isKeyRace, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { decimalString, money, parseMoney, parseQuantity, zero } from "@/core/money";
+import { sellSerial } from "@/core/stock";
 import { applyMovement, currentUnitCost, resolveWarehouse, StockRuleError } from "@/modules/inventory/stock";
 import { occurredDate } from "@/lib/format/date";
 
@@ -306,14 +307,7 @@ export async function postSale(
         if (!line.serial) {
           continue;
         }
-        const serial = await tx.productSerial.findFirst({
-          where: { organizationId: input.organizationId, serial: line.serial, status: "IN_STOCK" },
-          select: { id: true, productId: true },
-        });
-        if (!serial || serial.productId !== line.productId) {
-          throw new StockRuleError("That IMEI is not in stock for this product.");
-        }
-        await tx.productSerial.update({ where: { id: serial.id }, data: { status: "SOLD", saleId: sale.id } });
+        await sellSerial(tx, { organizationId: input.organizationId, productId: line.productId, warehouseId: warehouse.id, serial: line.serial, saleId: sale.id });
       }
       if (customer) {
         const shop = await tx.organization.findUnique({

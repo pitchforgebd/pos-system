@@ -311,6 +311,13 @@ export async function listCatalogTable(
         _sum: { quantity: true },
       })
     : [];
+  // What the stock is worth: each warehouse's quantity at its moving-average cost.
+  const worth = ids.length
+    ? await prisma.$queryRaw<Array<{ productId: string; value: Prisma.Decimal | null }>>`
+        SELECT productId, SUM(ROUND(quantity * COALESCE(averageCost, 0), 2)) AS value
+        FROM stock_balances WHERE organizationId = ${organizationId} AND productId IN (${Prisma.join(ids)}) GROUP BY productId`
+    : [];
+  const stockValue = new Map(worth.map((row) => [row.productId, new Prisma.Decimal(row.value ?? 0)]));
   const movements = ids.length
     ? await prisma.stockLedger.groupBy({
         by: ["productId", "direction", "movementType"],
@@ -351,7 +358,7 @@ export async function listCatalogTable(
         stockOut: decimalString(stockOut.get(row.id) ?? 0, 4),
         totalReturn: decimalString(returned.get(row.id) ?? 0, 4),
         currentStock: decimalString(current, 4),
-        purchaseValue: current.mul(row.purchasePrice).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP).toFixed(2),
+        stockValue: (stockValue.get(row.id) ?? new Prisma.Decimal(0)).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP).toFixed(2),
         sellingValue: current.mul(row.sellingPrice).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP).toFixed(2),
       };
     }),

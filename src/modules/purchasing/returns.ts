@@ -5,11 +5,12 @@ import { dateOnly } from "@/core/time/business-date";
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
 import { moneyAccountFor } from "@/core/ledger/accounts";
-import { postBalancedJournal, type JournalLineInput } from "@/modules/accounting/post";
+import type { JournalLineInput } from "@/modules/accounting/post";
+import { postWithStock } from "@/core/posting/stock";
 import { allocateNumber } from "@/modules/documents/numbers";
 import { hashPayload, idempotentTransaction, isKeyRace, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { decimalString, money, parseQuantity, zero } from "@/core/money";
-import { applyMovement, StockRuleError } from "@/modules/inventory/stock";
+import { StockRuleError } from "@/modules/inventory/stock";
 import { outstandingPayable } from "@/modules/purchasing/suppliers";
 import { returnLineAmount } from "@/modules/returns/amount";
 import { occurredDate } from "@/lib/format/date";
@@ -134,38 +135,40 @@ export async function postPurchaseReturn(
         },
         select: { id: true, number: true },
       });
-      for (const line of priced) {
-        await applyMovement(tx, {
-          organizationId: input.organizationId,
+      const refundAccount = await moneyAccountFor(tx, input.organizationId, { method: input.refundMethod ?? "CASH" });
+      // The goods leave stock at the average cost; the vendor gives back the bill price. What the books carry for the stock (the
+      // average) and what the vendor returns (the bill price) differ by the purchase price variance (N11, #16): Dr AP (bill price)
+      // / Cr Inventory (average), the difference to PPV, so the inventory account still equals the stock x the average cost.
+      const { journalId } = await postWithStock(tx, {
+        organizationId: input.organizationId,
+        branchId: input.branchId,
+        businessDate: occurredDate(input.businessDate),
+        description: `Purchase return ${number}`,
+        createdById: input.userId,
+        doc: { type: "PURCHASE_RETURN", id: purchaseReturn.id },
+        reference: { type: "purchase_return", id: purchaseReturn.id },
+        moves: priced.map((line) => ({
           productId: line.productId,
           variantId: line.variantId,
-          branchId: input.branchId,
-          warehouseId: purchase.warehouseId,
+          warehouseId: purchase.warehouseId as string,
           quantity: line.quantity,
-          direction: "OUT",
-          movementType: "SUPPLIER_RETURN",
-          referenceType: "purchase_return",
-          referenceId: purchaseReturn.id,
-          userId: input.userId,
-          unitCost: line.unitCost,
-        });
-      }
-      const refundAccount = await moneyAccountFor(tx, input.organizationId, { method: input.refundMethod ?? "CASH" });
-      const journalLines: JournalLineInput[] = [
-        ...(applied.gt(0) ? [{ role: "AP" as const, debit: applied, credit: zero(), party: { type: "VENDOR" as const, id: purchase.supplierId } }] : []),
-        ...(refund.gt(0) ? [{ accountId: refundAccount, debit: refund, credit: zero() }] : []),
-        ...(total.gt(0) ? [{ role: "INVENTORY" as const, debit: zero(), credit: total }] : []),
-      ];
-      if (journalLines.length > 0) {
-        const journalId = await postBalancedJournal(tx, {
-          organizationId: input.organizationId,
-          branchId: input.branchId,
-          businessDate: occurredDate(input.businessDate),
-          description: `Purchase return ${number}`,
-          createdById: input.userId,
-          lines: journalLines,
-          doc: { type: "PURCHASE_RETURN", id: purchaseReturn.id },
-        });
+          direction: "OUT" as const,
+          movementType: "SUPPLIER_RETURN" as const,
+        })),
+        lines: (moved) => {
+          const variance = money(total.minus(moved.out));
+          const journalLines: JournalLineInput[] = [
+            ...(applied.gt(0) ? [{ role: "AP" as const, debit: applied, credit: zero(), party: { type: "VENDOR" as const, id: purchase.supplierId } }] : []),
+            ...(refund.gt(0) ? [{ accountId: refundAccount, debit: refund, credit: zero() }] : []),
+            ...(moved.out.gt(0) ? [{ role: "INVENTORY" as const, debit: zero(), credit: moved.out }] : []),
+            // more back from the vendor than the stock carried: a gain; less: a loss
+            ...(variance.gt(0) ? [{ role: "PPV" as const, debit: zero(), credit: variance }] : []),
+            ...(variance.lt(0) ? [{ role: "PPV" as const, debit: variance.neg(), credit: zero() }] : []),
+          ];
+          return journalLines.length >= 2 ? journalLines : [];
+        },
+      });
+      if (journalId) {
         await tx.purchaseReturn.update({ where: { id: purchaseReturn.id }, data: { journalId } });
       }
       await saveIdempotency(tx, {

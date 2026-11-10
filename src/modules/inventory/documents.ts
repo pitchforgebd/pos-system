@@ -10,6 +10,7 @@ import { hashPayload, idempotentTransaction, isKeyRace, readIdempotency, saveIde
 import { decimalString, parseQuantity } from "@/core/money";
 import { postWithStock, type MovedStock, type StockMove } from "@/core/posting/stock";
 import type { DocType, PostLine } from "@/core/posting/journal";
+import { addSerials, cleanSerials, requireSerialPerUnit } from "@/core/stock";
 import { addExpiryLots, resolveWarehouse, StockRuleError, type ConsumedLot } from "@/modules/inventory/stock";
 
 // The stock documents (P03 task 4): opening, own stock, adjustment, damage, expiry write-off, take-off and transfer. Each one is a
@@ -27,6 +28,8 @@ export type StockLine = {
   lot?: string;
   manufacturedOn?: string;
   expiresOn?: string;
+  /** For a serial-tracked product: one IMEI or serial for each unit. */
+  serials?: string[];
 };
 
 type Actor = {
@@ -201,12 +204,13 @@ function inbound(kind: "OPENING" | "OWN", input: Actor & { businessDate: string;
     audit: { lines: input.lines.length },
     build: async (tx, warehouseId) => {
       const moves: StockMove[] = [];
+      const serialLines: Array<{ index: number; productId: string; variantId?: string; serials: string[] }> = [];
       const lots: Array<{ productId: string; variantId?: string; lot: ConsumedLot }> = [];
       for (const line of input.lines) {
         const parsed = lineQuantity(line);
         const product = await tx.product.findFirst({
           where: { id: line.productId, organizationId: input.organizationId, deletedAt: null },
-          select: { trackExpiry: true },
+          select: { trackExpiry: true, trackSerial: true },
         });
         if (!product) {
           throw new StockRuleError("That record was not found.", 404);
@@ -214,6 +218,13 @@ function inbound(kind: "OPENING" | "OWN", input: Actor & { businessDate: string;
         if (product.trackExpiry && (!line.lot || !line.expiresOn)) {
           throw new StockRuleError("Expiry-tracked products need a lot and an expiry date.");
         }
+        const serials = cleanSerials(line.serials);
+        if (product.trackSerial) {
+          requireSerialPerUnit(parsed.quantity, serials);
+        } else if (serials.length > 0) {
+          throw new StockRuleError("This product does not track serial numbers.");
+        }
+        serialLines.push({ index: moves.length, productId: line.productId, variantId: line.variantId, serials });
         moves.push({ productId: line.productId, variantId: line.variantId, warehouseId, quantity: parsed.quantity, direction: "IN", movementType, unitCost: parsed.unitCost });
         if (product.trackExpiry && line.lot && line.expiresOn) {
           lots.push({
@@ -227,7 +238,12 @@ function inbound(kind: "OPENING" | "OWN", input: Actor & { businessDate: string;
       return {
         moves,
         lines: (moved) => (moved.in.gt(0) ? bothSides({ role: "INVENTORY", debit: moved.in, credit: ZERO }, { role: counter, debit: ZERO, credit: moved.in }) : []),
-        after: async (tx) => {
+        after: async (tx, moved) => {
+          for (const entry of serialLines) {
+            if (entry.serials.length > 0) {
+              await addSerials(tx, { organizationId: input.organizationId, productId: entry.productId, variantId: entry.variantId, warehouseId, serials: entry.serials, inMovementId: moved.results[entry.index].ledgerId });
+            }
+          }
           for (const entry of lots) {
             await addExpiryLots(tx, { organizationId: input.organizationId, branchId: input.branchId, warehouseId, productId: entry.productId, variantId: entry.variantId, lots: [entry.lot] });
           }
