@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 
 import { partyBalances } from "@/core/parties";
+import { backfillAllocations } from "@/core/payments/backfill";
 import { post } from "@/core/posting/journal";
 import { businessDate } from "@/core/time/business-date";
 
@@ -9,13 +10,14 @@ type Db = Prisma.TransactionClient;
 // Databases written before P02 kept a customer's or vendor's balance in customer_ledgers / supplier_ledgers and wrote no party
 // on the journal lines. The balance now comes from the journal only (I8), so such a database is brought over once, here. Nothing
 // is edited except the missing party and document labels on lines and journals that were posted without them; where an advance
-// sat on the receivable it is moved to Customer Advance by a new, visible journal. Safe to run again: it finds nothing left to do.
+// sat on the receivable it is moved to Customer Advance by a new, visible journal; receipts and payments that settled invoices get their
+// allocation rows. Safe to run again: it finds nothing left to do.
 
 const ZERO = new Prisma.Decimal(0);
 const dec = (value: unknown) => new Prisma.Decimal(String(value ?? 0));
 const two = (value: Prisma.Decimal) => value.toFixed(2);
 
-export type RepairResult = { linesStamped: number; journalsDocumented: number; advancesMoved: number };
+export type RepairResult = { linesStamped: number; journalsDocumented: number; advancesMoved: number; allocationsReplayed: number };
 
 /** The documents whose journal says who a receivable or payable line is about, as (journal, party) rows. */
 const customerDocs = Prisma.sql`
@@ -136,7 +138,9 @@ export async function repairLegacyParties(db: Db, input: { organizationId: strin
   const linesStamped = await stampLines(db, input.organizationId);
   const journalsDocumented = await documentJournals(db, input.organizationId);
   const advancesMoved = await moveHeldAdvances(db, input);
-  return { linesStamped, journalsDocumented, advancesMoved };
+  // Receipts and payments made before allocations existed get the rows the new code would have written (so old invoices show PAID/PARTIAL).
+  const allocationsReplayed = await backfillAllocations(db, input.organizationId);
+  return { linesStamped, journalsDocumented, advancesMoved, allocationsReplayed };
 }
 
 export type PartyMismatch = {

@@ -44,7 +44,7 @@ for (const org of organizations) {
     }
     await report("before", org.id);
     const done = await runTx((tx) => repairLegacyParties(tx, { organizationId: org.id, userId: user.id, branchId: branch.id }));
-    console.log(`  repaired: ${done.linesStamped} line(s) given their party, ${done.journalsDocumented} journal(s) given their document, ${done.advancesMoved} advance(s) moved to Customer Advance`);
+    console.log(`  repaired: ${done.linesStamped} line(s) given their party, ${done.journalsDocumented} journal(s) given their document, ${done.advancesMoved} advance(s) moved to Customer Advance, ${done.allocationsReplayed} receipt(s)/payment(s) given their invoice allocations`);
     outOfLine += await report("after ", org.id);
   } else {
     outOfLine += await report("check ", org.id);
