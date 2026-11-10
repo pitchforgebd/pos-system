@@ -9,7 +9,8 @@ import { concurrentlySettled, concurrently, withTestOrg } from "../../tests/help
 import { allocateNumber, formatDocumentNumber } from "./numbers.ts";
 
 const allocate = (organizationId: string, documentType: "INV" | "PUR" | "RET" | "VCH" | "PAY", businessDate: string) =>
-  runTx((tx) => allocateNumber(tx, { organizationId, documentType, businessDate }));
+  // 50 transactions start at once, more than the pool holds; the test checks the numbers, not the wait for a connection.
+  runTx((tx) => allocateNumber(tx, { organizationId, documentType, businessDate }), { maxWaitMs: 60_000, timeoutMs: 60_000 });
 
 test("a number is the type, the fiscal-year label and a six-digit counter: INV-2627-000001", async () => {
   await withTestOrg(async (t) => {

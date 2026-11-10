@@ -4,6 +4,10 @@ import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
+import { randomUUID } from "node:crypto";
+
+import { moneyAccountFor } from "@/core/ledger/accounts";
+import { allocatePayment } from "@/core/payments";
 import { postBalancedJournal } from "@/modules/accounting/post";
 import { outstandingReceivable } from "@/modules/customers/customers";
 import { allocateNumber } from "@/modules/documents/numbers";
@@ -55,13 +59,21 @@ async function lockCustomer(tx: Prisma.TransactionClient, organizationId: string
 }
 
 export async function postCustomerPayment(
-  input: Actor & { customerId: string; businessDate: string; amount: string; method: "CASH" | "BANK" },
+  input: Actor & {
+    customerId: string;
+    businessDate: string;
+    amount: string;
+    method: "CASH" | "BANK";
+    /** The invoices this receipt is for; what they do not cover settles the oldest debt first. */
+    allocations?: Array<{ invoiceId: string; amount: string }>;
+  },
 ) {
   const requestHash = hashPayload({
     customerId: input.customerId,
     businessDate: input.businessDate,
     amount: input.amount,
     method: input.method,
+    allocations: input.allocations ?? null,
   });
   try {
     const data = await idempotentTransaction(async (tx) => {
@@ -94,19 +106,22 @@ export async function postCustomerPayment(
         documentType: "PAY",
         businessDate: input.businessDate,
       });
+      const paymentId = randomUUID();
       const journalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
         businessDate: occurredDate(input.businessDate),
         description: `Customer payment ${number}`,
         createdById: input.userId,
+        doc: { type: "CUSTOMER_PAYMENT", id: paymentId },
         lines: [
-          { accountCode: input.method === "CASH" ? "1100" : "1200", debit: amount, credit: new Prisma.Decimal(0) },
-          { accountCode: "1300", debit: new Prisma.Decimal(0), credit: amount },
+          { accountId: await moneyAccountFor(tx, input.organizationId, { method: input.method }), debit: amount, credit: new Prisma.Decimal(0) },
+          { role: "AR", debit: new Prisma.Decimal(0), credit: amount, party: { type: "CUSTOMER" as const, id: input.customerId } },
         ],
       });
       const payment = await tx.customerPayment.create({
         data: {
+          id: paymentId,
           organizationId: input.organizationId,
           branchId: input.branchId,
           customerId: input.customerId,
@@ -118,17 +133,13 @@ export async function postCustomerPayment(
         },
         select: { id: true, number: true },
       });
-      await tx.customerLedger.create({
-        data: {
-          organizationId: input.organizationId,
-          branchId: input.branchId,
-          customerId: input.customerId,
-          businessDate: occurredDate(input.businessDate),
-          entryType: "PAYMENT",
-          credit: amount,
-          referenceType: "customer_payment",
-          referenceId: payment.id,
-        },
+      await allocatePayment(tx, {
+        organizationId: input.organizationId,
+        kind: "CUSTOMER",
+        partyId: input.customerId,
+        journalId,
+        amount,
+        named: input.allocations?.map((row) => ({ documentId: row.invoiceId, amount: row.amount })),
       });
       await saveIdempotency(tx, {
         organizationId: input.organizationId,

@@ -29,21 +29,8 @@ test("phase 08 returns cannot exceed the eligible quantity", async () => {
   const user = await prisma.user.create({
     data: { organizationId: org.id, name: "Cashier", email: `return-${stamp}@example.com`, passwordHash: await hashPassword("correct-password") },
   });
-  const asset = await prisma.accountGroup.create({ data: { organizationId: org.id, code: "1000", name: "Assets" } });
-  const liability = await prisma.accountGroup.create({ data: { organizationId: org.id, code: "2000", name: "Liabilities" } });
-  const revenue = await prisma.accountGroup.create({ data: { organizationId: org.id, code: "4000", name: "Revenue" } });
-  const cost = await prisma.accountGroup.create({ data: { organizationId: org.id, code: "5000", name: "Cost of Sales" } });
-  await prisma.account.createMany({
-    data: [
-      { organizationId: org.id, groupId: asset.id, code: "1100", name: "Cash" },
-      { organizationId: org.id, groupId: asset.id, code: "1200", name: "Bank" },
-      { organizationId: org.id, groupId: asset.id, code: "1300", name: "Accounts Receivable" },
-      { organizationId: org.id, groupId: asset.id, code: "1400", name: "Inventory" },
-      { organizationId: org.id, groupId: liability.id, code: "2100", name: "Accounts Payable" },
-      { organizationId: org.id, groupId: revenue.id, code: "4100", name: "Sales" },
-      { organizationId: org.id, groupId: cost.id, code: "5100", name: "COGS" },
-    ],
-  });
+  const { ensureChart } = await import("../../core/ledger/chart.ts");
+  await ensureChart(prisma, org.id);
   const product = await prisma.product.create({
     data: {
       organizationId: org.id,
@@ -250,6 +237,9 @@ test("phase 08 returns cannot exceed the eligible quantity", async () => {
       const creditAmount = journal.lines.reduce((sum, line) => sum + Number(line.credit), 0);
       assert.equal(debit, creditAmount);
     }
+    // I2: every receivable and payable line these postings wrote names its party.
+    const { assertBooksReconcile } = await import("../../core/reconcile/index.ts");
+    await assertBooksReconcile(org.id);
   } finally {
     const { cleanupOrg } = await import("../../tests/helpers/cleanup.ts");
     await cleanupOrg(org.id);

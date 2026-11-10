@@ -35,6 +35,28 @@ enum JournalStatus {
   POSTED
 }
 
+/// What a ledger account is used for. Money accounts (cash, bank, mobile) are told apart by kind, not by code.
+enum AccountKind {
+  CASH
+  BANK
+  MOBILE
+  OTHER
+}
+
+/// A journal is the posting of a document, or the reversal of that posting (one of each per document).
+enum JournalKind {
+  POSTING
+  REVERSAL
+}
+
+/// Who a party line (receivable, payable, advance) is about.
+enum PartyType {
+  CUSTOMER
+  VENDOR
+  COURIER
+  EMPLOYEE
+}
+
 enum Direction {
   IN
   OUT
@@ -262,6 +284,8 @@ model Organization {
   accounts             Account[]
   journals             Journal[]
   journalLines         JournalLine[]
+  accountRoles         AccountRole[]
+  paymentAllocations   PaymentAllocation[]
   vouchers             Voucher[]
   expenses             Expense[]
   incomes              Income[]
@@ -340,6 +364,7 @@ model Branch {
   supplierLedgers    SupplierLedger[]
   supplierPayments   SupplierPayment[]
   journals           Journal[]
+  journalLines       JournalLine[]
   vouchers           Voucher[]
   expenses           Expense[]
   incomes            Income[]
@@ -1324,6 +1349,7 @@ model Sale {
   returns      SaleReturn[]
   invoice      Invoice?
   quotation    Quotation?
+  allocations  PaymentAllocation[]
   serials      ProductSerial[]
 
   @@index([organizationId, branchId, businessDate])
@@ -1542,6 +1568,7 @@ model Purchase {
   journal      Journal?          @relation("PurchaseJournal", fields: [journalId], references: [id], onDelete: Restrict)
   createdBy    User?             @relation("PurchaseCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   items        PurchaseItem[]
+  allocations  PaymentAllocation[]
   payments     PurchasePayment[]
   returns      PurchaseReturn[]
 
@@ -1646,11 +1673,18 @@ model Account {
   code           String       @db.VarChar(16)
   name           String       @db.VarChar(191)
   status         RecordStatus @default(ACTIVE)
+  /// A system account cannot be deactivated or deleted: the posting rules rely on it (N27).
+  isSystem       Boolean      @default(false)
+  kind           AccountKind  @default(OTHER)
+  accountNumber  String?      @db.VarChar(64)
+  bankName       String?      @db.VarChar(191)
+  bankBranch     String?      @db.VarChar(191)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
   organization     Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   group            AccountGroup         @relation(fields: [groupId], references: [id], onDelete: Restrict)
+  roles            AccountRole[]
   lines            JournalLine[]
   expenses         Expense[]
   incomes          Income[]
@@ -1675,12 +1709,17 @@ model Journal {
   description    String?       @db.VarChar(255)
   postedAt       DateTime?
   reversalOfId   String?       @db.Char(36)
+  /// The document this journal posts ("SALE", "PURCHASE", ...) and its id; empty for a manual journal until P02 task 4.
+  docType        String?       @db.VarChar(32)
+  docId          String?       @db.Char(36)
+  kind           JournalKind   @default(POSTING)
   createdById    String?       @db.Char(36)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
   organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   branch         Branch?            @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  paymentAllocations PaymentAllocation[]
   reversalOf     Journal?           @relation("JournalReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
   reversals      Journal[]          @relation("JournalReversal")
   createdBy      User?              @relation("JournalCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
@@ -1700,6 +1739,7 @@ model Journal {
   directReturn    DirectReturn?
 
   @@unique([organizationId, number])
+  @@unique([docType, docId, kind])
   @@index([organizationId, status, businessDate])
   @@index([organizationId, branchId, status, businessDate])
   @@map("journals")
@@ -1713,14 +1753,28 @@ model JournalLine {
   debit          Decimal  @default(0) @db.Decimal(18, 2)
   credit         Decimal  @default(0) @db.Decimal(18, 2)
   memo           String?  @db.VarChar(255)
+  /// Who the line is about. Receivable, payable, advance and courier lines carry a party; no other line does (I2).
+  partyType      PartyType?
+  partyId        String?  @db.Char(36)
+  shiftId        String?  @db.Char(36)
+  branchId       String?  @db.Char(36)
+  /// Copied from the journal so reports can filter and group lines without a join.
+  businessDate   DateTime @db.Date
+  /// Set by the fixed-assets phase (P09); no foreign key until that table exists.
+  assetId        String?  @db.Char(36)
   createdAt      DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   journal      Journal      @relation(fields: [journalId], references: [id], onDelete: Cascade)
   account      Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  shift        Shift?       @relation(fields: [shiftId], references: [id], onDelete: Restrict)
+  branch       Branch?      @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@index([journalId])
   @@index([accountId, createdAt])
+  @@index([organizationId, accountId, businessDate])
+  @@index([organizationId, partyType, partyId, businessDate])
+  @@index([shiftId])
   @@map("journal_lines")
 }
 
@@ -1956,6 +2010,7 @@ model Shift {
   user         User           @relation(fields: [userId], references: [id], onDelete: Restrict)
   movements    CashMovement[]
   handovers    CashHandover[]
+  journalLines JournalLine[]
 
   @@index([organizationId, branchId, status])
   @@map("shifts")
@@ -2260,6 +2315,47 @@ model DocumentSequence {
 
   @@unique([organizationId, documentType, fiscalYear])
   @@map("document_sequences")
+}
+
+/// Which ledger account plays which part ("CASH", "AR", "SALES" ...). Code never names an account by its number:
+/// it asks for the role (accountFor). Cash, bank and mobile accounts are chosen by the user, so they have no role of
+/// their own except the default ones ("BANK:DEFAULT", "MOBILE:DEFAULT").
+model AccountRole {
+  id             String   @id @default(uuid()) @db.Char(36)
+  organizationId String   @db.Char(36)
+  role           String   @db.VarChar(48)
+  accountId      String   @db.Char(36)
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  account      Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, role])
+  @@index([accountId])
+  @@map("account_roles")
+}
+
+/// Which part of a receipt or payment settles which invoice (customer receipts) or bill (vendor payments).
+/// The journal is the receipt/payment; exactly one of invoiceId and billId is set.
+model PaymentAllocation {
+  id             String   @id @default(uuid()) @db.Char(36)
+  organizationId String   @db.Char(36)
+  journalId      String   @db.Char(36)
+  invoiceId      String?  @db.Char(36)
+  billId         String?  @db.Char(36)
+  amount         Decimal  @db.Decimal(18, 2)
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  journal      Journal      @relation(fields: [journalId], references: [id], onDelete: Restrict)
+  // onUpdate Restrict: MySQL does not allow a column with ON UPDATE CASCADE in a CHECK, and ids never change.
+  invoice      Sale?        @relation(fields: [invoiceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  bill         Purchase?    @relation(fields: [billId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([organizationId, invoiceId])
+  @@index([organizationId, billId])
+  @@index([journalId])
+  @@map("payment_allocations")
 }
 
 model IdempotencyKey {

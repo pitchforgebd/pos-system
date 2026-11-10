@@ -5,6 +5,7 @@ import { ExpenseForm } from "@/components/accounting/forms";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
+import { GROUP } from "@/core/ledger/groups";
 import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
 import { listAccounts, listExpenses } from "@/modules/accounting/books";
@@ -32,7 +33,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Accounting", href: "/accounting" }, { label: "Expenses" }]}
       />
       {session.permissions.has("accounting.post") ? (
-        <ExpenseForm accounts={accounts.filter((account) => account.status === "ACTIVE" && account.groupCode === "6000").map((account) => ({ code: account.code, label: `${account.code} · ${account.name}` }))} />
+        <ExpenseForm accounts={accounts.filter((account) => account.status === "ACTIVE" && account.groupCode === GROUP.EXPENSE).map((account) => ({ code: account.code, label: `${account.code} · ${account.name}` }))} />
       ) : null}
       <form className="flex flex-wrap items-end gap-2" action="/accounting/expenses">
         <label className="grid min-w-56 flex-1 gap-1 text-sm">

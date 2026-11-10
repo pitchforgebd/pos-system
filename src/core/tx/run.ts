@@ -72,7 +72,11 @@ export async function runTx<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>,
       return await basePrisma.$transaction((tx) => runInAmbient(tx, () => fn(tx)), {
         timeout: options.timeoutMs ?? TX_DEFAULTS.timeoutMs,
         maxWait: options.maxWaitMs ?? TX_DEFAULTS.maxWaitMs,
-        ...(options.isolationLevel ? { isolationLevel: options.isolationLevel } : {}),
+        // READ COMMITTED unless the caller asks for another level. Two reasons, both about money: a plain read after a row lock
+        // must see what the transaction that held the lock committed (at REPEATABLE READ it sees the snapshot from before the
+        // wait, and two requests spend the same wallet), and a scan of a small table takes no gap locks that block another
+        // request's insert. defineRoute runs at this level too, so a service called directly behaves as it does behind a route.
+        isolationLevel: options.isolationLevel ?? Prisma.TransactionIsolationLevel.ReadCommitted,
       });
     } catch (error) {
       const retryable = isDeadlock(error) || (options.retryIf?.(error) ?? false);

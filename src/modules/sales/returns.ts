@@ -4,7 +4,7 @@ import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
-import { postBalancedJournal } from "@/modules/accounting/post";
+import { postBalancedJournal, type JournalLineInput } from "@/modules/accounting/post";
 import { outstandingReceivable } from "@/modules/customers/customers";
 import { allocateNumber } from "@/modules/documents/numbers";
 import { hashPayload, idempotentTransaction, isKeyRace, readIdempotency, saveIdempotency } from "@/core/idempotency";
@@ -153,15 +153,15 @@ export async function postSaleReturn(
           unitCost: line.unitCost,
         });
       }
-      const journalLines = [
-        ...(salesTotal.gt(0) ? [{ accountCode: "4100", debit: salesTotal, credit: zero() }] : []),
-        ...(vatTotal.gt(0) ? [{ accountCode: "2300", debit: vatTotal, credit: zero() }] : []),
-        ...(split.applied.gt(0) ? [{ accountCode: "1300", debit: zero(), credit: split.applied }] : []),
-        ...(split.refund.gt(0) ? [{ accountCode: "1100", debit: zero(), credit: split.refund }] : []),
+      const journalLines: JournalLineInput[] = [
+        ...(salesTotal.gt(0) ? [{ role: "SALES" as const, debit: salesTotal, credit: zero() }] : []),
+        ...(vatTotal.gt(0) ? [{ role: "OUTPUT_VAT" as const, debit: vatTotal, credit: zero() }] : []),
+        ...(split.applied.gt(0) ? [{ role: "AR" as const, debit: zero(), credit: split.applied, party: sale.customerId ? { type: "CUSTOMER" as const, id: sale.customerId } : undefined }] : []),
+        ...(split.refund.gt(0) ? [{ role: "CASH" as const, debit: zero(), credit: split.refund }] : []),
         ...(cost.gt(0)
           ? [
-              { accountCode: "1400", debit: cost, credit: zero() },
-              { accountCode: "5100", debit: zero(), credit: cost },
+              { role: "INVENTORY" as const, debit: cost, credit: zero() },
+              { role: "COGS" as const, debit: zero(), credit: cost },
             ]
           : []),
       ];
@@ -173,22 +173,9 @@ export async function postSaleReturn(
           description: `Sale return ${number}`,
           createdById: input.userId,
           lines: journalLines,
+          doc: { type: "SALE_RETURN", id: saleReturn.id },
         });
         await tx.saleReturn.update({ where: { id: saleReturn.id }, data: { journalId } });
-      }
-      if (sale.customerId && split.applied.gt(0)) {
-        await tx.customerLedger.create({
-          data: {
-            organizationId: input.organizationId,
-            branchId: input.branchId,
-            customerId: sale.customerId,
-            businessDate: occurredDate(input.businessDate),
-            entryType: "RETURN",
-            credit: split.applied,
-            referenceType: "sale_return",
-            referenceId: saleReturn.id,
-          },
-        });
       }
       await saveIdempotency(tx, {
         organizationId: input.organizationId,

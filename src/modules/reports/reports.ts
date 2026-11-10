@@ -2,6 +2,9 @@ import { Prisma } from "@prisma/client";
 import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
+import { GROUP } from "@/core/ledger/groups";
+import { partyBalances } from "@/core/parties";
+import type { AccountRole } from "@/core/ledger/roles";
 import { decimalString, moneyText } from "@/core/money";
 import { alertStatus } from "@/modules/inventory/stock";
 
@@ -133,7 +136,7 @@ export async function inventoryReport(scope: ReportScope) {
 }
 
 export async function customerReport(organizationId: string) {
-  const [count, customers, sums] = await Promise.all([
+  const [count, customers] = await Promise.all([
     prisma.customer.count({ where: { organizationId } }),
     prisma.customer.findMany({
       where: { organizationId },
@@ -141,25 +144,21 @@ export async function customerReport(organizationId: string) {
       take: listLimit,
       select: { id: true, name: true },
     }),
-    prisma.customerLedger.groupBy({
-      by: ["customerId"],
-      where: { organizationId },
-      _sum: { debit: true, credit: true },
-    }),
   ]);
-  const dueById = new Map(sums.map((row) => [row.customerId, dec(row._sum.debit).minus(dec(row._sum.credit))]));
+  const balances = await partyBalances(prisma, { organizationId, partyType: "CUSTOMER", partyIds: customers.map((row) => row.id) });
   return {
     count,
     rows: customers.map((row) => ({
       id: row.id,
       name: row.name,
-      due: moneyText(dueById.get(row.id) ?? new Prisma.Decimal(0)),
+      due: moneyText(balances.get(row.id)?.balance ?? new Prisma.Decimal(0)),
+      advance: moneyText(balances.get(row.id)?.advance ?? new Prisma.Decimal(0)),
     })),
   };
 }
 
 export async function supplierReport(organizationId: string) {
-  const [count, suppliers, sums] = await Promise.all([
+  const [count, suppliers] = await Promise.all([
     prisma.supplier.count({ where: { organizationId } }),
     prisma.supplier.findMany({
       where: { organizationId },
@@ -167,30 +166,27 @@ export async function supplierReport(organizationId: string) {
       take: listLimit,
       select: { id: true, name: true },
     }),
-    prisma.supplierLedger.groupBy({
-      by: ["supplierId"],
-      where: { organizationId },
-      _sum: { debit: true, credit: true },
-    }),
   ]);
-  const dueById = new Map(sums.map((row) => [row.supplierId, dec(row._sum.credit).minus(dec(row._sum.debit))]));
+  const balances = await partyBalances(prisma, { organizationId, partyType: "VENDOR", partyIds: suppliers.map((row) => row.id) });
   return {
     count,
     rows: suppliers.map((row) => ({
       id: row.id,
       name: row.name,
-      payable: moneyText(dueById.get(row.id) ?? new Prisma.Decimal(0)),
+      payable: moneyText(balances.get(row.id)?.balance ?? new Prisma.Decimal(0)),
     })),
   };
 }
 
-async function accountMovement(scope: ReportScope, code: string) {
-  const account = await prisma.account.findFirst({
-    where: { organizationId: scope.organizationId, code },
-    select: { id: true, code: true, name: true },
-  });
+async function accountMovement(scope: ReportScope, role: AccountRole) {
+  const account = (
+    await prisma.accountRole.findUnique({
+      where: { organizationId_role: { organizationId: scope.organizationId, role } },
+      select: { account: { select: { id: true, code: true, name: true } } },
+    })
+  )?.account;
   if (!account) {
-    return { code, debit: "0.00", credit: "0.00", count: 0, rows: [] as { id: string; businessDate: string; reference: string; debit: string; credit: string }[] };
+    return { code: "", debit: "0.00", credit: "0.00", count: 0, rows: [] as { id: string; businessDate: string; reference: string; debit: string; credit: string }[] };
   }
   const where = {
     organizationId: scope.organizationId,
@@ -222,11 +218,11 @@ async function accountMovement(scope: ReportScope, code: string) {
 }
 
 export function cashReport(scope: ReportScope) {
-  return accountMovement(scope, "1100");
+  return accountMovement(scope, "CASH");
 }
 
 export function bankReport(scope: ReportScope) {
-  return accountMovement(scope, "1200");
+  return accountMovement(scope, "BANK:DEFAULT");
 }
 
 export async function trialBalance(scope: ReportScope) {
@@ -314,12 +310,12 @@ export async function profitAndLoss(scope: ReportScope) {
   for (const row of sums) {
     const account = byId.get(row.accountId);
     const group = account?.group.code;
-    const amount = group === "4000" ? dec(row._sum.credit).minus(dec(row._sum.debit)) : dec(row._sum.debit).minus(dec(row._sum.credit));
-    if (group === "4000") {
+    const amount = group === GROUP.REVENUE ? dec(row._sum.credit).minus(dec(row._sum.debit)) : dec(row._sum.debit).minus(dec(row._sum.credit));
+    if (group === GROUP.REVENUE) {
       revenue = revenue.plus(amount);
-    } else if (group === "5000") {
+    } else if (group === GROUP.COST_OF_SALES) {
       cost = cost.plus(amount);
-    } else if (group === "6000") {
+    } else if (group === GROUP.EXPENSE) {
       expenses = expenses.plus(amount);
     } else {
       continue;

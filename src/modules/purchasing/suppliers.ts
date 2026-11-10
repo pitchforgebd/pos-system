@@ -1,11 +1,13 @@
 import { Prisma } from "@prisma/client";
 import { runTx } from "@/core/tx/run";
-import { dateOnly } from "@/core/time/business-date";
+import { businessDate } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
+import { partyBalance, partyBalances, recentPartyLines } from "@/core/parties";
 import { postBalancedJournal } from "@/modules/accounting/post";
 import { decimalString, parseMoney } from "@/core/money";
+import { occurredDate } from "@/lib/format/date";
 
 const supplierSelect = {
   id: true,
@@ -44,29 +46,19 @@ function present(row: {
   };
 }
 
+/** What the shop owes the vendor: the balance of their payable lines in the journal (I8). */
 export async function outstandingPayable(organizationId: string, supplierId: string, tx: Prisma.TransactionClient | typeof prisma = prisma) {
-  const sum = await tx.supplierLedger.aggregate({
-    where: { organizationId, supplierId },
-    _sum: { debit: true, credit: true },
-  });
-  return new Prisma.Decimal(sum._sum.credit ?? 0).minus(sum._sum.debit ?? 0);
+  return partyBalance(tx as Prisma.TransactionClient, { organizationId, partyType: "VENDOR", partyId: supplierId });
 }
 
 export async function listSuppliers(organizationId: string) {
-  const [rows, sums] = await Promise.all([
-    prisma.supplier.findMany({
-      where: { organizationId },
-      orderBy: { name: "asc" },
-      select: supplierSelect,
-    }),
-    prisma.supplierLedger.groupBy({
-      by: ["supplierId"],
-      where: { organizationId },
-      _sum: { debit: true, credit: true },
-    }),
-  ]);
-  const due = new Map(sums.map((row) => [row.supplierId, new Prisma.Decimal(row._sum.credit ?? 0).minus(row._sum.debit ?? 0)]));
-  return rows.map((row) => present(row, due.get(row.id) ?? new Prisma.Decimal(0)));
+  const rows = await prisma.supplier.findMany({
+    where: { organizationId },
+    orderBy: { name: "asc" },
+    select: supplierSelect,
+  });
+  const balances = await partyBalances(prisma, { organizationId, partyType: "VENDOR", partyIds: rows.map((row) => row.id) });
+  return rows.map((row) => present(row, balances.get(row.id)?.balance ?? new Prisma.Decimal(0)));
 }
 
 export async function getSupplier(organizationId: string, id: string) {
@@ -74,21 +66,9 @@ export async function getSupplier(organizationId: string, id: string) {
   if (!row) {
     return null;
   }
-  const ledger = await prisma.supplierLedger.findMany({
-    where: { organizationId, supplierId: id },
-    orderBy: { businessDate: "desc" },
-    take: 50,
-  });
   return {
     ...present(row, await outstandingPayable(organizationId, id)),
-    ledger: ledger.map((entry) => ({
-      id: entry.id,
-      businessDate: dateOnly(entry.businessDate),
-      entryType: entry.entryType,
-      debit: decimalString(entry.debit, 2),
-      credit: decimalString(entry.credit, 2),
-      referenceType: entry.referenceType,
-    })),
+    ledger: await recentPartyLines(prisma, { organizationId, partyType: "VENDOR", partyId: id }),
   };
 }
 
@@ -111,6 +91,9 @@ export async function createSupplier(input: {
   if (!opening || (input.creditLimit && !creditLimit)) {
     return { ok: false as const, status: 422 as const, code: "BUSINESS_RULE" as const, message: "Enter money amounts with up to two decimals." };
   }
+  if (opening.gt(0) && !input.branchId) {
+    return { ok: false as const, status: 422 as const, code: "BUSINESS_RULE" as const, message: "Select a branch before entering an opening balance: it is posted to the books." };
+  }
   const supplier = await runTx(async (tx) => {
     const created = await tx.supplier.create({
     data: {
@@ -127,28 +110,18 @@ export async function createSupplier(input: {
     select: supplierSelect,
   });
   if (opening.gt(0)) {
-    await tx.supplierLedger.create({
-      data: {
-        organizationId: input.organizationId,
-        supplierId: created.id,
-        businessDate: new Date(),
-        entryType: "OPENING",
-        credit: opening,
-        referenceType: "supplier",
-        referenceId: created.id,
-      },
-    });
     if (input.branchId) {
       await postBalancedJournal(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
-        businessDate: new Date(),
+        businessDate: occurredDate(businessDate()),
         description: `Supplier opening ${created.name}`,
         createdById: input.actorId,
         lines: [
-          { accountCode: "3100", debit: opening, credit: new Prisma.Decimal(0) },
-          { accountCode: "2100", debit: new Prisma.Decimal(0), credit: opening },
+          { role: "OPENING_EQUITY", debit: opening, credit: new Prisma.Decimal(0) },
+          { role: "AP", debit: new Prisma.Decimal(0), credit: opening, party: { type: "VENDOR" as const, id: created.id } },
         ],
+        doc: { type: "SUPPLIER_OPENING", id: created.id },
       });
     }
   }

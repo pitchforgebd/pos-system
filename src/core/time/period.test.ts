@@ -102,9 +102,10 @@ test("a journal cannot be posted for tomorrow or into a locked period", async ()
           businessDate: new Date(`${date}T00:00:00.000Z`),
           description: "period test",
           createdById: t.owner.id,
+          doc: { type: "JOURNAL", id: crypto.randomUUID() },
           lines: [
-            { accountCode: "1100", debit: new Prisma.Decimal("10.00"), credit: new Prisma.Decimal(0) },
-            { accountCode: "1300", debit: new Prisma.Decimal(0), credit: new Prisma.Decimal("10.00") },
+            { role: "CASH", debit: new Prisma.Decimal("10.00"), credit: new Prisma.Decimal(0) },
+            { role: "SALES", debit: new Prisma.Decimal(0), credit: new Prisma.Decimal("10.00") },
           ],
         }),
       );

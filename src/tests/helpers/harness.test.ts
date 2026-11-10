@@ -153,8 +153,8 @@ test("cleanup does not deadlock with postings that are running at the same time"
       const journal = await tx.journal.create({ data: { organizationId, businessDate: new Date("2026-10-01T00:00:00.000Z") } });
       await tx.journalLine.createMany({
         data: [
-          { organizationId, journalId: journal.id, accountId, debit: "1.00" },
-          { organizationId, journalId: journal.id, accountId, credit: "1.00" },
+          { organizationId, journalId: journal.id, accountId, debit: "1.00", businessDate: new Date("2026-10-01T00:00:00.000Z") },
+          { organizationId, journalId: journal.id, accountId, credit: "1.00", businessDate: new Date("2026-10-01T00:00:00.000Z") },
         ],
       });
     });

@@ -1,7 +1,7 @@
 import { prisma } from "../src/lib/db/client.ts";
 import { hashPassword } from "../src/modules/auth/password.ts";
 import { permissionCodes } from "../src/lib/permissions/codes.ts";
-import { accountGroups, accounts } from "./chart-of-accounts.ts";
+import { ensureChart } from "../src/core/ledger/chart.ts";
 import { seedDemoContent } from "./demo.ts";
 
 async function main() {
@@ -20,28 +20,8 @@ async function main() {
     create: { name: "Meridian", slug: "meridian" },
   });
 
-  for (const group of accountGroups) {
-    await prisma.accountGroup.upsert({
-      where: { organizationId_code: { organizationId: organization.id, code: group.code } },
-      update: { name: group.name },
-      create: { organizationId: organization.id, code: group.code, name: group.name },
-    });
-  }
-
-  const groups = await prisma.accountGroup.findMany({ where: { organizationId: organization.id } });
-  const groupIdByCode = new Map(groups.map((group) => [group.code, group.id]));
-
-  for (const account of accounts) {
-    const groupId = groupIdByCode.get(account.groupCode);
-    if (!groupId) {
-      throw new Error(`Missing account group ${account.groupCode}`);
-    }
-    await prisma.account.upsert({
-      where: { organizationId_code: { organizationId: organization.id, code: account.code } },
-      update: { name: account.name, groupId },
-      create: { organizationId: organization.id, groupId, code: account.code, name: account.name },
-    });
-  }
+  // The chart of accounts v2 and its roles; also brings an organization that has the older chart up to date.
+  await ensureChart(prisma, organization.id);
 
   const ownerEmail = process.env.SEED_OWNER_EMAIL?.trim().toLowerCase();
   const ownerPassword = process.env.SEED_OWNER_PASSWORD;

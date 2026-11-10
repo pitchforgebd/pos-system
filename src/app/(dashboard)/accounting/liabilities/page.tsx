@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { ChartAccountTable } from "@/components/accounting/chart-table";
 import { PageHeader } from "@/components/ui/page-header";
+import { GROUP } from "@/core/ledger/groups";
 import { getSession } from "@/modules/auth/current-session";
 import { listAccounts } from "@/modules/accounting/books";
 
@@ -21,7 +22,7 @@ export default async function LiabilitiesPage() {
         description="Accounts payable already moves with purchases and supplier payments. A separate liability received or paid document is not posted."
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Accounting", href: "/accounting" }, { label: "Liabilities" }]}
       />
-      <ChartAccountTable rows={accounts.filter((account) => account.groupCode === "2000")} />
+      <ChartAccountTable rows={accounts.filter((account) => account.groupCode === GROUP.LIABILITY)} />
     </div>
   );
 }

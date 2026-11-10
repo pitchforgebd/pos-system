@@ -176,9 +176,10 @@ test("a journal for tomorrow or for a locked day is a 422 answer through the rou
           businessDate: new Date(`${body.businessDate}T00:00:00.000Z`),
           description: "route test",
           createdById: t.owner.id,
+          doc: { type: "JOURNAL", id: crypto.randomUUID() },
           lines: [
-            { accountCode: "1100", debit: new (await import("@prisma/client")).Prisma.Decimal("5.00"), credit: new (await import("@prisma/client")).Prisma.Decimal(0) },
-            { accountCode: "1300", debit: new (await import("@prisma/client")).Prisma.Decimal(0), credit: new (await import("@prisma/client")).Prisma.Decimal("5.00") },
+            { role: "CASH", debit: new (await import("@prisma/client")).Prisma.Decimal("5.00"), credit: new (await import("@prisma/client")).Prisma.Decimal(0) },
+            { role: "SALES", debit: new (await import("@prisma/client")).Prisma.Decimal(0), credit: new (await import("@prisma/client")).Prisma.Decimal("5.00") },
           ],
         });
         return jsonOk({ posted: true });

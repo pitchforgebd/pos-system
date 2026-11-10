@@ -324,12 +324,12 @@ async function drawerTotals(tx: Prisma.TransactionClient, shift: { id: string; o
   const cashSales = payments.reduce((sum, payment) => sum.plus(payment.amount), zero());
   const returns = await tx.saleReturn.findMany({
     where: { organizationId, branchId, status: "POSTED", createdAt: { gte: new Date(shift.openedAt) } },
-    select: { journal: { select: { lines: { select: { credit: true, account: { select: { code: true } } } } } } },
+    select: { journal: { select: { lines: { select: { credit: true, account: { select: { kind: true } } } } } } },
   });
   let refunds = zero();
   for (const saleReturn of returns) {
     for (const line of saleReturn.journal?.lines ?? []) {
-      if (line.account.code === "1100") {
+      if (line.account.kind === "CASH") {
         refunds = refunds.plus(line.credit);
       }
     }

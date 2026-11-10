@@ -49,7 +49,7 @@ test("phase 11 quotations and requisitions do not post money or stock", async ()
     assert.equal(stored?.status, "ACCEPTED");
     assert.equal(await prisma.sale.count({ where: { organizationId: org.id } }), 0);
     assert.equal(await prisma.journal.count({ where: { organizationId: org.id } }), 0);
-    assert.equal(await prisma.customerLedger.count({ where: { organizationId: org.id } }), 0);
+    assert.equal(await prisma.journalLine.count({ where: { organizationId: org.id } }), 0, "a quotation posts nothing to the books");
 
     const request = await createRequisition({ ...actor, idempotencyKey: randomUUID(), businessDate: "2026-10-01", note: "Need bags" });
     assert.equal(request.ok, true);

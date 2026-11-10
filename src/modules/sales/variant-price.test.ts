@@ -25,22 +25,8 @@ test("a variant sells at its own price and falls back to the product price", asy
   const user = await prisma.user.create({
     data: { organizationId: org.id, name: "Cashier", email: `variant-${stamp}@example.com`, passwordHash: await hashPassword("correct-password") },
   });
-  const asset = await prisma.accountGroup.create({ data: { organizationId: org.id, code: "1000", name: "Assets" } });
-  const liability = await prisma.accountGroup.create({ data: { organizationId: org.id, code: "2000", name: "Liabilities" } });
-  const revenue = await prisma.accountGroup.create({ data: { organizationId: org.id, code: "4000", name: "Revenue" } });
-  const cost = await prisma.accountGroup.create({ data: { organizationId: org.id, code: "5000", name: "Cost of Sales" } });
-  await prisma.account.createMany({
-    data: [
-      { organizationId: org.id, groupId: asset.id, code: "1100", name: "Cash" },
-      { organizationId: org.id, groupId: asset.id, code: "1200", name: "Bank" },
-      { organizationId: org.id, groupId: asset.id, code: "1300", name: "Accounts Receivable" },
-      { organizationId: org.id, groupId: asset.id, code: "1400", name: "Inventory" },
-      { organizationId: org.id, groupId: liability.id, code: "2300", name: "VAT Payable" },
-      { organizationId: org.id, groupId: revenue.id, code: "4100", name: "Sales" },
-      { organizationId: org.id, groupId: revenue.id, code: "4200", name: "Other Charges" },
-      { organizationId: org.id, groupId: cost.id, code: "5100", name: "COGS" },
-    ],
-  });
+  const { ensureChart } = await import("../../core/ledger/chart.ts");
+  await ensureChart(prisma, org.id);
   const product = await prisma.product.create({
     data: {
       organizationId: org.id,

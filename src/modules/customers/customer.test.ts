@@ -15,7 +15,7 @@ process.env.BCRYPT_COST = "4";
 test("phase 10 posts customer due and advance without inventing points", async () => {
   const { prisma } = await import("../../lib/db/client.ts");
   const { hashPassword } = await import("../auth/password.ts");
-  const { createCustomer, outstandingReceivable, updateCustomer } = await import("./customers.ts");
+  const { createCustomer, customerWallet, outstandingReceivable, updateCustomer } = await import("./customers.ts");
   const { postCustomerPayment } = await import("./dues.ts");
   const { postCustomerAdvance } = await import("./advances.ts");
   const { closeInstallment, createInstallment } = await import("./installments.ts");
@@ -32,16 +32,8 @@ test("phase 10 posts customer due and advance without inventing points", async (
       passwordHash: await hashPassword("correct-password"),
     },
   });
-  const asset = await prisma.accountGroup.create({ data: { organizationId: org.id, code: "1000", name: "Assets" } });
-  const equity = await prisma.accountGroup.create({ data: { organizationId: org.id, code: "3000", name: "Equity" } });
-  await prisma.account.createMany({
-    data: [
-      { organizationId: org.id, groupId: asset.id, code: "1100", name: "Cash" },
-      { organizationId: org.id, groupId: asset.id, code: "1200", name: "Bank" },
-      { organizationId: org.id, groupId: asset.id, code: "1300", name: "Accounts Receivable" },
-      { organizationId: org.id, groupId: equity.id, code: "3100", name: "Owner Capital" },
-    ],
-  });
+  const { ensureChart } = await import("../../core/ledger/chart.ts");
+  await ensureChart(prisma, org.id);
   const actor = {
     organizationId: org.id,
     branchId: branch.id,
@@ -110,11 +102,9 @@ test("phase 10 posts customer due and advance without inventing points", async (
       method: "BANK",
     });
     assert.equal(advance.ok, true);
-    assert.equal((await outstandingReceivable(org.id, created.customer.id)).toFixed(2), "4.00");
-    const advanceLine = await prisma.customerLedger.findFirst({
-      where: { customerId: created.customer.id, entryType: "ADVANCE" },
-    });
-    assert.equal(advanceLine?.credit.toFixed(2), "2.00");
+    // N16: an advance is the shop's liability to the customer (the wallet), not a negative receivable.
+    assert.equal((await outstandingReceivable(org.id, created.customer.id)).toFixed(2), "6.00");
+    assert.equal((await customerWallet(org.id, created.customer.id)).toFixed(2), "2.00");
     assert.equal(await prisma.customerPayment.count({ where: { customerId: created.customer.id } }), 1);
     assert.equal(await prisma.customerAdvance.count({ where: { customerId: created.customer.id } }), 1);
 
@@ -127,7 +117,8 @@ test("phase 10 posts customer due and advance without inventing points", async (
     }
     const bank = journals.find((journal) => journal.description === "Customer advance");
     assert.equal(bank?.lines.some((line) => line.account.code === "1200" && line.debit.toFixed(2) === "2.00"), true);
-    assert.equal(bank?.lines.some((line) => line.account.code === "1300" && line.credit.toFixed(2) === "2.00"), true);
+    assert.equal(bank?.lines.some((line) => line.account.code === "2150" && line.credit.toFixed(2) === "2.00"), true, "the advance is credited to Customer Advance");
+    assert.equal(bank?.lines.some((line) => line.account.code === "1300"), false, "and not to the receivable");
 
     const sale = await prisma.sale.create({
       data: {
@@ -232,6 +223,9 @@ test("phase 10 posts customer due and advance without inventing points", async (
       method: "CASH",
     });
     assert.equal(blocked.ok, false);
+    // I2: every receivable and payable line these postings wrote names its party.
+    const { assertBooksReconcile } = await import("../../core/reconcile/index.ts");
+    await assertBooksReconcile(org.id);
   } finally {
     const { cleanupOrg } = await import("../../tests/helpers/cleanup.ts");
     await cleanupOrg(org.id);

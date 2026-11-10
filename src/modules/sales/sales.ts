@@ -4,8 +4,10 @@ import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
-import { postBalancedJournal } from "@/modules/accounting/post";
-import { outstandingReceivable } from "@/modules/customers/customers";
+import { moneyAccountFor } from "@/core/ledger/accounts";
+import { invoicePayment } from "@/core/payments";
+import { postBalancedJournal, type JournalLineInput } from "@/modules/accounting/post";
+import { customerWallet, outstandingReceivable } from "@/modules/customers/customers";
 import { allocateNumber } from "@/modules/documents/numbers";
 import { documentSorts, listQuery, pageInfo, type ListQuery, type Paged } from "@/core/list";
 import { hashPayload, idempotentTransaction, isKeyRace, readIdempotency, saveIdempotency } from "@/core/idempotency";
@@ -108,7 +110,7 @@ export async function postSale(
       if (payment.gt(0) && method !== "CASH" && method !== "BANK" && method !== "CARD" && method !== "WALLET") {
         throw new StockRuleError("Use cash, bank, card, or wallet.");
       }
-      const tenderAccount = method === "CASH" ? "1100" : "1200";
+      const tenderAccount = await moneyAccountFor(tx, input.organizationId, { method });
       const priced = [];
       for (const line of input.lines) {
         const quantity = parseQuantity(line.quantity);
@@ -190,8 +192,8 @@ export async function postSale(
         if (!customer) {
           throw new StockRuleError("Choose a customer for a wallet payment.");
         }
-        const balance = await outstandingReceivable(input.organizationId, customer.id, tx);
-        if (balance.neg().lt(payment)) {
+        const balance = await customerWallet(input.organizationId, customer.id, tx);
+        if (balance.lt(payment)) {
           throw new StockRuleError("The wallet balance is smaller than the payment.");
         }
       }
@@ -264,18 +266,18 @@ export async function postSale(
           businessDate: occurredDate(input.businessDate),
         });
       }
-      const journalLines = [
-        ...(payment.gt(0) && method !== "WALLET" ? [{ accountCode: tenderAccount, debit: payment, credit: zero() }] : []),
-        ...(due.gt(0) || (method === "WALLET" && payment.gt(0))
-          ? [{ accountCode: "1300", debit: method === "WALLET" ? money(due.plus(payment)) : due, credit: zero() }]
-          : []),
-        ...(salesCredit.gt(0) ? [{ accountCode: "4100", debit: zero(), credit: salesCredit }] : []),
-        ...(vatTotal.gt(0) ? [{ accountCode: "2300", debit: zero(), credit: vatTotal }] : []),
-        ...(charges.gt(0) ? [{ accountCode: "4200", debit: zero(), credit: charges }] : []),
+      const journalLines: JournalLineInput[] = [
+        ...(payment.gt(0) && method !== "WALLET" ? [{ accountId: tenderAccount, debit: payment, credit: zero() }] : []),
+        // Paid from the wallet: the advance the shop holds for the customer goes down; no receivable is made for that part.
+        ...(method === "WALLET" && payment.gt(0) && customer ? [{ role: "CUSTOMER_ADVANCE" as const, debit: payment, credit: zero(), party: { type: "CUSTOMER" as const, id: customer.id } }] : []),
+        ...(due.gt(0) ? [{ role: "AR" as const, debit: due, credit: zero(), party: customer ? { type: "CUSTOMER" as const, id: customer.id } : undefined }] : []),
+        ...(salesCredit.gt(0) ? [{ role: "SALES" as const, debit: zero(), credit: salesCredit }] : []),
+        ...(vatTotal.gt(0) ? [{ role: "OUTPUT_VAT" as const, debit: zero(), credit: vatTotal }] : []),
+        ...(charges.gt(0) ? [{ role: "CHARGE_INCOME" as const, debit: zero(), credit: charges }] : []),
         ...(cogs.gt(0)
           ? [
-              { accountCode: "5100", debit: cogs, credit: zero() },
-              { accountCode: "1400", debit: zero(), credit: cogs },
+              { role: "COGS" as const, debit: cogs, credit: zero() },
+              { role: "INVENTORY" as const, debit: zero(), credit: cogs },
             ]
           : []),
       ];
@@ -287,6 +289,7 @@ export async function postSale(
           description: `Sale ${number}`,
           createdById: input.userId,
           lines: journalLines,
+          doc: { type: "SALE", id: sale.id },
         });
         await tx.sale.update({ where: { id: sale.id }, data: { journalId } });
       }
@@ -295,23 +298,9 @@ export async function postSale(
           data: { organizationId: input.organizationId, saleId: sale.id, method, amount: payment },
         });
       }
-      const ledgerDebit = method === "WALLET" ? money(due.plus(payment)) : due;
-      if (customer && ledgerDebit.gt(0)) {
-        await tx.customerLedger.create({
-          data: {
-            organizationId: input.organizationId,
-            branchId: input.branchId,
-            customerId: customer.id,
-            businessDate: occurredDate(input.businessDate),
-            entryType: "SALE",
-            debit: ledgerDebit,
-            referenceType: "sale",
-            referenceId: sale.id,
-          },
-        });
-        if (customer.creditLimit && (await outstandingReceivable(input.organizationId, customer.id, tx)).gt(customer.creditLimit)) {
-          throw new StockRuleError("The sale exceeds the customer credit limit.");
-        }
+      // The receivable only grows by what was not paid now (a wallet payment is not a receivable), so that is when the limit is checked.
+      if (customer && due.gt(0) && customer.creditLimit && (await outstandingReceivable(input.organizationId, customer.id, tx)).gt(customer.creditLimit)) {
+        throw new StockRuleError("The sale exceeds the customer credit limit.");
       }
       for (const line of priced) {
         if (!line.serial) {
@@ -463,6 +452,8 @@ async function requireCustomer(tx: Prisma.TransactionClient, organizationId: str
     }
     return null;
   }
+  // The customer row is locked for the rest of the transaction: two requests that spend the same wallet, or push the same
+  // customer over the credit limit, take turns instead of both reading the old balance.
   const customer = await tx.customer.findFirst({
     where: { id: customerId, organizationId },
     select: { id: true, status: true, creditLimit: true },
@@ -470,6 +461,7 @@ async function requireCustomer(tx: Prisma.TransactionClient, organizationId: str
   if (!customer) {
     throw new StockRuleError("That record was not found.", 404);
   }
+  await tx.$queryRaw`SELECT id FROM customers WHERE id = ${customer.id} AND organizationId = ${organizationId} FOR UPDATE`;
   if (customer.status !== "ACTIVE") {
     throw new StockRuleError("That customer is not active.");
   }
@@ -530,9 +522,14 @@ export async function getSale(organizationId: string, branchId: string, id: stri
   }
   const debit = row.journal?.lines.reduce((sum, line) => sum.plus(line.debit), zero()) ?? zero();
   const credit = row.journal?.lines.reduce((sum, line) => sum.plus(line.credit), zero()) ?? zero();
+  const payment = await invoicePayment(prisma, organizationId, row.id);
   return {
     id: row.id,
     number: row.invoice?.number ?? null,
+    /** PAID, PARTIAL or UNPAID; what is still owed on the invoice, and what receipts have settled since. */
+    paymentStatus: payment.status,
+    owed: decimalString(payment.owed, 2),
+    received: decimalString(payment.allocated, 2),
     status: row.status,
     businessDate: dateOnly(row.businessDate),
     customerName: row.customer?.name ?? "Walk-in",

@@ -1,11 +1,15 @@
+import { randomUUID } from "node:crypto";
+
 import { Prisma } from "@prisma/client";
 import { runTx } from "@/core/tx/run";
 import { RuleError } from "@/core/errors/rule-error";
+import { accountFor, accountsFor, MONEY_KINDS, moneyAccountFor } from "@/core/ledger/accounts";
+import { GROUP } from "@/core/ledger/groups";
 import { businessDate, dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
-import { PostingError, postBalancedJournal } from "@/modules/accounting/post";
+import { PostingError, postBalancedJournal, type DocType } from "@/modules/accounting/post";
 import { allocateNumber } from "@/modules/documents/numbers";
 import { hashPayload, isKeyRace, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { decimalString, money, parseMoney, zero } from "@/core/money";
@@ -90,7 +94,10 @@ export async function postJournal(input: Actor & { businessDate: string; descrip
       }
       const parsed = parseLines(input.lines);
       const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: input.businessDate });
+      const entryId = randomUUID();
       const journalId = await postBalancedJournal(tx, {
+        id: entryId,
+        doc: { type: "JOURNAL", id: entryId },
         organizationId: input.organizationId,
         branchId: input.branchId,
         businessDate: occurredDate(input.businessDate),
@@ -173,7 +180,14 @@ export async function reverseJournal(input: Actor & { journalId: string; busines
       const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: input.businessDate });
       const lines = journal.lines
         .filter((line) => new Prisma.Decimal(line.debit).gt(0) || new Prisma.Decimal(line.credit).gt(0))
-        .map((line) => ({ accountCode: line.account.code, debit: new Prisma.Decimal(line.credit), credit: new Prisma.Decimal(line.debit) }));
+        .map((line) => ({
+          accountId: line.accountId,
+          debit: new Prisma.Decimal(line.credit),
+          credit: new Prisma.Decimal(line.debit),
+          party: line.partyType && line.partyId ? { type: line.partyType, id: line.partyId } : undefined,
+          shiftId: line.shiftId,
+          assetId: line.assetId,
+        }));
       const total = money(lines.reduce((sum, line) => sum.plus(line.debit), zero()));
       const journalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
@@ -184,6 +198,9 @@ export async function reverseJournal(input: Actor & { journalId: string; busines
         lines,
         number,
         reversalOfId: journal.id,
+        // the same document as the journal it undoes (a journal from before documents were recorded stands for itself)
+        doc: journal.docType && journal.docId ? { type: journal.docType as DocType, id: journal.docId } : { type: "JOURNAL", id: journal.id },
+        kind: "REVERSAL",
       });
       await tx.voucher.create({
         data: {
@@ -248,20 +265,22 @@ export async function postExpense(
         where: { organizationId: input.organizationId, code: input.accountCode, status: "ACTIVE" },
         select: { id: true, code: true, group: { select: { code: true } } },
       });
-      if (!account || account.group.code !== "6000") {
+      if (!account || account.group.code !== GROUP.EXPENSE) {
         throw new PostingError("Choose an active expense account.");
       }
       const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "EXP", businessDate: input.businessDate });
-      const cashCode = input.method === "BANK" ? "1200" : "1100";
+      const paidFrom = await moneyAccountFor(tx, input.organizationId, { method: input.method });
+      const docId = randomUUID();
       const journalId = await postBalancedJournal(tx, {
+        doc: { type: "EXPENSE", id: docId },
         organizationId: input.organizationId,
         branchId: input.branchId,
         businessDate: occurredDate(input.businessDate),
         description: `Expense ${number}`,
         createdById: input.userId,
         lines: [
-          { accountCode: account.code, debit: amount, credit: zero() },
-          { accountCode: cashCode, debit: zero(), credit: amount },
+          { accountId: account.id, debit: amount, credit: zero() },
+          { accountId: paidFrom, debit: zero(), credit: amount },
         ],
         number,
       });
@@ -269,6 +288,7 @@ export async function postExpense(
         data: {
           organizationId: input.organizationId,
           branchId: input.branchId,
+          id: docId,
           accountId: account.id,
           number,
           amount,
@@ -318,17 +338,21 @@ export async function postContra(input: Actor & { businessDate: string; directio
         throw new PostingError("Enter an amount greater than zero.");
       }
       const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: input.businessDate });
-      const debitCode = input.direction === "CASH_TO_BANK" ? "1200" : "1100";
-      const creditCode = input.direction === "CASH_TO_BANK" ? "1100" : "1200";
+      const cashAccount = await accountFor(tx, input.organizationId, "CASH");
+      const bankAccount = await accountFor(tx, input.organizationId, "BANK:DEFAULT");
+      const debitAccount = input.direction === "CASH_TO_BANK" ? bankAccount : cashAccount;
+      const creditAccount = input.direction === "CASH_TO_BANK" ? cashAccount : bankAccount;
+      const docId = randomUUID();
       const journalId = await postBalancedJournal(tx, {
+        doc: { type: "CONTRA", id: docId },
         organizationId: input.organizationId,
         branchId: input.branchId,
         businessDate: occurredDate(input.businessDate),
         description: `Contra ${number}`,
         createdById: input.userId,
         lines: [
-          { accountCode: debitCode, debit: amount, credit: zero() },
-          { accountCode: creditCode, debit: zero(), credit: amount },
+          { accountId: debitAccount, debit: amount, credit: zero() },
+          { accountId: creditAccount, debit: zero(), credit: amount },
         ],
         number,
       });
@@ -337,6 +361,7 @@ export async function postContra(input: Actor & { businessDate: string; directio
           organizationId: input.organizationId,
           branchId: input.branchId,
           number,
+          id: docId,
           voucherType: "CONTRA",
           amount,
           businessDate: occurredDate(input.businessDate),
@@ -402,13 +427,16 @@ export async function listAccounts(organizationId: string) {
   const rows = await prisma.account.findMany({
     where: { organizationId },
     orderBy: { code: "asc" },
-    select: { id: true, code: true, name: true, status: true, group: { select: { code: true, name: true } } },
+    select: { id: true, code: true, name: true, status: true, kind: true, isSystem: true, roles: { select: { role: true } }, group: { select: { code: true, name: true } } },
   });
   return rows.map((row) => ({
     id: row.id,
     code: row.code,
     name: row.name,
     status: row.status,
+    kind: row.kind,
+    isSystem: row.isSystem,
+    roles: row.roles.map((role) => role.role),
     groupCode: row.group.code,
     groupName: row.group.name,
   }));
@@ -573,7 +601,7 @@ export async function listCashBankLines(organizationId: string, branchId: string
   const rows = await prisma.journalLine.findMany({
     where: {
       organizationId,
-      account: { OR: [{ code: "1100" }, { code: { startsWith: "12" } }] },
+      account: { kind: { in: [...MONEY_KINDS] } },
       journal: {
         status: "POSTED",
         branchId,
@@ -657,7 +685,7 @@ export async function cashFlow(organizationId: string, branchId: string, from?: 
   const sums = await prisma.journalLine.aggregate({
     where: {
       organizationId,
-      account: { OR: [{ code: "1100" }, { code: { startsWith: "12" } }] },
+      account: { kind: { in: [...MONEY_KINDS] } },
       journal: {
         status: "POSTED",
         branchId,
@@ -677,8 +705,8 @@ export async function cashFlow(organizationId: string, branchId: string, from?: 
 
 export async function cashBankBalances(organizationId: string, branchId: string) {
   const accounts = await prisma.account.findMany({
-    where: { organizationId, OR: [{ code: "1100" }, { code: { startsWith: "12" } }] },
-    select: { id: true, code: true, name: true },
+    where: { organizationId, kind: { in: [...MONEY_KINDS] } },
+    select: { id: true, code: true, name: true, kind: true },
     orderBy: { code: "asc" },
   });
   if (accounts.length === 0) {
@@ -693,30 +721,37 @@ export async function cashBankBalances(organizationId: string, branchId: string)
   return accounts.map((account) => ({
     code: account.code,
     name: account.name,
+    kind: account.kind,
     balance: decimalString(byId.get(account.id) ?? new Prisma.Decimal(0), 2),
   }));
 }
 
-const blockedVoucherCodes = new Set(["1100", "1300", "1400", "2100", "4100", "5100"]);
+// A voucher may not touch the accounts that have a screen of their own: cash and bank, receivables, payables, stock, sales and
+// cost of sales. They are told apart by role and kind, not by number.
+const blockedVoucherRoles = ["CASH", "AR", "INVENTORY", "AP", "SALES", "COGS"] as const;
 
+/**
+ * The cash or bank account a payment uses: the cash drawer, the bank account the user chose by its code (it must be a
+ * bank or mobile account), or the default bank account. Returns its id.
+ */
 async function resolveMoneyAccount(
   tx: Prisma.TransactionClient,
   organizationId: string,
   method: "CASH" | "BANK",
   bankCode?: string,
 ) {
-  const code = method === "CASH" ? "1100" : bankCode?.trim() || "1200";
-  if (method === "BANK" && !/^12\d{2}$/.test(code)) {
-    throw new PostingError("Choose a bank account.");
+  const code = bankCode?.trim();
+  if (method === "BANK" && code) {
+    const chosen = await tx.account.findFirst({
+      where: { organizationId, code, status: "ACTIVE", kind: { in: ["BANK", "MOBILE"] } },
+      select: { id: true },
+    });
+    if (!chosen) {
+      throw new PostingError("Choose a bank account.");
+    }
+    return { id: chosen.id };
   }
-  const account = await tx.account.findFirst({
-    where: { organizationId, code, status: "ACTIVE" },
-    select: { id: true, code: true },
-  });
-  if (!account) {
-    throw new PostingError("That cash or bank account is not active.");
-  }
-  return account;
+  return { id: await moneyAccountFor(tx, organizationId, { method }) };
 }
 
 async function nextAccountCode(tx: Prisma.TransactionClient, organizationId: string, start: number, end: number) {
@@ -782,20 +817,22 @@ export async function postIncome(
         where: { organizationId: input.organizationId, code: input.accountCode, status: "ACTIVE" },
         select: { id: true, code: true, group: { select: { code: true } } },
       });
-      if (!account || account.group.code !== "4000" || account.code === "4100") {
+      if (!account || account.group.code !== GROUP.REVENUE || account.id === (await accountFor(tx, input.organizationId, "SALES"))) {
         throw new PostingError("Choose an income account other than sales.");
       }
       const moneyAccount = await resolveMoneyAccount(tx, input.organizationId, input.method, input.bankCode);
       const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: input.businessDate });
+      const docId = randomUUID();
       const journalId = await postBalancedJournal(tx, {
+        doc: { type: "INCOME", id: docId },
         organizationId: input.organizationId,
         branchId: input.branchId,
         businessDate: occurredDate(input.businessDate),
         description: `Income ${number}`,
         createdById: input.userId,
         lines: [
-          { accountCode: moneyAccount.code, debit: amount, credit: zero() },
-          { accountCode: account.code, debit: zero(), credit: amount },
+          { accountId: moneyAccount.id, debit: amount, credit: zero() },
+          { accountId: account.id, debit: zero(), credit: amount },
         ],
         number,
       });
@@ -803,6 +840,7 @@ export async function postIncome(
         data: {
           organizationId: input.organizationId,
           branchId: input.branchId,
+          id: docId,
           accountId: account.id,
           category: input.category?.trim() || account.code,
           amount,
@@ -848,9 +886,11 @@ export async function postCapital(
         throw new PostingError("Enter an owner name and an amount greater than zero.");
       }
       const moneyAccount = await resolveMoneyAccount(tx, input.organizationId, input.method, input.bankCode);
-      const equityCode = input.capitalType === "ADDED" ? "3100" : "3200";
+      const equityAccount = await accountFor(tx, input.organizationId, input.capitalType === "ADDED" ? "CAPITAL" : "DRAWINGS");
       const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: input.businessDate });
+      const docId = randomUUID();
       const journalId = await postBalancedJournal(tx, {
+        doc: { type: "CAPITAL", id: docId },
         organizationId: input.organizationId,
         branchId: input.branchId,
         businessDate: occurredDate(input.businessDate),
@@ -859,12 +899,12 @@ export async function postCapital(
         lines:
           input.capitalType === "ADDED"
             ? [
-                { accountCode: moneyAccount.code, debit: amount, credit: zero() },
-                { accountCode: equityCode, debit: zero(), credit: amount },
+                { accountId: moneyAccount.id, debit: amount, credit: zero() },
+                { accountId: equityAccount, debit: zero(), credit: amount },
               ]
             : [
-                { accountCode: equityCode, debit: amount, credit: zero() },
-                { accountCode: moneyAccount.code, debit: zero(), credit: amount },
+                { accountId: equityAccount, debit: amount, credit: zero() },
+                { accountId: moneyAccount.id, debit: zero(), credit: amount },
               ],
         number,
       });
@@ -872,6 +912,7 @@ export async function postCapital(
         data: {
           organizationId: input.organizationId,
           branchId: input.branchId,
+          id: docId,
           capitalType: input.capitalType,
           ownerName,
           amount,
@@ -917,7 +958,9 @@ export async function postLoan(
       }
       const moneyAccount = await resolveMoneyAccount(tx, input.organizationId, input.method, input.bankCode);
       const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: input.businessDate });
+      const docId = randomUUID();
       const journalId = await postBalancedJournal(tx, {
+        doc: { type: "LOAN", id: docId },
         organizationId: input.organizationId,
         branchId: input.branchId,
         businessDate: occurredDate(input.businessDate),
@@ -926,12 +969,12 @@ export async function postLoan(
         lines:
           input.direction === "RECEIVED"
             ? [
-                { accountCode: moneyAccount.code, debit: amount, credit: zero() },
-                { accountCode: "2200", debit: zero(), credit: amount },
+                { accountId: moneyAccount.id, debit: amount, credit: zero() },
+                { role: "LOAN" as const, debit: zero(), credit: amount },
               ]
             : [
-                { accountCode: "2200", debit: amount, credit: zero() },
-                { accountCode: moneyAccount.code, debit: zero(), credit: amount },
+                { role: "LOAN" as const, debit: amount, credit: zero() },
+                { accountId: moneyAccount.id, debit: zero(), credit: amount },
               ],
         number,
       });
@@ -981,14 +1024,17 @@ export async function postCashVoucher(
       }
       const account = await tx.account.findFirst({
         where: { organizationId: input.organizationId, code: input.accountCode, status: "ACTIVE" },
-        select: { code: true, group: { select: { code: true } } },
+        select: { id: true, kind: true, group: { select: { code: true } } },
       });
-      if (!account || blockedVoucherCodes.has(account.code) || /^12\d{2}$/.test(account.code) || !["2000", "3000", "4000", "6000"].includes(account.group.code)) {
+      const blocked = new Set((await accountsFor(tx, input.organizationId, [...blockedVoucherRoles])).values());
+      if (!account || blocked.has(account.id) || account.kind !== "OTHER" || ![GROUP.LIABILITY, GROUP.EQUITY, GROUP.REVENUE, GROUP.EXPENSE].some((code) => code === account.group.code)) {
         throw new PostingError("Choose an expense, income, loan, or equity account. Sales, stock, and party balances use their own screens.");
       }
       const moneyAccount = await resolveMoneyAccount(tx, input.organizationId, input.method, input.bankCode);
       const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: input.businessDate });
+      const docId = randomUUID();
       const journalId = await postBalancedJournal(tx, {
+        doc: { type: "VOUCHER", id: docId },
         organizationId: input.organizationId,
         branchId: input.branchId,
         businessDate: occurredDate(input.businessDate),
@@ -997,12 +1043,12 @@ export async function postCashVoucher(
         lines:
           input.voucherType === "PAYMENT"
             ? [
-                { accountCode: account.code, debit: amount, credit: zero() },
-                { accountCode: moneyAccount.code, debit: zero(), credit: amount },
+                { accountId: account.id, debit: amount, credit: zero() },
+                { accountId: moneyAccount.id, debit: zero(), credit: amount },
               ]
             : [
-                { accountCode: moneyAccount.code, debit: amount, credit: zero() },
-                { accountCode: account.code, debit: zero(), credit: amount },
+                { accountId: moneyAccount.id, debit: amount, credit: zero() },
+                { accountId: account.id, debit: zero(), credit: amount },
               ],
         number,
       });
@@ -1011,6 +1057,7 @@ export async function postCashVoucher(
           organizationId: input.organizationId,
           branchId: input.branchId,
           number,
+          id: docId,
           voucherType: input.voucherType,
           amount,
           businessDate: occurredDate(input.businessDate),
@@ -1022,6 +1069,49 @@ export async function postCashVoucher(
       return { id: journalId, number, replayed: false };
     });
     return finishPost(input, data, "voucher");
+  } catch (error) {
+    const mapped = failure(error);
+    if (mapped) {
+      return mapped;
+    }
+    throw error;
+  }
+}
+
+/**
+ * The cash in the drawer when the books start: Dr Cash in Hand / Cr Opening Balance Equity. Entered once per branch (the branch
+ * is the document, so a second entry is refused); cash after that comes from sales, receipts and the owner's capital.
+ */
+export async function postOpeningCash(input: Actor & { amount: string }) {
+  const requestHash = hashPayload({ amount: input.amount, branchId: input.branchId });
+  try {
+    const data = await runTx(async (tx) => {
+      const existing = await begin(tx, input.organizationId, input.idempotencyKey, requestHash);
+      if (existing) {
+        return { id: existing.entityId, replayed: true, number: null as string | null };
+      }
+      const amount = parseMoney(input.amount);
+      if (!amount || amount.lte(0)) {
+        throw new PostingError("Enter an opening cash amount greater than zero.");
+      }
+      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: businessDate() });
+      const journalId = await postBalancedJournal(tx, {
+        organizationId: input.organizationId,
+        branchId: input.branchId,
+        businessDate: occurredDate(businessDate()),
+        description: `Opening cash ${number}`,
+        createdById: input.userId,
+        number,
+        doc: { type: "CASH_OPENING", id: input.branchId },
+        lines: [
+          { role: "CASH", debit: amount, credit: zero() },
+          { role: "OPENING_EQUITY", debit: zero(), credit: amount },
+        ],
+      });
+      await remember(tx, { ...input, requestHash, entityType: "opening_cash", entityId: journalId });
+      return { id: journalId, number, replayed: false };
+    });
+    return finishPost(input, data, "opening_cash");
   } catch (error) {
     const mapped = failure(error);
     if (mapped) {
@@ -1053,7 +1143,7 @@ export async function createBankAccount(
         throw new PostingError("That bank name already exists.", 409);
       }
       const group = await tx.accountGroup.findFirst({
-        where: { organizationId: input.organizationId, code: "1000" },
+        where: { organizationId: input.organizationId, code: GROUP.ASSET },
         select: { id: true },
       });
       if (!group) {
@@ -1065,7 +1155,7 @@ export async function createBankAccount(
       }
       const code = await nextAccountCode(tx, input.organizationId, 1201, 1299);
       const account = await tx.account.create({
-        data: { organizationId: input.organizationId, groupId: group.id, code, name },
+        data: { organizationId: input.organizationId, groupId: group.id, code, name, kind: "BANK" },
         select: { id: true, code: true },
       });
       const bank = await tx.bankAccount.create({
@@ -1081,9 +1171,10 @@ export async function createBankAccount(
           businessDate: occurredDate(businessDate()),
           description: `Bank opening ${name} ${number}`,
           createdById: input.userId,
+          doc: { type: "BANK_OPENING", id: account.id },
           lines: [
-            { accountCode: account.code, debit: opening, credit: zero() },
-            { accountCode: "3100", debit: zero(), credit: opening },
+            { accountId: account.id, debit: opening, credit: zero() },
+            { role: "OPENING_EQUITY" as const, debit: zero(), credit: opening },
           ],
           number,
         });

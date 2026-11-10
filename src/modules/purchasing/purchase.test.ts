@@ -32,16 +32,8 @@ test("phase 06 purchases and supplier balances", async () => {
       passwordHash: await hashPassword("correct-password"),
     },
   });
-  const asset = await prisma.accountGroup.create({ data: { organizationId: org.id, code: "1000", name: "Assets" } });
-  const liability = await prisma.accountGroup.create({ data: { organizationId: org.id, code: "2000", name: "Liabilities" } });
-  await prisma.account.createMany({
-    data: [
-      { organizationId: org.id, groupId: asset.id, code: "1100", name: "Cash" },
-      { organizationId: org.id, groupId: asset.id, code: "1200", name: "Bank" },
-      { organizationId: org.id, groupId: asset.id, code: "1400", name: "Inventory" },
-      { organizationId: org.id, groupId: liability.id, code: "2100", name: "Accounts Payable" },
-    ],
-  });
+  const { ensureChart } = await import("../../core/ledger/chart.ts");
+  await ensureChart(prisma, org.id);
   const product = await prisma.product.create({
     data: {
       organizationId: org.id,
@@ -161,6 +153,9 @@ test("phase 06 purchases and supplier balances", async () => {
       const credit = journal.lines.reduce((sum, line) => sum + Number(line.credit), 0);
       assert.equal(debit, credit);
     }
+    // I2: every receivable and payable line these postings wrote names its party.
+    const { assertBooksReconcile } = await import("../../core/reconcile/index.ts");
+    await assertBooksReconcile(org.id);
   } finally {
     const { cleanupOrg } = await import("../../tests/helpers/cleanup.ts");
     for (const id of [org.id, other.id]) {

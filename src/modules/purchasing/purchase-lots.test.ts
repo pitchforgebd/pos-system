@@ -25,16 +25,8 @@ test("a purchase of an expiry-tracked product creates its lots", async () => {
   const user = await prisma.user.create({
     data: { organizationId: org.id, name: "Buyer", email: `pl-${stamp}@example.com`, passwordHash: await hashPassword("correct-password") },
   });
-  const asset = await prisma.accountGroup.create({ data: { organizationId: org.id, code: "1000", name: "Assets" } });
-  const liability = await prisma.accountGroup.create({ data: { organizationId: org.id, code: "2000", name: "Liabilities" } });
-  await prisma.account.createMany({
-    data: [
-      { organizationId: org.id, groupId: asset.id, code: "1100", name: "Cash" },
-      { organizationId: org.id, groupId: asset.id, code: "1200", name: "Bank" },
-      { organizationId: org.id, groupId: asset.id, code: "1400", name: "Inventory" },
-      { organizationId: org.id, groupId: liability.id, code: "2100", name: "Accounts Payable" },
-    ],
-  });
+  const { ensureChart } = await import("../../core/ledger/chart.ts");
+  await ensureChart(prisma, org.id);
   async function product(code: string, trackExpiry: boolean) {
     return prisma.product.create({
       data: {
@@ -101,6 +93,9 @@ test("a purchase of an expiry-tracked product creates its lots", async () => {
     // A product that does not expire ignores the lot fields' absence.
     assert.equal((await buy([{ productId: salt.id, quantity: "5", unitCost: "5.00" }])).ok, true);
     assert.equal(await prisma.expiryBatch.count({ where: { organizationId: org.id, productId: salt.id } }), 0);
+    // I2: every receivable and payable line these postings wrote names its party.
+    const { assertBooksReconcile } = await import("../../core/reconcile/index.ts");
+    await assertBooksReconcile(org.id);
   } finally {
     const { cleanupOrg } = await import("../../tests/helpers/cleanup.ts");
     await cleanupOrg(org.id);

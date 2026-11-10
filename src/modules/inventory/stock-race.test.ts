@@ -44,7 +44,7 @@ for (const [name, isolationLevel] of levels) {
               userId: t.owner.id,
               unitCost: new Prisma.Decimal("10.00"),
             }),
-          { isolationLevel, retries: 0 },
+          { isolationLevel, retries: 0, maxWaitMs: 60_000, timeoutMs: 60_000 },
         ),
       );
       const failures = settled.filter((r): r is PromiseRejectedResult => r.status === "rejected").map((r) => `${(r.reason as { code?: string }).code ?? "?"}: ${String((r.reason as Error).message).split("\n").pop()}`);
@@ -77,7 +77,9 @@ const move = (t: { org: { id: string }; branch: { id: string }; warehouse: { id:
         unitCost: direction === "IN" ? new Prisma.Decimal("10.00") : null,
         ...extra,
       }),
-    { retries: 0 },
+    // These tests fire 20 to 60 transactions at once to provoke the race, more than the pool holds, while the whole suite runs in
+    // parallel. They check that the race is correct, not how long a transaction waits for a free connection, so the wait is long.
+    { retries: 0, maxWaitMs: 60_000, timeoutMs: 60_000 },
   );
 
 test("an OUT on a stock row that does not exist is refused, and no empty row is left behind", async () => {

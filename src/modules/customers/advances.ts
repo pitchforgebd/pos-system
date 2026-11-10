@@ -4,6 +4,9 @@ import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
+import { randomUUID } from "node:crypto";
+
+import { moneyAccountFor } from "@/core/ledger/accounts";
 import { postBalancedJournal } from "@/modules/accounting/post";
 import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { decimalString, parseMoney } from "@/core/money";
@@ -68,19 +71,22 @@ export async function postCustomerAdvance(
       if (!amount || amount.lte(0)) {
         throw new StockRuleError("Enter an advance amount greater than zero.");
       }
+      const advanceId = randomUUID();
       const journalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
         businessDate: occurredDate(input.businessDate),
         description: "Customer advance",
         createdById: input.userId,
+        doc: { type: "CUSTOMER_ADVANCE", id: advanceId },
         lines: [
-          { accountCode: input.method === "CASH" ? "1100" : "1200", debit: amount, credit: new Prisma.Decimal(0) },
-          { accountCode: "1300", debit: new Prisma.Decimal(0), credit: amount },
+          { accountId: await moneyAccountFor(tx, input.organizationId, { method: input.method }), debit: amount, credit: new Prisma.Decimal(0) },
+          { role: "CUSTOMER_ADVANCE", debit: new Prisma.Decimal(0), credit: amount, party: { type: "CUSTOMER" as const, id: input.customerId } },
         ],
       });
       const advance = await tx.customerAdvance.create({
         data: {
+          id: advanceId,
           organizationId: input.organizationId,
           branchId: input.branchId,
           customerId: input.customerId,
@@ -90,18 +96,6 @@ export async function postCustomerAdvance(
           journalId,
         },
         select: { id: true },
-      });
-      await tx.customerLedger.create({
-        data: {
-          organizationId: input.organizationId,
-          branchId: input.branchId,
-          customerId: input.customerId,
-          businessDate: occurredDate(input.businessDate),
-          entryType: "ADVANCE",
-          credit: amount,
-          referenceType: "customer_advance",
-          referenceId: advance.id,
-        },
       });
       await saveIdempotency(tx, {
         organizationId: input.organizationId,

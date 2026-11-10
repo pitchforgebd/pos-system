@@ -1,3 +1,4 @@
+import { GROUP } from "@/core/ledger/groups";
 import { toCsv } from "@/modules/imports/csv";
 import {
   bankReport,
@@ -44,10 +45,10 @@ export async function reportCsv(kind: string, scope: ReportScope) {
       ["account", "name", "group", "amount"],
       [
         ...report.rows.map((row) => [row.code, row.name, row.group, row.amount]),
-        ["", "Revenue", "4000", report.revenue],
-        ["", "Cost of sales", "5000", report.cost],
+        ["", "Revenue", GROUP.REVENUE, report.revenue],
+        ["", "Cost of sales", GROUP.COST_OF_SALES, report.cost],
         ["", "Gross profit", "", report.gross],
-        ["", "Expenses", "6000", report.expenses],
+        ["", "Expenses", GROUP.EXPENSE, report.expenses],
         ["", "Net", "", report.net],
       ],
     );

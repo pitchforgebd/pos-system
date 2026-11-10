@@ -4,6 +4,7 @@ import { ChartAccountTable } from "@/components/accounting/chart-table";
 import { IncomeForm } from "@/components/accounting/forms";
 import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
+import { GROUP } from "@/core/ledger/groups";
 import { EmptyState } from "@/components/ui/states";
 import { listIncomeRows } from "@/modules/accounting/unposted";
 import { getSession } from "@/modules/auth/current-session";
@@ -30,11 +31,11 @@ export default async function IncomePage() {
       />
       {session.permissions.has("accounting.post") && session.branchId ? (
         <IncomeForm
-          accounts={accounts.filter((account) => account.status === "ACTIVE" && account.groupCode === "4000" && account.code !== "4100").map((account) => ({ code: account.code, label: `${account.code} · ${account.name}` }))}
-          moneyAccounts={accounts.filter((account) => account.status === "ACTIVE" && (account.code === "1100" || account.code.startsWith("12"))).map((account) => ({ code: account.code, label: `${account.code} · ${account.name}` }))}
+          accounts={accounts.filter((account) => account.status === "ACTIVE" && account.groupCode === GROUP.REVENUE && !account.roles.includes("SALES")).map((account) => ({ code: account.code, label: `${account.code} · ${account.name}` }))}
+          moneyAccounts={accounts.filter((account) => account.status === "ACTIVE" && ["CASH", "BANK", "MOBILE"].includes(account.kind)).map((account) => ({ code: account.code, kind: account.kind, label: `${account.code} · ${account.name}` }))}
         />
       ) : null}
-      <ChartAccountTable rows={accounts.filter((account) => account.groupCode === "4000")} />
+      <ChartAccountTable rows={accounts.filter((account) => account.groupCode === GROUP.REVENUE)} />
       <DataTable
         caption="Income documents"
         columns={[

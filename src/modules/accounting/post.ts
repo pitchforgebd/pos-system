@@ -1,79 +1,14 @@
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 
-import { RuleError, type RuleStatus } from "@/core/errors/rule-error";
-import { dateOnly } from "@/core/time/business-date";
-import { assertPostable } from "@/core/time/period";
+import { PostingError } from "@/core/posting/errors";
+import { post, type DocType, type JournalPlan, type PartyRef, type PostLine } from "@/core/posting/journal";
 
-export class PostingError extends RuleError {
-  constructor(message: string, status: RuleStatus = 422) {
-    super(message, status);
-    this.name = "PostingError";
-  }
-}
+// The ledger engine is src/core/posting. These names stay for the modules that already import them; the old entry point is
+// the same engine, and goes when the last module has moved to `post` directly.
+export { PostingError };
+export type JournalLineInput = PostLine;
+export type { DocType, PartyRef };
 
-type JournalLineInput = {
-  accountCode: string;
-  debit: Prisma.Decimal;
-  credit: Prisma.Decimal;
-};
-
-export async function postBalancedJournal(
-  tx: Prisma.TransactionClient,
-  input: {
-    organizationId: string;
-    branchId: string;
-    businessDate: Date;
-    description: string;
-    createdById: string;
-    lines: JournalLineInput[];
-    number?: string | null;
-    reversalOfId?: string | null;
-  },
-) {
-  let debit = new Prisma.Decimal(0);
-  let credit = new Prisma.Decimal(0);
-  for (const line of input.lines) {
-    if (line.debit.isNeg() || line.credit.isNeg() || (line.debit.gt(0) && line.credit.gt(0))) {
-      throw new PostingError("A journal line must be a debit or a credit.");
-    }
-    debit = debit.plus(line.debit);
-    credit = credit.plus(line.credit);
-  }
-  if (!debit.eq(credit)) {
-    throw new PostingError("The journal is not balanced.");
-  }
-  // The period rules apply to every posting: not in the future, not in a locked period (invariant I11).
-  await assertPostable(tx, { organizationId: input.organizationId }, dateOnly(input.businessDate));
-  const codes = [...new Set(input.lines.map((line) => line.accountCode))];
-  const accounts = await tx.account.findMany({
-    where: { organizationId: input.organizationId, code: { in: codes }, status: "ACTIVE" },
-    select: { id: true, code: true },
-  });
-  const accountId = new Map(accounts.map((account) => [account.code, account.id]));
-  if (codes.some((code) => !accountId.has(code))) {
-    throw new PostingError("The chart of accounts is missing an account this entry requires.");
-  }
-  const journal = await tx.journal.create({
-    data: {
-      organizationId: input.organizationId,
-      branchId: input.branchId,
-      businessDate: input.businessDate,
-      status: "POSTED",
-      description: input.description,
-      postedAt: new Date(),
-      createdById: input.createdById,
-      number: input.number ?? null,
-      reversalOfId: input.reversalOfId ?? null,
-      lines: {
-        create: input.lines.map((line) => ({
-          organizationId: input.organizationId,
-          accountId: accountId.get(line.accountCode) ?? "",
-          debit: line.debit,
-          credit: line.credit,
-        })),
-      },
-    },
-    select: { id: true },
-  });
-  return journal.id;
+export function postBalancedJournal(tx: Prisma.TransactionClient, input: JournalPlan) {
+  return post(tx, input);
 }
