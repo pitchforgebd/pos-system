@@ -21,6 +21,7 @@ test("damage and expiry write-off are idempotent", async () => {
 
   const stamp = Date.now().toString();
   const org = await prisma.organization.create({ data: { name: "Idem", slug: `idem-${stamp}` } });
+  await (await import("../../core/ledger/chart.ts")).ensureChart(prisma, org.id);
   const branch = await prisma.branch.create({ data: { organizationId: org.id, name: "Main" } });
   const warehouse = await prisma.warehouse.create({ data: { organizationId: org.id, branchId: branch.id, name: "Main" } });
   const user = await prisma.user.create({
@@ -95,7 +96,7 @@ test("damage and expiry write-off are idempotent", async () => {
       assert.equal(replay.replayed, true);
       assert.equal(replay.id, first.id);
     }
-    assert.equal(await prisma.damageRecord.count({ where: { organizationId: org.id } }), 1);
+    assert.equal(await prisma.stockDocument.count({ where: { organizationId: org.id, type: "DAMAGE" } }), 1);
     assert.equal(await quantityOf(plain), "8.0000");
 
     const different = await postDamage({ ...damage, quantity: "3", idempotencyKey: key });
@@ -116,7 +117,7 @@ test("damage and expiry write-off are idempotent", async () => {
       [true, true],
     );
     assert.equal(raced.filter((result) => result.ok && result.replayed).length, 1);
-    assert.equal(await prisma.damageRecord.count({ where: { organizationId: org.id } }), 2);
+    assert.equal(await prisma.stockDocument.count({ where: { organizationId: org.id, type: "DAMAGE" } }), 2);
     assert.equal(await quantityOf(plain), "6.0000");
 
     const batch = await prisma.expiryBatch.findFirstOrThrow({ where: { organizationId: org.id, productId: expiring } });

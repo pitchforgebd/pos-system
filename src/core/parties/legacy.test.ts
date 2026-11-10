@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { prisma } from "../../lib/db/client.ts";
+import { runTx } from "../tx/run.ts";
 import { partyLineViolations } from "../posting/invariants.ts";
 import { factories, withTestOrg } from "../../tests/helpers/index.ts";
 import { partyBalance } from "./index.ts";
@@ -94,7 +95,7 @@ test("before the repair the journal knows no parties, so the comparison finds ev
 test("repairing writes the party on the old lines, moves held advances to Customer Advance, and the balances then match", async () => {
   await withTestOrg(async (t) => {
     const { c1, c2, c3, v1, sale } = await legacyShop(t);
-    const done = await repairLegacyParties(prisma, { organizationId: t.org.id, userId: t.owner.id, branchId: t.branch.id });
+    const done = await runTx((tx) => repairLegacyParties(tx, { organizationId: t.org.id, userId: t.owner.id, branchId: t.branch.id }));
     assert.ok(done.linesStamped >= 7, `stamped ${done.linesStamped}`);
     assert.equal(done.advancesMoved, 1, "Karim's net -70 is an advance the shop holds");
 
@@ -120,9 +121,9 @@ test("repairing writes the party on the old lines, moves held advances to Custom
 test("repairing twice changes nothing the second time", async () => {
   await withTestOrg(async (t) => {
     await legacyShop(t);
-    await repairLegacyParties(prisma, { organizationId: t.org.id, userId: t.owner.id, branchId: t.branch.id });
+    await runTx((tx) => repairLegacyParties(tx, { organizationId: t.org.id, userId: t.owner.id, branchId: t.branch.id }));
     const journals = await prisma.journal.count({ where: { organizationId: t.org.id } });
-    const second = await repairLegacyParties(prisma, { organizationId: t.org.id, userId: t.owner.id, branchId: t.branch.id });
+    const second = await runTx((tx) => repairLegacyParties(tx, { organizationId: t.org.id, userId: t.owner.id, branchId: t.branch.id }));
     assert.deepEqual([second.linesStamped, second.advancesMoved], [0, 0]);
     assert.equal(await prisma.journal.count({ where: { organizationId: t.org.id } }), journals);
   });
@@ -138,7 +139,7 @@ test("an opening balance the old code posted against Owner Capital is moved to O
     assert.equal(await net("CAPITAL"), 20, "Rahim's opening credited 50, Old Mill's opening debited 30");
     assert.equal(await net("OPENING_EQUITY"), 0);
 
-    const first = await repairLegacyParties(prisma, { organizationId: t.org.id, userId: t.owner.id, branchId: t.branch.id });
+    const first = await runTx((tx) => repairLegacyParties(tx, { organizationId: t.org.id, userId: t.owner.id, branchId: t.branch.id }));
     assert.equal(first.openingsReclassed, 2);
     assert.equal(await net("CAPITAL"), 0, "the owner put nothing in or took nothing out");
     assert.equal(await net("OPENING_EQUITY"), 20);
@@ -146,7 +147,7 @@ test("an opening balance the old code posted against Owner Capital is moved to O
     const openings = await prisma.journal.findMany({ where: { organizationId: t.org.id, docType: { in: ["CUSTOMER_OPENING", "SUPPLIER_OPENING"] } } });
     assert.deepEqual(reclass.map((row) => row.docId).sort(), openings.map((row) => row.id).sort(), "each move names the opening it moves");
 
-    const second = await repairLegacyParties(prisma, { organizationId: t.org.id, userId: t.owner.id, branchId: t.branch.id });
+    const second = await runTx((tx) => repairLegacyParties(tx, { organizationId: t.org.id, userId: t.owner.id, branchId: t.branch.id }));
     assert.equal(second.openingsReclassed, 0);
     assert.equal(await prisma.journal.count({ where: { organizationId: t.org.id, docType: "OPENING_RECLASS" } }), 2);
   });

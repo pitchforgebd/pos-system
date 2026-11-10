@@ -185,6 +185,7 @@ enum AccountingTransactionType {
 }
 
 enum DocumentType {
+  STK
   INV
   PUR
   RET

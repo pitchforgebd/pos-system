@@ -38,6 +38,13 @@ export type DocType =
   | "CASH_OPENING"
   | "LEGACY_ADVANCE"
   | "OPENING_RECLASS"
+  | "OPENING_STOCK"
+  | "OWN_STOCK"
+  | "STOCK_ADJUSTMENT"
+  | "DAMAGE"
+  | "EXPIRY_WRITEOFF"
+  | "TAKE_OFF"
+  | "TRANSFER"
   | "DIRECT_RETURN"
   | "LOYALTY_REDEEM";
 
@@ -60,6 +67,8 @@ export type PostLine = (
   shiftId?: string | null;
   assetId?: string | null;
   memo?: string | null;
+  /** The branch of this line when it is not the journal's (a transfer's destination). */
+  branchId?: string;
 };
 
 export type JournalPlan = {
@@ -77,6 +86,11 @@ export type JournalPlan = {
   kind?: JournalKind;
   number?: string | null;
   reversalOfId?: string | null;
+  /**
+   * For a document that moved stock: how much the stock value of each branch changed (in minus out). The inventory account must
+   * change by exactly this in each branch (I3), or the journal is refused. Set by postWithStock.
+   */
+  stockNet?: Map<string, Prisma.Decimal>;
 };
 
 const partyRoleIds = Object.keys(PARTY_ROLES) as PartyRole[];
@@ -167,6 +181,28 @@ async function checkParties(tx: Db, plan: JournalPlan, accountIds: string[]) {
   }
 }
 
+/** I3: the inventory lines of the journal, branch by branch, add up to the change in stock value the document made. */
+async function checkInventory(tx: Db, plan: JournalPlan, accountIds: string[]) {
+  if (!plan.stockNet) {
+    return;
+  }
+  const inventory = (await accountsFor(tx, plan.organizationId, ["INVENTORY"])).get("INVENTORY");
+  const booked = new Map<string, Prisma.Decimal>();
+  plan.lines.forEach((line, index) => {
+    if (accountIds[index] === inventory) {
+      const branchId = line.branchId ?? plan.branchId;
+      booked.set(branchId, (booked.get(branchId) ?? new Prisma.Decimal(0)).plus(line.debit).minus(line.credit));
+    }
+  });
+  for (const branchId of new Set([...booked.keys(), ...plan.stockNet.keys()])) {
+    const stock = plan.stockNet.get(branchId) ?? new Prisma.Decimal(0);
+    const books = booked.get(branchId) ?? new Prisma.Decimal(0);
+    if (!stock.eq(books)) {
+      refuse(`The inventory account moved by ${books.toFixed(2)} but the stock moved by ${stock.toFixed(2)} (I3).`);
+    }
+  }
+}
+
 async function checkShifts(tx: Db, plan: JournalPlan) {
   const shifts = new Set(plan.lines.flatMap((line) => (line.shiftId ? [line.shiftId] : [])));
   if (shifts.size > 0 && (await tx.shift.count({ where: { id: { in: [...shifts] }, organizationId: plan.organizationId } })) !== shifts.size) {
@@ -184,6 +220,7 @@ export async function post(tx: Db, plan: JournalPlan): Promise<string> {
   await assertPostable(tx, { organizationId: plan.organizationId }, dateOnly(plan.businessDate));
   const accountIds = await resolveAccounts(tx, plan);
   await checkParties(tx, plan, accountIds);
+  await checkInventory(tx, plan, accountIds);
   await checkShifts(tx, plan);
   try {
     const journal = await tx.journal.create({
@@ -214,7 +251,7 @@ export async function post(tx: Db, plan: JournalPlan): Promise<string> {
             assetId: line.assetId ?? null,
             // The date and branch of the journal are kept on every line, so reports need no join.
             businessDate: plan.businessDate,
-            branchId: plan.branchId,
+            branchId: line.branchId ?? plan.branchId,
           })),
         },
       },

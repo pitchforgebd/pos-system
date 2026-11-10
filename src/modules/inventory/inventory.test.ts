@@ -21,6 +21,7 @@ test("phase 05 stock and products", async () => {
 
   const stamp = Date.now().toString();
   const org = await prisma.organization.create({ data: { name: "Stock A", slug: `stock-a-${stamp}` } });
+  await (await import("../../core/ledger/chart.ts")).ensureChart(prisma, org.id);
   const other = await prisma.organization.create({ data: { name: "Stock B", slug: `stock-b-${stamp}` } });
   const branch = await prisma.branch.create({ data: { organizationId: org.id, name: "Main" } });
   const warehouse = await prisma.warehouse.create({ data: { organizationId: org.id, branchId: branch.id, name: "Main" } });
@@ -70,7 +71,7 @@ test("phase 05 stock and products", async () => {
       businessDate: "2026-10-01",
       lines: [{ productId: created.product.id, quantity: "2.0000", unitCost: "10.00" }],
     });
-    assert.equal(opened.ok, true);
+    assert.equal(opened.ok, true, JSON.stringify(opened));
     const low = await listStock({ organizationId: org.id, branchId: branch.id });
     assert.equal(low[0]?.quantity, "2.0000");
     assert.equal(low[0]?.alert, "LOW");

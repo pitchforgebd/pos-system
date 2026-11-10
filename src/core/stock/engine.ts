@@ -38,6 +38,8 @@ export type MovementInput = {
   unitCost?: Prisma.Decimal | null;
   /** For an OUT movement of an expiry-tracked product: take from this lot first. */
   lot?: string | null;
+  /** An expiry write-off: take exactly this lot (its id), and nothing else. */
+  lotId?: string | null;
   /** If given, the lots an OUT movement used up are added here (a transfer moves them on). */
   lotsOut?: ConsumedLot[];
   /** The day the movement belongs to (Dhaka): tells whether a lot is in date, and is written on the ledger row. Defaults to today. */
@@ -104,6 +106,23 @@ async function consumeExpiryLots(tx: Prisma.TransactionClient, input: MovementIn
     remaining = remaining.minus(take);
   }
   // Anything left over came from stock that was never put into a lot (older records); the stock balance has already confirmed it exists.
+}
+
+/** An expiry write-off takes the named lot and only that lot. */
+async function consumeLotById(tx: Prisma.TransactionClient, input: MovementInput) {
+  const rows = await tx.$queryRaw<Array<{ quantity: Prisma.Decimal }>>`
+    SELECT quantity FROM expiry_batches
+    WHERE id = ${input.lotId} AND organizationId = ${input.organizationId} AND warehouseId = ${input.warehouseId} AND productId = ${input.productId}
+    FOR UPDATE
+  `;
+  if (!rows[0]) {
+    throw new StockRuleError("That record was not found.", 404);
+  }
+  const available = new Prisma.Decimal(rows[0].quantity);
+  if (input.quantity.gt(available)) {
+    throw new StockRuleError("The write-off quantity is greater than the lot quantity.");
+  }
+  await tx.expiryBatch.updateMany({ where: { id: input.lotId as string }, data: { quantity: available.minus(input.quantity) } });
 }
 
 /**
@@ -233,7 +252,9 @@ export async function applyMovement(tx: Prisma.TransactionClient, input: Movemen
   await tx.stockBalance.updateMany({ where: { id: locked[0].id }, data: { quantity: next, averageCost } });
 
   const day = input.businessDate ?? today();
-  if (input.direction === "OUT" && product.trackExpiry && consumesLots.has(input.movementType)) {
+  if (input.direction === "OUT" && input.lotId) {
+    await consumeLotById(tx, input);
+  } else if (input.direction === "OUT" && product.trackExpiry && consumesLots.has(input.movementType)) {
     await consumeExpiryLots(tx, input, next, day);
   }
 

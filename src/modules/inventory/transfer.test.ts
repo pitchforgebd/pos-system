@@ -20,6 +20,7 @@ test("a transfer is received at once, keeps cost and lots, and is idempotent", a
 
   const stamp = `${Date.now()}-trf`;
   const org = await prisma.organization.create({ data: { name: "Transfer", slug: `transfer-${stamp}` } });
+  await (await import("../../core/ledger/chart.ts")).ensureChart(prisma, org.id);
   const north = await prisma.branch.create({ data: { organizationId: org.id, name: "North" } });
   const south = await prisma.branch.create({ data: { organizationId: org.id, name: "South" } });
   const northStore = await prisma.warehouse.create({ data: { organizationId: org.id, branchId: north.id, name: "Store" } });

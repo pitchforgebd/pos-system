@@ -16,6 +16,7 @@ test("an opening-stock import posts one document for all valid rows", async () =
 
   const stamp = `${Date.now()}-oi`;
   const org = await prisma.organization.create({ data: { name: "Opening import", slug: `opening-import-${stamp}` } });
+  await (await import("../../core/ledger/chart.ts")).ensureChart(prisma, org.id);
   const branch = await prisma.branch.create({ data: { organizationId: org.id, name: "Main" } });
   const warehouse = await prisma.warehouse.create({ data: { organizationId: org.id, branchId: branch.id, name: "Main" } });
   const user = await prisma.user.create({
@@ -76,13 +77,15 @@ test("an opening-stock import posts one document for all valid rows", async () =
       result.rows.map((row) => row.status),
       ["IMPORTED", "IMPORTED", "FAILED", "FAILED"],
     );
-    assert.equal(await prisma.openingStock.count({ where: { organizationId: org.id } }), 1);
+    assert.equal(await prisma.stockDocument.count({ where: { organizationId: org.id, type: "OPENING" } }), 1);
     assert.equal(await prisma.stockLedger.count({ where: { organizationId: org.id } }), 2);
+    assert.equal(await prisma.journal.count({ where: { organizationId: org.id, docType: "OPENING_STOCK" } }), 1);
 
     const replay = await confirmOpeningImport({ ...base, idempotencyKey: key });
     assert.equal(replay.ok && replay.replayed, true);
-    assert.equal(await prisma.openingStock.count({ where: { organizationId: org.id } }), 1);
+    assert.equal(await prisma.stockDocument.count({ where: { organizationId: org.id, type: "OPENING" } }), 1);
     assert.equal(await prisma.stockLedger.count({ where: { organizationId: org.id } }), 2);
+    assert.equal(await prisma.journal.count({ where: { organizationId: org.id, docType: "OPENING_STOCK" } }), 1);
   } finally {
     const { cleanupOrg } = await import("../../tests/helpers/cleanup.ts");
     await cleanupOrg(org.id);

@@ -10,7 +10,7 @@ for (const line of readFileSync(new URL("../../../.env", import.meta.url), "utf8
   }
 }
 
-test("phase 15 imports each row on its own and does not post opening stock to a journal", async () => {
+test("phase 15 imports each row on its own and posts the opening stock as one journal", async () => {
   const { prisma } = await import("../../lib/db/client.ts");
   const { parseCsv } = await import("./csv.ts");
   const { confirmOpeningImport } = await import("./opening-import.ts");
@@ -18,6 +18,7 @@ test("phase 15 imports each row on its own and does not post opening stock to a 
 
   const stamp = Date.now().toString();
   const org = await prisma.organization.create({ data: { name: "Import A", slug: `import-a-${stamp}` } });
+  await (await import("../../core/ledger/chart.ts")).ensureChart(prisma, org.id);
   const branch = await prisma.branch.create({ data: { organizationId: org.id, name: "Main" } });
   const warehouse = await prisma.warehouse.create({ data: { organizationId: org.id, branchId: branch.id, name: "Main" } });
   const user = await prisma.user.create({
@@ -76,7 +77,7 @@ test("phase 15 imports each row on its own and does not post opening stock to a 
     }
     const balance = await prisma.stockBalance.findFirst({ where: { organizationId: org.id, product: { sku } } });
     assert.equal(balance?.quantity.toFixed(4), "2.0000");
-    assert.equal(await prisma.journal.count({ where: { organizationId: org.id } }), journalsBefore);
+    assert.equal(await prisma.journal.count({ where: { organizationId: org.id } }), journalsBefore + 1, "one opening-stock document, one journal (Dr Inventory / Cr Opening Balance Equity)");
 
     const exported = await exportProducts(org.id);
     assert.equal(exported.ok, true);
