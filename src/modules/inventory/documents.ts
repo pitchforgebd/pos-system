@@ -136,17 +136,13 @@ async function postInbound(
           unitCost: parsed.unitCost,
         });
         if (product.trackExpiry && line.lot && line.expiresOn) {
-          await tx.expiryBatch.create({
-            data: {
-              organizationId: input.organizationId,
-              branchId: input.branchId,
-              productId: line.productId,
-              variantId: line.variantId ?? null,
-              lot: line.lot,
-              manufacturedOn: line.manufacturedOn ? occurredDate(line.manufacturedOn) : null,
-              expiresOn: occurredDate(line.expiresOn),
-              quantity: parsed.quantity,
-            },
+          await addExpiryLots(tx, {
+            organizationId: input.organizationId,
+            branchId: input.branchId,
+            warehouseId: warehouse.id,
+            productId: line.productId,
+            variantId: line.variantId,
+            lots: [{ lot: line.lot, manufacturedOn: line.manufacturedOn ? occurredDate(line.manufacturedOn) : null, expiresOn: occurredDate(line.expiresOn), quantity: parsed.quantity }],
           });
         }
       }
@@ -472,13 +468,13 @@ export async function writeOffExpiry(input: Actor & { batchId: string; quantity:
       if (quantity.gt(batch.quantity)) {
         throw new StockRuleError("The write-off quantity is greater than the lot quantity.");
       }
-      const warehouse = await warehouseOrThrow(input.organizationId, input.branchId, input.warehouseId);
+      // the lot is in one warehouse: that is where the stock leaves from
       await applyMovement(tx, {
         organizationId: input.organizationId,
         productId: batch.productId,
         variantId: batch.variantId,
         branchId: input.branchId,
-        warehouseId: warehouse.id,
+        warehouseId: batch.warehouseId,
         quantity,
         direction: "OUT",
         movementType: "EXPIRY",
@@ -711,6 +707,7 @@ export async function postTransfer(
           await addExpiryLots(tx, {
             organizationId: input.organizationId,
             branchId: input.toBranchId,
+            warehouseId: toWarehouse.id,
             productId: product.id,
             variantId: line.variantId,
             lots,

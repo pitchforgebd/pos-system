@@ -13,7 +13,7 @@ import { prisma } from "@/lib/db/client";
 //   I4  stock on hand = the sum of the stock movements, for each product, branch and warehouse
 //   I6  the inventory account of a branch = stock on hand x average cost (within 1.00). Only a warning for now: it becomes a hard
 //       check when stock valuation is complete (P03)
-//   I7  the quantity in expiry lots does not exceed the stock on hand
+//   I7  the quantity in expiry lots of a warehouse does not exceed the stock on hand in that warehouse
 //   I8  no invoice or bill is settled for more than it put on the books, no receipt settles more than it was
 //   I15 the trial balance balances, and assets = liabilities + equity + profit so far
 
@@ -144,12 +144,12 @@ async function lotsAboveStock(db: Db, organizationId: string): Promise<Finding[]
   const rows = await db.$queryRaw<Array<{ productId: string; branchId: string; lots: Prisma.Decimal | string; stock: Prisma.Decimal | string }>>`
     SELECT e.productId AS productId, e.branchId AS branchId, SUM(e.quantity) AS lots,
            (SELECT COALESCE(SUM(b.quantity), 0) FROM stock_balances b
-            WHERE b.organizationId = e.organizationId AND b.productId = e.productId AND b.branchId = e.branchId AND b.variantScope = COALESCE(e.variantId, '')) AS stock
+            WHERE b.organizationId = e.organizationId AND b.productId = e.productId AND b.branchId = e.branchId AND b.warehouseId = e.warehouseId AND b.variantScope = COALESCE(e.variantId, '')) AS stock
     FROM expiry_batches e
     WHERE e.organizationId = ${organizationId}
-    GROUP BY e.productId, e.branchId, e.variantId, e.organizationId
+    GROUP BY e.productId, e.branchId, e.warehouseId, e.variantId, e.organizationId
     HAVING SUM(e.quantity) > (SELECT COALESCE(SUM(b.quantity), 0) FROM stock_balances b
-            WHERE b.organizationId = e.organizationId AND b.productId = e.productId AND b.branchId = e.branchId AND b.variantScope = COALESCE(e.variantId, ''))
+            WHERE b.organizationId = e.organizationId AND b.productId = e.productId AND b.branchId = e.branchId AND b.warehouseId = e.warehouseId AND b.variantScope = COALESCE(e.variantId, ''))
     ORDER BY e.productId
   `;
   const names = await productNames(db, organizationId, rows.map((row) => row.productId));

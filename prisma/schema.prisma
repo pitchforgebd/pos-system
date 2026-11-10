@@ -62,7 +62,42 @@ enum Direction {
   OUT
 }
 
+/// One general header for the stock documents that have no document of their own (a transfer keeps stock_transfers).
+enum StockDocumentType {
+  OPENING
+  OWN
+  ADJUST
+  DAMAGE
+  EXPIRY
+  TAKE_OFF
+  TRANSFER
+}
+
+/// Why stock left the warehouse without a sale (D1). OWN_USE is the owner's drawing; the rest are an expense.
+enum TakeOffPurpose {
+  SAMPLE
+  DEMO
+  FIELD_TRIAL
+  OWN_USE
+  GIFT
+}
+
+enum SerialStatus {
+  IN_STOCK
+  RESERVED
+  SOLD
+  RETURNED
+  DAMAGED
+}
+
+enum ReservationStatus {
+  ACTIVE
+  RELEASED
+  CONSUMED
+}
+
 enum StockMovementType {
+  TAKE_OFF
   OPENING
   PURCHASE
   SALE
@@ -252,6 +287,8 @@ model Organization {
   stockAdjustments     StockAdjustment[]
   damageRecords        DamageRecord[]
   expiryBatches        ExpiryBatch[]
+  stockDocuments       StockDocument[]
+  stockReservations    StockReservation[]
   openingStocks        OpeningStock[]
   ownStockInvoices     OwnStockInvoice[]
   customers            Customer[]
@@ -350,6 +387,7 @@ model Branch {
   stockAdjustments   StockAdjustment[]
   damageRecords      DamageRecord[]
   expiryBatches      ExpiryBatch[]
+  stockDocuments     StockDocument[]
   openingStocks      OpeningStock[]
   ownStockInvoices   OwnStockInvoice[]
   sales              Sale[]
@@ -398,6 +436,10 @@ model Warehouse {
   racks            Rack[]
   stockBalances    StockBalance[]
   stockLedgers     StockLedger[]
+  expiryBatches    ExpiryBatch[]
+  stockDocuments   StockDocument[]
+  stockReservations StockReservation[]
+  serials          ProductSerial[]
   transfersFrom    StockTransfer[]   @relation("TransferFromWarehouse")
   transfersTo      StockTransfer[]   @relation("TransferToWarehouse")
   stockAdjustments StockAdjustment[]
@@ -685,6 +727,7 @@ model Product {
   damageRecords   DamageRecord[]
   expiryBatches   ExpiryBatch[]
   serials         ProductSerial[]
+  stockReservations StockReservation[]
   quotationItems  QuotationItem[]
   warrantyClaims  WarrantyClaim[]
   directReturns   DirectReturn[]
@@ -841,6 +884,8 @@ model StockBalance {
   branchId       String  @db.Char(36)
   warehouseId    String  @db.Char(36)
   quantity       Decimal @db.Decimal(18, 4)
+  /// Held for confirmed orders (P06); never more than the quantity.
+  reservedQty    Decimal @default(0) @db.Decimal(18, 4)
   /// Moving-average unit cost of the stock on hand. Null until a stock-in with a cost arrives.
   averageCost    Decimal? @db.Decimal(18, 4)
   updatedAt      DateTime @updatedAt
@@ -868,8 +913,12 @@ model StockLedger {
   movementType   StockMovementType
   referenceType  String            @db.VarChar(64)
   referenceId    String            @db.Char(36)
-  /// Present when the operation has a cost. Costing method is not chosen.
-  unitCost       Decimal?          @db.Decimal(18, 2)
+  /// Present when the operation has a cost: four decimals (N13).
+  unitCost       Decimal?          @db.Decimal(18, 4)
+  /// quantity x unitCost in money (two decimals): what the movement is worth in the books.
+  totalCost      Decimal?          @db.Decimal(18, 2)
+  /// The day the movement belongs to (Dhaka), not the day it was typed.
+  businessDate   DateTime          @default(dbgenerated("(curdate())")) @db.Date
   userId         String            @db.Char(36)
   createdAt      DateTime          @default(now())
 
@@ -880,10 +929,68 @@ model StockLedger {
   warehouse    Warehouse?      @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
   user         User            @relation(fields: [userId], references: [id], onDelete: Restrict)
 
+  @@index([organizationId, businessDate])
   @@index([organizationId, productId, branchId, createdAt])
   @@index([organizationId, branchId, createdAt])
   @@index([organizationId, referenceType, referenceId])
   @@map("stock_ledgers")
+}
+
+/// The header of a stock document that has no table of its own: opening, own stock, adjustment, damage, expiry write-off, take-off.
+/// The movements are the stock ledger rows that point at it (referenceType "stock_document"); the books are its journal.
+model StockDocument {
+  id               String            @id @default(uuid()) @db.Char(36)
+  organizationId   String            @db.Char(36)
+  branchId         String            @db.Char(36)
+  warehouseId      String            @db.Char(36)
+  type             StockDocumentType
+  number           String?           @db.VarChar(32)
+  businessDate     DateTime          @db.Date
+  reason           String?           @db.VarChar(255)
+  /// Damage: where it happened.
+  place            String?           @db.VarChar(191)
+  takeOffPurpose   TakeOffPurpose?
+  /// Take-off: who received the goods, who approved, and a note.
+  recipient        String?           @db.VarChar(191)
+  approvedBy       String?           @db.VarChar(191)
+  note             String?           @db.VarChar(500)
+  /// Take-off: the expense account chosen instead of the purpose's default.
+  expenseAccountId String?           @db.Char(36)
+  journalId        String?           @unique @db.Char(36)
+  createdById      String?           @db.Char(36)
+  createdAt        DateTime          @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  branch       Branch       @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  warehouse    Warehouse    @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  journal      Journal?     @relation(fields: [journalId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, number])
+  @@index([organizationId, branchId, type, businessDate])
+  @@map("stock_documents")
+}
+
+/// Stock held for a confirmed order (P06): active until the order is dispatched (consumed) or cancelled (released).
+model StockReservation {
+  id             String            @id @default(uuid()) @db.Char(36)
+  organizationId String            @db.Char(36)
+  orderId        String            @db.Char(36)
+  orderItemId    String?           @db.Char(36)
+  productId      String            @db.Char(36)
+  variantId      String?           @db.Char(36)
+  warehouseId    String            @db.Char(36)
+  quantity       Decimal           @db.Decimal(18, 4)
+  status         ReservationStatus @default(ACTIVE)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  product      Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
+  warehouse    Warehouse    @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, orderId])
+  @@index([organizationId, productId, warehouseId, status])
+  @@map("stock_reservations")
 }
 
 model StockTransfer {
@@ -981,8 +1088,12 @@ model ExpiryBatch {
   id             String    @id @default(uuid()) @db.Char(36)
   organizationId String    @db.Char(36)
   branchId       String    @db.Char(36)
+  /// Lots belong to a warehouse (N14): a sale from warehouse A never touches warehouse B's lot.
+  warehouseId    String    @db.Char(36)
   productId      String    @db.Char(36)
   variantId      String?   @db.Char(36)
+  /// Empty string when there is no variant (MySQL unique indexes do not treat NULL as one value).
+  variantScope   String    @default("") @db.VarChar(36)
   lot            String    @db.VarChar(64)
   manufacturedOn DateTime? @db.Date
   expiresOn      DateTime  @db.Date
@@ -992,9 +1103,11 @@ model ExpiryBatch {
 
   organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   branch       Branch          @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  warehouse    Warehouse       @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
   product      Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
   variant      ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
 
+  @@unique([organizationId, warehouseId, productId, variantScope, lot, expiresOn])
   @@index([organizationId, productId, expiresOn])
   @@map("expiry_batches")
 }
@@ -1720,6 +1833,7 @@ model Journal {
   organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   branch         Branch?            @relation(fields: [branchId], references: [id], onDelete: Restrict)
   paymentAllocations PaymentAllocation[]
+  stockDocument  StockDocument?
   reversalOf     Journal?           @relation("JournalReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
   reversals      Journal[]          @relation("JournalReversal")
   createdBy      User?              @relation("JournalCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
@@ -2399,13 +2513,19 @@ model ProductSerial {
   id             String  @id @default(uuid()) @db.Char(36)
   organizationId String  @db.Char(36)
   productId      String  @db.Char(36)
+  variantId      String? @db.Char(36)
+  /// Where the unit is (a sale only takes a serial that is in the warehouse it sells from).
+  warehouseId    String? @db.Char(36)
   serial         String  @db.VarChar(64)
-  status         String  @default("IN_STOCK") @db.VarChar(16)
+  status         SerialStatus @default(IN_STOCK)
   saleId         String? @db.Char(36)
+  /// The stock ledger row that brought the unit in (a purchase or an opening): serials are added on stock-in only.
+  inMovementId   String? @db.Char(36)
   createdAt      DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   product      Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
+  warehouse    Warehouse?   @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
   sale         Sale?        @relation(fields: [saleId], references: [id], onDelete: Restrict)
 
   @@unique([organizationId, serial])

@@ -123,7 +123,7 @@ test("a warning alone does not fail the check", async () => {
 test("more expiry-lot quantity than stock is named (I7)", async () => {
   await withTestOrg(async (t) => {
     const { product } = await trade(t);
-    await prisma.expiryBatch.create({ data: { organizationId: t.org.id, branchId: t.branch.id, productId: product.id, lot: "L1", expiresOn: new Date("2030-01-01T00:00:00.000Z"), quantity: "5000.0000" } });
+    await prisma.expiryBatch.create({ data: { organizationId: t.org.id, branchId: t.branch.id, warehouseId: t.warehouse.id, productId: product.id, lot: "L1", expiresOn: new Date("2030-01-01T00:00:00.000Z"), quantity: "5000.0000" } });
     const result = await reconcileBooks(prisma, t.org.id);
     assert.deepEqual(invariants(result.findings), ["I7"]);
     assert.match(result.findings[0].subject, new RegExp(product.sku));

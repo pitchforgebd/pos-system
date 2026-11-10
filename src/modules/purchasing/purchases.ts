@@ -189,6 +189,7 @@ export async function postPurchase(
           await addExpiryLots(tx, {
             organizationId: input.organizationId,
             branchId: input.branchId,
+            warehouseId: warehouse.id,
             productId: line.productId,
             variantId: line.variantId,
             lots: [

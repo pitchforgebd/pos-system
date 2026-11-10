@@ -106,10 +106,11 @@ test("the cost of goods sold follows the moving average of the stock on hand", a
     assert.equal(adjusted.ok, true);
     assert.equal(await average(rice.id), "18.7500");
 
-    // Stock that never had a cost is costed at the product's purchase price, and the sale still goes through.
+    // Stock that never had a cost is valued at the product's purchase price from the first unit (the books carry it at that value,
+    // so the average is set then), and the sale still goes through.
     const salt = await product("SALT", "4.50");
     assert.equal((await postAdjustment({ ...actor, idempotencyKey: randomUUID(), productId: salt.id, quantity: "3", direction: "IN", reason: "count" })).ok, true);
-    assert.equal(await average(salt.id), null);
+    assert.equal(await average(salt.id), "4.5000");
     assert.equal(await sell(salt.id, "1", "50.00"), "4.5000");
 
     // The ledger of the books agrees: cost of goods sold is the sum of what the sales were costed at.
