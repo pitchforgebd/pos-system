@@ -70,6 +70,9 @@ export async function postBalancedJournal(
           accountId: accountId.get(line.accountCode) ?? "",
           debit: line.debit,
           credit: line.credit,
+          // The date and branch of the journal are kept on every line, so reports need no join.
+          businessDate: input.businessDate,
+          branchId: input.branchId,
         })),
       },
     },

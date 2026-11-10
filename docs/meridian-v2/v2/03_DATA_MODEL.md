@@ -33,10 +33,10 @@ note          VARCHAR(500) NULL
 | `accounts` + `isSystem` BOOL, `kind` enum(CASH, BANK, MOBILE, OTHER), `accountNumber`, `bankName`, `bankBranch` | ব্যাংক/মোবাইল অ্যাকাউন্ট আলাদা অ্যাকাউন্ট হিসেবে |
 | `account_roles` (organizationId, role, accountId) unique(org, role) | হার্ডকোড কোড বাদ (B8) |
 | `journals` + `businessDate`, `docType`, `docId`, `@@unique([docType, docId, kind])` | এক ডকুমেন্টে এক জার্নাল (reversal আলাদা kind) |
-| `journal_lines` + `partyType` enum(CUSTOMER, VENDOR, COURIER, EMPLOYEE) NULL, `partyId` NULL, `shiftId` NULL, `branchId`, `businessDate` (denormalized), `assetId` NULL | সাবলেজার ও রিপোর্টের ডাইমেনশন |
+| `journal_lines` + `partyType` enum(CUSTOMER, VENDOR, COURIER, EMPLOYEE) NULL, `partyId` NULL, `shiftId` NULL, `branchId`, `businessDate` (denormalized), `assetId` NULL (FK P09-এ, `fixed_assets` আসার পর) | সাবলেজার ও রিপোর্টের ডাইমেনশন। DB CHECK: লাইন হয় debit নয় credit, > 0 (I1) |
 | ইন্ডেক্স: `journal_lines(organizationId, accountId, businessDate)`, `(organizationId, partyType, partyId, businessDate)`, `(shiftId)` | রিপোর্ট দ্রুত |
 | `customer_ledgers`, `supplier_ledgers` | **বাদ** — জার্নালের party লাইন থেকে view/query। migration-এ ডাটা জার্নালে আছে কিনা যাচাই করে drop |
-| `payment_allocations` (receiptJournalId বা paymentDocId, invoiceId বা billId, amount) | কোন টাকা কোন ইনভয়েসে — পেমেন্ট স্ট্যাটাস |
+| `payment_allocations` (journalId = রসিদ/পেমেন্টের জার্নাল, invoiceId বা billId — ঠিক একটি, amount > 0) | কোন টাকা কোন ইনভয়েসে — পেমেন্ট স্ট্যাটাস। DB CHECK দিয়ে জোর করা; MySQL ON UPDATE CASCADE-যুক্ত কলামে CHECK মানে না, তাই এই দুই FK-তে `ON UPDATE RESTRICT` (id কখনো বদলায় না) |
 | `couriers` → পার্টি হিসেবে (বিদ্যমান টেবিল রাখা, partyType COURIER) | |
 
 ## ৪. ইনভেন্টরি (P03)

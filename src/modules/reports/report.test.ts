@@ -58,6 +58,8 @@ test("phase 14 reports sum posted rows and keep the trial balance equal", async 
         accountId: byCode.get(code) ?? "",
         debit,
         credit,
+        branchId: branch.id,
+        businessDate: new Date("2026-10-01T00:00:00.000Z"),
       })),
     });
   }
