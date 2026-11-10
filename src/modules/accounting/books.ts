@@ -1078,6 +1078,49 @@ export async function postCashVoucher(
   }
 }
 
+/**
+ * The cash in the drawer when the books start: Dr Cash in Hand / Cr Opening Balance Equity. Entered once per branch (the branch
+ * is the document, so a second entry is refused); cash after that comes from sales, receipts and the owner's capital.
+ */
+export async function postOpeningCash(input: Actor & { amount: string }) {
+  const requestHash = hashPayload({ amount: input.amount, branchId: input.branchId });
+  try {
+    const data = await runTx(async (tx) => {
+      const existing = await begin(tx, input.organizationId, input.idempotencyKey, requestHash);
+      if (existing) {
+        return { id: existing.entityId, replayed: true, number: null as string | null };
+      }
+      const amount = parseMoney(input.amount);
+      if (!amount || amount.lte(0)) {
+        throw new PostingError("Enter an opening cash amount greater than zero.");
+      }
+      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: businessDate() });
+      const journalId = await postBalancedJournal(tx, {
+        organizationId: input.organizationId,
+        branchId: input.branchId,
+        businessDate: occurredDate(businessDate()),
+        description: `Opening cash ${number}`,
+        createdById: input.userId,
+        number,
+        doc: { type: "CASH_OPENING", id: input.branchId },
+        lines: [
+          { role: "CASH", debit: amount, credit: zero() },
+          { role: "OPENING_EQUITY", debit: zero(), credit: amount },
+        ],
+      });
+      await remember(tx, { ...input, requestHash, entityType: "opening_cash", entityId: journalId });
+      return { id: journalId, number, replayed: false };
+    });
+    return finishPost(input, data, "opening_cash");
+  } catch (error) {
+    const mapped = failure(error);
+    if (mapped) {
+      return mapped;
+    }
+    throw error;
+  }
+}
+
 export async function createBankAccount(
   input: Actor & { name: string; openingAmount?: string },
 ) {
@@ -1131,7 +1174,7 @@ export async function createBankAccount(
           doc: { type: "BANK_OPENING", id: account.id },
           lines: [
             { accountId: account.id, debit: opening, credit: zero() },
-            { role: "CAPITAL" as const, debit: zero(), credit: opening },
+            { role: "OPENING_EQUITY" as const, debit: zero(), credit: opening },
           ],
           number,
         });

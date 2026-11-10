@@ -1,11 +1,12 @@
 import { Prisma } from "@prisma/client";
 import { runTx } from "@/core/tx/run";
-import { dateOnly } from "@/core/time/business-date";
+import { businessDate, dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
 import { postBalancedJournal } from "@/modules/accounting/post";
 import { decimalString, parseMoney } from "@/core/money";
+import { occurredDate } from "@/lib/format/date";
 
 const supplierSelect = {
   id: true,
@@ -111,6 +112,9 @@ export async function createSupplier(input: {
   if (!opening || (input.creditLimit && !creditLimit)) {
     return { ok: false as const, status: 422 as const, code: "BUSINESS_RULE" as const, message: "Enter money amounts with up to two decimals." };
   }
+  if (opening.gt(0) && !input.branchId) {
+    return { ok: false as const, status: 422 as const, code: "BUSINESS_RULE" as const, message: "Select a branch before entering an opening balance: it is posted to the books." };
+  }
   const supplier = await runTx(async (tx) => {
     const created = await tx.supplier.create({
     data: {
@@ -131,7 +135,7 @@ export async function createSupplier(input: {
       data: {
         organizationId: input.organizationId,
         supplierId: created.id,
-        businessDate: new Date(),
+        businessDate: occurredDate(businessDate()),
         entryType: "OPENING",
         credit: opening,
         referenceType: "supplier",
@@ -142,11 +146,11 @@ export async function createSupplier(input: {
       await postBalancedJournal(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
-        businessDate: new Date(),
+        businessDate: occurredDate(businessDate()),
         description: `Supplier opening ${created.name}`,
         createdById: input.actorId,
         lines: [
-          { role: "CAPITAL", debit: opening, credit: new Prisma.Decimal(0) },
+          { role: "OPENING_EQUITY", debit: opening, credit: new Prisma.Decimal(0) },
           { role: "AP", debit: new Prisma.Decimal(0), credit: opening, party: { type: "VENDOR" as const, id: created.id } },
         ],
         doc: { type: "SUPPLIER_OPENING", id: created.id },

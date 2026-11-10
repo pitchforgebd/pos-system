@@ -279,6 +279,9 @@ export async function createCustomer(input: {
   if (!opening || (input.creditLimit && !creditLimit)) {
     return { ok: false as const, status: 422 as const, code: "BUSINESS_RULE" as const, message: "Enter money amounts with up to two decimals." };
   }
+  if (opening.gt(0) && !input.branchId) {
+    return { ok: false as const, status: 422 as const, code: "BUSINESS_RULE" as const, message: "Select a branch before entering an opening balance: it is posted to the books." };
+  }
   const type = await activeType(input.organizationId, input.customerTypeId);
   if (!type.ok) {
     return type;
@@ -323,7 +326,7 @@ export async function createCustomer(input: {
           createdById: input.actorId,
           lines: [
             { role: "AR", debit: opening, credit: new Prisma.Decimal(0), party: { type: "CUSTOMER" as const, id: created.id } },
-            { role: "CAPITAL", debit: new Prisma.Decimal(0), credit: opening },
+            { role: "OPENING_EQUITY", debit: new Prisma.Decimal(0), credit: opening },
           ],
           doc: { type: "CUSTOMER_OPENING", id: created.id },
         });

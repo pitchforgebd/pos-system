@@ -64,6 +64,8 @@
 | 3 | কাস্টমার opening বাকি | Dr AR(P) / Cr OPENING_EQUITY | — |
 | 4 | Vendor opening বাকি | Dr OPENING_EQUITY / Cr AP(P) | — |
 | 5 | ক্যাশ/ব্যাংক opening | Dr MONEY / Cr OPENING_EQUITY | — |
+
+**opening-এর নিয়ম:** #3–#5 সবই একই দিনে (ঢাকার আজ) পোস্ট হয় এবং **ব্রাঞ্চ ছাড়া নেওয়া হয় না** (ব্রাঞ্চ না থাকলে জার্নাল বাদ পড়ে ব্যালান্স মিলত না; তাই কাস্টমার/Vendor তৈরিতে opening থাকলে ব্রাঞ্চ বাধ্যতামূলক)। ক্যাশ opening প্রতি ব্রাঞ্চে একবার (ব্রাঞ্চই ডকুমেন্ট, দ্বিতীয়বার 409), `POST /api/v1/accounting/opening-cash`। মালিকের মূলধন (3100) শুধু মালিক টাকা দিলে/তুললে নড়ে।
 | 6 | Adjustment + | Dr INVENTORY / Cr INVENTORY_GAIN (avg) | IN `ADJUSTMENT` |
 | 7 | Adjustment − | Dr INVENTORY_LOSS / Cr INVENTORY (avg) | OUT `ADJUSTMENT` |
 | 8 | Damage / Expiry | Dr INVENTORY_LOSS / Cr INVENTORY (avg) | OUT `DAMAGE`/`EXPIRY` |

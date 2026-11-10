@@ -35,6 +35,7 @@ export type DocType =
   | "CONTRA"
   | "JOURNAL"
   | "BANK_OPENING"
+  | "CASH_OPENING"
   | "DIRECT_RETURN"
   | "LOYALTY_REDEEM";
 
