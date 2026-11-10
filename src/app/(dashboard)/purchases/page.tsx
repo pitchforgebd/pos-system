@@ -6,7 +6,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { Pagination } from "@/components/ui/pagination";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/states";
-import { listQuery, pageHref } from "@/core/list";
+import { listQuery } from "@/core/list";
 import { getSession } from "@/modules/auth/current-session";
 import { listPurchases, purchaseSorts } from "@/modules/purchasing/purchases";
 
@@ -62,7 +62,8 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Pr
           pageCount={page.pageCount}
           total={page.total}
           pageSize={page.pageSize}
-          hrefFor={(target) => pageHref("/purchases", { q: params.q, sort: params.sort, pageSize: page.pageSize === 25 ? undefined : page.pageSize }, target)}
+          path="/purchases"
+          params={{ ...(params.q ? { q: params.q } : {}), ...(params.sort ? { sort: params.sort } : {}), ...(page.pageSize !== 25 ? { pageSize: page.pageSize } : {}) }}
         />
       ) : null}
     </div>

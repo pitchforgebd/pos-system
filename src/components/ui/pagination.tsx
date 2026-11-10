@@ -1,4 +1,7 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
+import { pageHref } from "@/core/list";
 
 type PaginationProps = {
   page: number;
@@ -9,16 +12,22 @@ type PaginationProps = {
   | {
       /** Client-side list: the parent holds the page in state. */
       onPageChange: (page: number) => void;
-      hrefFor?: never;
+      path?: never;
+      params?: never;
     }
   | {
-      /** Server-side list: every page is a link, so the page works without JavaScript and can be shared. See `pageHref` in @/core/list. */
-      hrefFor: (page: number) => string;
+      /**
+       * Server-side list: every page is a link (so the page works without JavaScript and can be shared). `path` is the page's
+       * own path and `params` its other query parameters, kept on every link. Plain data, not a function: a server page cannot
+       * hand a function to a client component.
+       */
+      path: string;
+      params?: Record<string, string | number>;
       onPageChange?: never;
     }
 );
 
-export function Pagination({ page, pageCount, total, pageSize, onPageChange, hrefFor }: PaginationProps) {
+export function Pagination({ page, pageCount, total, pageSize, onPageChange, path, params }: PaginationProps) {
   // A page past the last one (an old link, a typed number) shows nothing, and Previous goes back to the last real page.
   const pastEnd = page > pageCount;
   const start = total === 0 || pastEnd ? 0 : (page - 1) * pageSize + 1;
@@ -27,9 +36,13 @@ export function Pagination({ page, pageCount, total, pageSize, onPageChange, hre
   const hasNext = page < pageCount;
 
   function control(label: string, target: number, enabled: boolean) {
-    if (hrefFor && enabled) {
-      return (
-        <Button variant="secondary" size="sm" href={hrefFor(target)}>
+    if (path !== undefined) {
+      return enabled ? (
+        <Button variant="secondary" size="sm" href={pageHref(path, params ?? {}, target)}>
+          {label}
+        </Button>
+      ) : (
+        <Button variant="secondary" size="sm" disabled>
           {label}
         </Button>
       );
