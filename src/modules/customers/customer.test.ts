@@ -105,10 +105,6 @@ test("phase 10 posts customer due and advance without inventing points", async (
     // N16: an advance is the shop's liability to the customer (the wallet), not a negative receivable.
     assert.equal((await outstandingReceivable(org.id, created.customer.id)).toFixed(2), "6.00");
     assert.equal((await customerWallet(org.id, created.customer.id)).toFixed(2), "2.00");
-    const advanceLine = await prisma.customerLedger.findFirst({
-      where: { customerId: created.customer.id, entryType: "ADVANCE" },
-    });
-    assert.equal(advanceLine?.credit.toFixed(2), "2.00");
     assert.equal(await prisma.customerPayment.count({ where: { customerId: created.customer.id } }), 1);
     assert.equal(await prisma.customerAdvance.count({ where: { customerId: created.customer.id } }), 1);
 

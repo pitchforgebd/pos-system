@@ -214,18 +214,6 @@ export async function postPurchase(
         doc: { type: "PURCHASE", id: purchase.id },
       });
       await tx.purchase.update({ where: { id: purchase.id }, data: { journalId: purchaseJournalId } });
-      await tx.supplierLedger.create({
-        data: {
-          organizationId: input.organizationId,
-          branchId: input.branchId,
-          supplierId: supplier.id,
-          businessDate: occurredDate(input.businessDate),
-          entryType: "PURCHASE",
-          credit: subtotal,
-          referenceType: "purchase",
-          referenceId: purchase.id,
-        },
-      });
       if (payment.gt(0) && input.paymentMethod) {
         await settleSupplier(tx, {
           ...input,
@@ -322,18 +310,6 @@ async function settleSupplier(
       },
     });
   }
-  await tx.supplierLedger.create({
-    data: {
-      organizationId: input.organizationId,
-      branchId: input.branchId,
-      supplierId: input.supplierId,
-      businessDate: occurredDate(input.businessDate),
-      entryType: "PAYMENT",
-      debit: input.amount,
-      referenceType: "supplier_payment",
-      referenceId: payment.id,
-    },
-  });
   return payment;
 }
 

@@ -88,6 +88,17 @@ async function documentJournals(tx: Db, organizationId: string) {
       SET j.docType = ${type}, j.docId = d.id
       WHERE j.organizationId = ${organizationId} AND j.docType IS NULL AND j.kind = 'POSTING'`;
   }
+  // an opening journal was named after its party; accepted only when the name is unique
+  total += await tx.$executeRaw`
+    UPDATE journals j JOIN customers c ON c.organizationId = j.organizationId AND j.description = CONCAT('Customer opening ', c.name)
+    SET j.docType = 'CUSTOMER_OPENING', j.docId = c.id
+    WHERE j.organizationId = ${organizationId} AND j.docType IS NULL AND j.kind = 'POSTING'
+      AND (SELECT COUNT(*) FROM customers c2 WHERE c2.organizationId = j.organizationId AND c2.name = c.name) = 1`;
+  total += await tx.$executeRaw`
+    UPDATE journals j JOIN suppliers s ON s.organizationId = j.organizationId AND j.description = CONCAT('Supplier opening ', s.name)
+    SET j.docType = 'SUPPLIER_OPENING', j.docId = s.id
+    WHERE j.organizationId = ${organizationId} AND j.docType IS NULL AND j.kind = 'POSTING'
+      AND (SELECT COUNT(*) FROM suppliers s2 WHERE s2.organizationId = j.organizationId AND s2.name = s.name) = 1`;
   return total;
 }
 

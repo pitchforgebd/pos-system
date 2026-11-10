@@ -40,12 +40,21 @@ test("phase 17 lists dues in one pass and the new indexes cover the explained fi
   const org = await prisma.organization.create({ data: { name: "Fast A", slug: `fast-${stamp}` } });
   const owed = await prisma.customer.create({ data: { organizationId: org.id, name: "Ada" } });
   const clear = await prisma.customer.create({ data: { organizationId: org.id, name: "Bea" } });
-  await prisma.customerLedger.createMany({
-    data: [
-      { organizationId: org.id, customerId: owed.id, businessDate: new Date("2026-10-01T00:00:00.000Z"), entryType: "OPENING", debit: "8.00", credit: "0.00" },
-      { organizationId: org.id, customerId: owed.id, businessDate: new Date("2026-10-01T00:00:00.000Z"), entryType: "PAYMENT", debit: "0.00", credit: "3.00" },
-    ],
-  });
+  // A customer's balance comes from the journal lines that name them: owes 8.00, paid 3.00.
+  const { Prisma } = await import("@prisma/client");
+  const { post } = await import("../../core/posting/journal.ts");
+  const { runTx } = await import("../../core/tx/run.ts");
+  const { ensureChart } = await import("../../core/ledger/chart.ts");
+  await ensureChart(prisma, org.id);
+  await prisma.organization.update({ where: { id: org.id }, data: { backdateDays: 100000 } });
+  const branch = await prisma.branch.create({ data: { organizationId: org.id, name: "Main" } });
+  const poster = await prisma.user.create({ data: { organizationId: org.id, name: "Poster", email: `poster-${stamp}@example.test`, passwordHash: "x" } });
+  const party = { type: "CUSTOMER" as const, id: owed.id };
+  const day = new Date("2026-10-01T00:00:00.000Z");
+  const dec = (value: string) => new Prisma.Decimal(value);
+  const base = { organizationId: org.id, branchId: branch.id, businessDate: day, createdById: poster.id };
+  await runTx((tx) => post(tx, { ...base, description: "opening", doc: { type: "JOURNAL", id: crypto.randomUUID() }, lines: [{ role: "AR", debit: dec("8.00"), credit: dec("0"), party }, { role: "OPENING_EQUITY", debit: dec("0"), credit: dec("8.00") }] }));
+  await runTx((tx) => post(tx, { ...base, description: "payment", doc: { type: "JOURNAL", id: crypto.randomUUID() }, lines: [{ role: "CASH", debit: dec("3.00"), credit: dec("0") }, { role: "AR", debit: dec("0"), credit: dec("3.00"), party }] }));
 
   try {
     const listed = await listCustomers(org.id);

@@ -3,6 +3,7 @@ import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { GROUP } from "@/core/ledger/groups";
+import { partyBalancesOf } from "@/core/parties";
 import { moneyText } from "@/core/money";
 
 export type WingSummary = {
@@ -295,25 +296,20 @@ async function reportBoards(organizationId: string, branchId: string | null, bra
     }),
     prisma.customerPayment.aggregate({ where: { organizationId, ...scope }, _sum: { amount: true } }),
     prisma.customer.count({ where: { organizationId } }),
-    prisma.customerLedger.groupBy({
-      by: ["customerId"],
-      where: { organizationId, ...scope },
-      _sum: { debit: true, credit: true },
-    }),
-    prisma.customerLedger.aggregate({
-      where: { organizationId, entryType: "OPENING", ...scope },
-      _sum: { debit: true, credit: true },
-    }),
+    partyBalancesOf(prisma, { organizationId, partyType: "CUSTOMER", branchIds: ids }),
+    prisma.$queryRaw<Array<{ debit: Prisma.Decimal | null; credit: Prisma.Decimal | null }>>`
+      SELECT SUM(l.debit) AS debit, SUM(l.credit) AS credit
+      FROM journal_lines l
+      JOIN journals j ON j.id = l.journalId
+      JOIN account_roles r ON r.organizationId = l.organizationId AND r.accountId = l.accountId AND r.role = 'AR'
+      WHERE l.organizationId = ${organizationId} AND l.branchId IN (${Prisma.join(ids)}) AND j.docType = 'CUSTOMER_OPENING'
+    `,
     prisma.customer.findMany({
       where: { organizationId, customerType: { name: "Dealer" } },
       select: { id: true },
     }),
     prisma.supplier.count({ where: { organizationId } }),
-    prisma.supplierLedger.groupBy({
-      by: ["supplierId"],
-      where: { organizationId, ...scope },
-      _sum: { debit: true, credit: true },
-    }),
+    partyBalancesOf(prisma, { organizationId, partyType: "VENDOR", branchIds: ids }),
     prisma.product.count({ where: { organizationId, deletedAt: null } }),
     prisma.$queryRaw<Array<{ godown: bigint; stockValue: Prisma.Decimal | null }>>`
       SELECT COUNT(DISTINCT CASE WHEN sb.quantity > 0 THEN sb.productId END) AS godown,
@@ -339,9 +335,9 @@ async function reportBoards(organizationId: string, branchId: string | null, bra
   let dueCustomers = 0;
   let customersDue = new Prisma.Decimal(0);
   const dueByCustomer = new Map<string, Prisma.Decimal>();
-  for (const row of customerLines) {
-    const balance = new Prisma.Decimal(row._sum.debit ?? 0).minus(row._sum.credit ?? 0);
-    dueByCustomer.set(row.customerId, balance);
+  for (const [customerId, row] of customerLines) {
+    const balance = row.balance;
+    dueByCustomer.set(customerId, balance);
     if (balance.gt(0)) {
       dueCustomers += 1;
       customersDue = customersDue.plus(balance);
@@ -359,16 +355,15 @@ async function reportBoards(organizationId: string, branchId: string | null, bra
   let dueSuppliers = 0;
   let suppliersDue = new Prisma.Decimal(0);
   let supplierAdvance = new Prisma.Decimal(0);
-  for (const row of supplierLines) {
-    const payable = new Prisma.Decimal(row._sum.credit ?? 0).minus(row._sum.debit ?? 0);
-    if (payable.gt(0)) {
+  for (const [, row] of supplierLines) {
+    if (row.balance.gt(0)) {
       dueSuppliers += 1;
-      suppliersDue = suppliersDue.plus(payable);
-    } else if (payable.lt(0)) {
-      supplierAdvance = supplierAdvance.plus(payable.neg());
+      suppliersDue = suppliersDue.plus(row.balance);
     }
+    // money paid ahead to the vendor (their advance), as before shown as the supplier advance
+    supplierAdvance = supplierAdvance.plus(row.advance);
   }
-  const openingDue = new Prisma.Decimal(openingLines._sum.debit ?? 0).minus(openingLines._sum.credit ?? 0);
+  const openingDue = new Prisma.Decimal(openingLines[0]?.debit ?? 0).minus(openingLines[0]?.credit ?? 0);
   return {
     supplierAdvance: moneyText(supplierAdvance),
     sell: {

@@ -124,18 +124,6 @@ export async function postCustomerPayment(
         },
         select: { id: true, number: true },
       });
-      await tx.customerLedger.create({
-        data: {
-          organizationId: input.organizationId,
-          branchId: input.branchId,
-          customerId: input.customerId,
-          businessDate: occurredDate(input.businessDate),
-          entryType: "PAYMENT",
-          credit: amount,
-          referenceType: "customer_payment",
-          referenceId: payment.id,
-        },
-      });
       await saveIdempotency(tx, {
         organizationId: input.organizationId,
         userId: input.userId,

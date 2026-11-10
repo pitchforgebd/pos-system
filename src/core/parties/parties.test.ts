@@ -191,3 +191,44 @@ test("a vendor's ageing buckets the bills still unpaid, oldest paid first", asyn
     assert.equal(aging.total.toFixed(2), "70.00");
   });
 });
+
+test("partyBalancesOf lists every party that has a balance or an advance, optionally for some branches only", async () => {
+  const { partyBalancesOf } = await import("./index.ts");
+  await withTestOrg(async (t) => {
+    await open(t);
+    const f = factories(t);
+    const [a, b, c] = [await f.customer(), await f.customer(), await f.customer()];
+    const otherBranch = await prisma.branch.create({ data: { organizationId: t.org.id, name: "Elsewhere" } });
+    await entry(t, { date: today(), role: "AR", side: "debit", amount: "10.00", partyType: "CUSTOMER", partyId: a.id });
+    await entry(t, { date: today(), role: "AR", side: "debit", amount: "20.00", partyType: "CUSTOMER", partyId: b.id });
+    await entry(t, { date: today(), role: "AR", side: "credit", amount: "20.00", partyType: "CUSTOMER", partyId: b.id });
+    await entry(t, { date: today(), role: "CUSTOMER_ADVANCE", side: "credit", amount: "5.00", partyType: "CUSTOMER", partyId: c.id });
+    const all = await partyBalancesOf(prisma, { organizationId: t.org.id, partyType: "CUSTOMER" });
+    assert.deepEqual([...all.keys()].sort(), [a.id, b.id, c.id].sort(), "b nets to zero but has lines, so is listed");
+    assert.equal(all.get(a.id)?.balance.toFixed(2), "10.00");
+    assert.equal(all.get(c.id)?.advance.toFixed(2), "5.00");
+    const here = await partyBalancesOf(prisma, { organizationId: t.org.id, partyType: "CUSTOMER", branchIds: [t.branch.id] });
+    assert.equal(here.size, 3);
+    const there = await partyBalancesOf(prisma, { organizationId: t.org.id, partyType: "CUSTOMER", branchIds: [otherBranch.id] });
+    assert.equal(there.size, 0, "nothing was posted in the other branch");
+  });
+});
+
+test("recentPartyLines gives the newest lines of a party's accounts first, each labelled by the document that made it", async () => {
+  const { recentPartyLines } = await import("./index.ts");
+  await withTestOrg(async (t) => {
+    await open(t);
+    const customer = await factories(t).customer();
+    const base = { partyType: "CUSTOMER" as const, partyId: customer.id };
+    await entry(t, { ...base, role: "AR", date: addDays(today(), -3), side: "debit", amount: "100.00" });
+    await entry(t, { ...base, role: "CUSTOMER_ADVANCE", date: addDays(today(), -2), side: "credit", amount: "40.00" });
+    await entry(t, { ...base, role: "AR", date: addDays(today(), -1), side: "credit", amount: "30.00" });
+    const other = await factories(t).customer();
+    await entry(t, { partyType: "CUSTOMER", partyId: other.id, role: "AR", date: today(), side: "debit", amount: "999.00" });
+    const lines = await recentPartyLines(prisma, { organizationId: t.org.id, partyType: "CUSTOMER", partyId: customer.id });
+    assert.deepEqual(lines.map((l) => [l.debit, l.credit]), [["0.00", "30.00"], ["0.00", "40.00"], ["100.00", "0.00"]], "newest first, only this customer, receivable and advance lines");
+    const limited = await recentPartyLines(prisma, { organizationId: t.org.id, partyType: "CUSTOMER", partyId: customer.id, limit: 2 });
+    assert.equal(limited.length, 2);
+    assert.ok(lines.every((l) => l.entryType === "JOURNAL"), "the test posts manual journals");
+  });
+});

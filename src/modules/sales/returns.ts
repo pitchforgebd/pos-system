@@ -177,20 +177,6 @@ export async function postSaleReturn(
         });
         await tx.saleReturn.update({ where: { id: saleReturn.id }, data: { journalId } });
       }
-      if (sale.customerId && split.applied.gt(0)) {
-        await tx.customerLedger.create({
-          data: {
-            organizationId: input.organizationId,
-            branchId: input.branchId,
-            customerId: sale.customerId,
-            businessDate: occurredDate(input.businessDate),
-            entryType: "RETURN",
-            credit: split.applied,
-            referenceType: "sale_return",
-            referenceId: saleReturn.id,
-          },
-        });
-      }
       await saveIdempotency(tx, {
         organizationId: input.organizationId,
         userId: input.userId,

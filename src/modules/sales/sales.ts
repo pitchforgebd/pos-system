@@ -297,23 +297,9 @@ export async function postSale(
           data: { organizationId: input.organizationId, saleId: sale.id, method, amount: payment },
         });
       }
-      const ledgerDebit = method === "WALLET" ? money(due.plus(payment)) : due;
-      if (customer && ledgerDebit.gt(0)) {
-        await tx.customerLedger.create({
-          data: {
-            organizationId: input.organizationId,
-            branchId: input.branchId,
-            customerId: customer.id,
-            businessDate: occurredDate(input.businessDate),
-            entryType: "SALE",
-            debit: ledgerDebit,
-            referenceType: "sale",
-            referenceId: sale.id,
-          },
-        });
-        if (customer.creditLimit && (await outstandingReceivable(input.organizationId, customer.id, tx)).gt(customer.creditLimit)) {
-          throw new StockRuleError("The sale exceeds the customer credit limit.");
-        }
+      // The receivable only grows by what was not paid now (a wallet payment is not a receivable), so that is when the limit is checked.
+      if (customer && due.gt(0) && customer.creditLimit && (await outstandingReceivable(input.organizationId, customer.id, tx)).gt(customer.creditLimit)) {
+        throw new StockRuleError("The sale exceeds the customer credit limit.");
       }
       for (const line of priced) {
         if (!line.serial) {

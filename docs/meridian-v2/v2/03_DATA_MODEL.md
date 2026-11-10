@@ -35,7 +35,7 @@ note          VARCHAR(500) NULL
 | `journals` + `businessDate`, `docType`, `docId`, `@@unique([docType, docId, kind])` | এক ডকুমেন্টে এক জার্নাল (reversal আলাদা kind) |
 | `journal_lines` + `partyType` enum(CUSTOMER, VENDOR, COURIER, EMPLOYEE) NULL, `partyId` NULL, `shiftId` NULL, `branchId`, `businessDate` (denormalized), `assetId` NULL (FK P09-এ, `fixed_assets` আসার পর) | সাবলেজার ও রিপোর্টের ডাইমেনশন। DB CHECK: লাইন হয় debit নয় credit, > 0 (I1) |
 | ইন্ডেক্স: `journal_lines(organizationId, accountId, businessDate)`, `(organizationId, partyType, partyId, businessDate)`, `(shiftId)` | রিপোর্ট দ্রুত |
-| `customer_ledgers`, `supplier_ledgers` | **বাদ** — জার্নালের party লাইন থেকে view/query। migration-এ ডাটা জার্নালে আছে কিনা যাচাই করে drop |
+| `customer_ledgers`, `supplier_ledgers` | **বাদ** — জার্নালের party লাইন থেকে view/query। **অবস্থা (P02 টাস্ক ৬):** কোডে এই দুই টেবিলে আর কিছু লেখা বা পড়া হয় না (শুধু `scripts/party-ledgers.ts` যাচাইয়ের জন্য পড়ে); পুরনো ডাটা `scripts/party-ledgers.ts repair` দিয়ে জার্নালে আনা ও মেলানো হয়েছে। টেবিল দুটি `drop` করার migration মালিকের অনুমতির অপেক্ষায় (dev ডাটাবেসের ডাটা মুছে যায়), তাই এখনো লেখা হয়নি |
 | `payment_allocations` (journalId = রসিদ/পেমেন্টের জার্নাল, invoiceId বা billId — ঠিক একটি, amount > 0) | কোন টাকা কোন ইনভয়েসে — পেমেন্ট স্ট্যাটাস। DB CHECK দিয়ে জোর করা; MySQL ON UPDATE CASCADE-যুক্ত কলামে CHECK মানে না, তাই এই দুই FK-তে `ON UPDATE RESTRICT` (id কখনো বদলায় না) |
 | `couriers` → পার্টি হিসেবে (বিদ্যমান টেবিল রাখা, partyType COURIER) | |
 

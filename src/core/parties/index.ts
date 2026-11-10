@@ -1,4 +1,4 @@
-import { Prisma, type PartyType } from "@prisma/client";
+import { Prisma, type PartyType, type PrismaClient } from "@prisma/client";
 
 import type { PartyRole } from "@/core/ledger/roles";
 import { dateOnly, daysBetween, isIsoDate } from "@/core/time/business-date";
@@ -7,7 +7,8 @@ import { dateOnly, daysBetween, isIsoDate } from "@/core/time/business-date";
 // all of it is the sum of the journal lines that carry the party, read from journal_lines and nowhere else, so a balance can
 // never disagree with the books. Every function takes the party's own lines through the (organization, party, date) index.
 
-type Db = Prisma.TransactionClient;
+/** A transaction, or the shared client for a read outside one. */
+type Db = Prisma.TransactionClient | PrismaClient;
 
 /** MAIN is the receivable (customer, courier) or payable (vendor); ADVANCE is the money held for or paid to the party ahead. */
 export type PartyAccount = "MAIN" | "ADVANCE";
@@ -37,13 +38,37 @@ function sideOf(partyType: PartyType, account: PartyAccount): Side | null {
 
 type Raw = { partyId: string; role: string; debit: Prisma.Decimal | string | null; credit: Prisma.Decimal | string | null };
 
+type Balances = Map<string, { balance: Prisma.Decimal; advance: Prisma.Decimal }>;
+
 /** Balance and advance of each of the given parties, as of a day (default: everything posted). Every asked party has an entry. */
 export async function partyBalances(
   db: Db,
   input: { organizationId: string; partyType: PartyType; partyIds: string[]; asOf?: string },
-): Promise<Map<string, { balance: Prisma.Decimal; advance: Prisma.Decimal }>> {
-  const result = new Map(input.partyIds.map((id) => [id, { balance: ZERO, advance: ZERO }]));
+): Promise<Balances> {
   if (input.partyIds.length === 0) {
+    return new Map();
+  }
+  return balancesOf(db, input, input.partyIds);
+}
+
+/**
+ * Every party of a kind that has any receivable, payable or advance line, with its balance and advance (for the reports that list
+ * who owes what), optionally counting only the lines posted in some branches.
+ */
+export async function partyBalancesOf(
+  db: Db,
+  input: { organizationId: string; partyType: PartyType; asOf?: string; branchIds?: string[] },
+): Promise<Balances> {
+  return balancesOf(db, input, null);
+}
+
+async function balancesOf(
+  db: Db,
+  input: { organizationId: string; partyType: PartyType; asOf?: string; branchIds?: string[] },
+  partyIds: string[] | null,
+): Promise<Balances> {
+  const result: Balances = new Map((partyIds ?? []).map((id) => [id, { balance: ZERO, advance: ZERO }]));
+  if (input.branchIds && input.branchIds.length === 0) {
     return result;
   }
   const roles = (["MAIN", "ADVANCE"] as const).flatMap((account) => {
@@ -60,14 +85,19 @@ export async function partyBalances(
     JOIN account_roles r ON r.organizationId = l.organizationId AND r.accountId = l.accountId AND r.role IN (${Prisma.join(roles)})
     WHERE l.organizationId = ${input.organizationId}
       AND l.partyType = ${input.partyType}
-      AND l.partyId IN (${Prisma.join(input.partyIds)})
+      ${partyIds ? Prisma.sql`AND l.partyId IN (${Prisma.join(partyIds)})` : Prisma.empty}
+      ${input.branchIds ? Prisma.sql`AND l.branchId IN (${Prisma.join(input.branchIds)})` : Prisma.empty}
       ${asOf ? Prisma.sql`AND l.businessDate <= ${asOf}` : Prisma.empty}
     GROUP BY l.partyId, r.role
   `;
   const main = sideOf(input.partyType, "MAIN");
   const advance = sideOf(input.partyType, "ADVANCE");
   for (const row of rows) {
-    const entry = result.get(row.partyId);
+    let entry = result.get(row.partyId);
+    if (!entry && partyIds === null) {
+      entry = { balance: ZERO, advance: ZERO };
+      result.set(row.partyId, entry);
+    }
     if (!entry) {
       continue;
     }
@@ -190,4 +220,49 @@ export async function agingBuckets(
     }
   }
   return { buckets, total, unapplied: toApply };
+}
+
+export type RecentLine = { id: string; businessDate: string; entryType: string; debit: string; credit: string; referenceType: string | null };
+
+// What a document type is called on a customer's or vendor's page.
+const ENTRY_LABEL: Record<string, string> = {
+  SALE: "SALE",
+  SALE_RETURN: "RETURN",
+  CUSTOMER_PAYMENT: "PAYMENT",
+  CUSTOMER_ADVANCE: "ADVANCE",
+  LEGACY_ADVANCE: "ADVANCE",
+  CUSTOMER_OPENING: "OPENING",
+  LOYALTY_REDEEM: "ADJUSTMENT",
+  PURCHASE: "PURCHASE",
+  PURCHASE_RETURN: "RETURN",
+  SUPPLIER_PAYMENT: "PAYMENT",
+  SUPPLIER_OPENING: "OPENING",
+};
+
+/** The newest lines on a party's accounts (receivable or payable, and advance), for the party's page. */
+export async function recentPartyLines(
+  db: Db,
+  input: { organizationId: string; partyType: PartyType; partyId: string; limit?: number },
+): Promise<RecentLine[]> {
+  const roles = (["MAIN", "ADVANCE"] as const).flatMap((account) => {
+    const side = sideOf(input.partyType, account);
+    return side ? [side.role] : [];
+  });
+  if (roles.length === 0) {
+    return [];
+  }
+  const lines = await db.journalLine.findMany({
+    where: { organizationId: input.organizationId, partyType: input.partyType, partyId: input.partyId, account: { roles: { some: { role: { in: roles } } } } },
+    orderBy: [{ businessDate: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+    take: input.limit ?? 50,
+    select: { id: true, businessDate: true, debit: true, credit: true, journal: { select: { docType: true } } },
+  });
+  return lines.map((line) => ({
+    id: line.id,
+    businessDate: dateOnly(line.businessDate),
+    entryType: ENTRY_LABEL[line.journal.docType ?? ""] ?? line.journal.docType ?? "JOURNAL",
+    debit: dec(line.debit).toFixed(2),
+    credit: dec(line.credit).toFixed(2),
+    referenceType: line.journal.docType,
+  }));
 }

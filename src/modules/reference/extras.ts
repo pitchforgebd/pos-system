@@ -379,18 +379,6 @@ export async function redeemLoyalty(input: Actor & { customerId: string; points:
           { role: "AR", debit: new Prisma.Decimal(0), credit: taka, party: { type: "CUSTOMER" as const, id: input.customerId } },
         ],
       });
-      await tx.customerLedger.create({
-        data: {
-          organizationId: input.organizationId,
-          branchId: input.branchId,
-          customerId: input.customerId,
-          businessDate: day(input.businessDate),
-          entryType: "ADJUSTMENT",
-          credit: taka,
-          referenceType: "loyalty",
-          referenceId: journalId,
-        },
-      });
       const entry = await tx.loyaltyTransaction.create({
         data: {
           id: redeemId,

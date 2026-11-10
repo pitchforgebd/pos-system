@@ -84,18 +84,32 @@ test("phase 14 reports sum posted rows and keep the trial balance equal", async 
         businessDate: new Date("2026-10-01T00:00:00.000Z"),
       },
     });
-    await prisma.customerLedger.create({
-      data: { organizationId: org.id, customerId: customer.id, businessDate: new Date("2026-10-01T00:00:00.000Z"), entryType: "OPENING", debit: "8.00", credit: "0.00" },
-    });
-    await prisma.customerLedger.create({
-      data: { organizationId: org.id, customerId: customer.id, businessDate: new Date("2026-10-02T00:00:00.000Z"), entryType: "PAYMENT", debit: "0.00", credit: "3.00" },
-    });
-    await prisma.supplierLedger.create({
-      data: { organizationId: org.id, supplierId: supplier.id, businessDate: new Date("2026-10-01T00:00:00.000Z"), entryType: "OPENING", debit: "0.00", credit: "7.00" },
-    });
-    await prisma.supplierLedger.create({
-      data: { organizationId: org.id, supplierId: supplier.id, businessDate: new Date("2026-10-02T00:00:00.000Z"), entryType: "PAYMENT", debit: "2.00", credit: "0.00" },
-    });
+
+    // Party balances come from the journal: post what the old ledger rows used to say, through the posting engine.
+    const { Prisma } = await import("@prisma/client");
+    const poster = await prisma.user.create({ data: { organizationId: org.id, name: "Poster", email: `poster-${stamp}@example.test`, passwordHash: "x" } });
+    const { post: postEntry } = await import("../../core/posting/journal.ts");
+    const { runTx } = await import("../../core/tx/run.ts");
+    const { ensureChart } = await import("../../core/ledger/chart.ts");
+    await ensureChart(prisma, org.id);
+    await prisma.organization.update({ where: { id: org.id }, data: { backdateDays: 100000 } });
+    const owe = (partyType: "CUSTOMER" | "VENDOR", partyId: string, date: string, role: "AR" | "AP", side: "debit" | "credit", amount: string) => {
+      const money = new Prisma.Decimal(amount);
+      const zero = new Prisma.Decimal(0);
+      const partySide = side === "debit" ? { debit: money, credit: zero } : { debit: zero, credit: money };
+      const otherSide = side === "debit" ? { debit: zero, credit: money } : { debit: money, credit: zero };
+      return runTx((tx) =>
+        postEntry(tx, {
+          organizationId: org.id, branchId: branch.id, businessDate: new Date(`${date}T00:00:00.000Z`), description: `${role} ${side}`, createdById: poster.id,
+          doc: { type: "JOURNAL", id: crypto.randomUUID() },
+          lines: [{ role, ...partySide, party: { type: partyType, id: partyId } }, { role: "OPENING_EQUITY", ...otherSide }],
+        }),
+      );
+    };
+    await owe("CUSTOMER", customer.id, "2026-10-01", "AR", "debit", "8.00");
+    await owe("CUSTOMER", customer.id, "2026-10-02", "AR", "credit", "3.00");
+    await owe("VENDOR", supplier.id, "2026-10-01", "AP", "credit", "7.00");
+    await owe("VENDOR", supplier.id, "2026-10-02", "AP", "debit", "2.00");
 
     const sales = await salesReport(scope);
     assert.equal(sales.total, "12.50");
@@ -154,7 +168,8 @@ test("phase 14 reports sum posted rows and keep the trial balance equal", async 
     const trial = await trialBalance(scope);
     assert.equal(trial.balanced, true);
     assert.equal(trial.debit, trial.credit);
-    assert.equal(trial.debit, "15.00");
+    // 15.00 from the three entries above, 20.00 from the party entries (8 + 3 + 7 + 2) posted for the due reports
+    assert.equal(trial.debit, "35.00");
     const book = await dayBook(scope);
     assert.equal(book.balanced, true);
     assert.equal(book.debit, book.credit);
@@ -166,6 +181,7 @@ test("phase 14 reports sum posted rows and keep the trial balance equal", async 
     assert.equal(result.net, "5.00");
     assert.equal(result.rows.some((row) => row.code === "1100"), false);
     const cash = await cashReport(scope);
+    // the party entries above are set against Opening Balance Equity, so they do not move cash
     assert.equal(cash.debit, "10.00");
     assert.equal(cash.credit, "5.00");
   } finally {

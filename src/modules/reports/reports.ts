@@ -3,6 +3,7 @@ import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { GROUP } from "@/core/ledger/groups";
+import { partyBalances } from "@/core/parties";
 import type { AccountRole } from "@/core/ledger/roles";
 import { decimalString, moneyText } from "@/core/money";
 import { alertStatus } from "@/modules/inventory/stock";
@@ -135,7 +136,7 @@ export async function inventoryReport(scope: ReportScope) {
 }
 
 export async function customerReport(organizationId: string) {
-  const [count, customers, sums] = await Promise.all([
+  const [count, customers] = await Promise.all([
     prisma.customer.count({ where: { organizationId } }),
     prisma.customer.findMany({
       where: { organizationId },
@@ -143,25 +144,21 @@ export async function customerReport(organizationId: string) {
       take: listLimit,
       select: { id: true, name: true },
     }),
-    prisma.customerLedger.groupBy({
-      by: ["customerId"],
-      where: { organizationId },
-      _sum: { debit: true, credit: true },
-    }),
   ]);
-  const dueById = new Map(sums.map((row) => [row.customerId, dec(row._sum.debit).minus(dec(row._sum.credit))]));
+  const balances = await partyBalances(prisma, { organizationId, partyType: "CUSTOMER", partyIds: customers.map((row) => row.id) });
   return {
     count,
     rows: customers.map((row) => ({
       id: row.id,
       name: row.name,
-      due: moneyText(dueById.get(row.id) ?? new Prisma.Decimal(0)),
+      due: moneyText(balances.get(row.id)?.balance ?? new Prisma.Decimal(0)),
+      advance: moneyText(balances.get(row.id)?.advance ?? new Prisma.Decimal(0)),
     })),
   };
 }
 
 export async function supplierReport(organizationId: string) {
-  const [count, suppliers, sums] = await Promise.all([
+  const [count, suppliers] = await Promise.all([
     prisma.supplier.count({ where: { organizationId } }),
     prisma.supplier.findMany({
       where: { organizationId },
@@ -169,19 +166,14 @@ export async function supplierReport(organizationId: string) {
       take: listLimit,
       select: { id: true, name: true },
     }),
-    prisma.supplierLedger.groupBy({
-      by: ["supplierId"],
-      where: { organizationId },
-      _sum: { debit: true, credit: true },
-    }),
   ]);
-  const dueById = new Map(sums.map((row) => [row.supplierId, dec(row._sum.credit).minus(dec(row._sum.debit))]));
+  const balances = await partyBalances(prisma, { organizationId, partyType: "VENDOR", partyIds: suppliers.map((row) => row.id) });
   return {
     count,
     rows: suppliers.map((row) => ({
       id: row.id,
       name: row.name,
-      payable: moneyText(dueById.get(row.id) ?? new Prisma.Decimal(0)),
+      payable: moneyText(balances.get(row.id)?.balance ?? new Prisma.Decimal(0)),
     })),
   };
 }

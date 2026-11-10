@@ -5,7 +5,7 @@ import { businessDate, dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
-import { partyBalance } from "@/core/parties";
+import { partyBalance, partyBalances, recentPartyLines } from "@/core/parties";
 import { postBalancedJournal } from "@/modules/accounting/post";
 import { decimalString, parseMoney } from "@/core/money";
 
@@ -84,48 +84,35 @@ function present(
 }
 
 export async function listRegisterCustomers(organizationId: string) {
-  const [rows, sums] = await Promise.all([
-    prisma.customer.findMany({
-      where: { organizationId, status: "ACTIVE" },
-      orderBy: { name: "asc" },
-      take: 200,
-      select: { id: true, name: true, phone: true },
-    }),
-    prisma.customerLedger.groupBy({
-      by: ["customerId"],
-      where: { organizationId },
-      _sum: { debit: true, credit: true },
-    }),
-  ]);
-  const due = new Map(sums.map((row) => [row.customerId, new Prisma.Decimal(row._sum.debit ?? 0).minus(row._sum.credit ?? 0)]));
+  const rows = await prisma.customer.findMany({
+    where: { organizationId, status: "ACTIVE" },
+    orderBy: { name: "asc" },
+    take: 200,
+    select: { id: true, name: true, phone: true },
+  });
+  // Only the rows shown get a balance (H8), and it comes from the journal.
+  const balances = await partyBalances(prisma, { organizationId, partyType: "CUSTOMER", partyIds: rows.map((row) => row.id) });
   return rows.map((row) => ({
     id: row.id,
     name: row.name,
     phone: row.phone,
-    outstanding: decimalString(due.get(row.id) ?? new Prisma.Decimal(0), 2),
+    outstanding: decimalString(balances.get(row.id)?.balance ?? new Prisma.Decimal(0), 2),
   }));
 }
 
 export async function listCustomers(organizationId: string, search?: string) {
   const needle = search?.trim();
-  const [rows, sums] = await Promise.all([
-    prisma.customer.findMany({
-      where: {
-        organizationId,
-        ...(needle ? { OR: [{ name: { contains: needle } }, { phone: { contains: needle } }] } : {}),
-      },
-      orderBy: { name: "asc" },
-      take: 200,
-      select: customerSelect,
-    }),
-    prisma.customerLedger.groupBy({
-      by: ["customerId"],
-      where: { organizationId },
-      _sum: { debit: true, credit: true },
-    }),
-  ]);
-  const due = new Map(sums.map((row) => [row.customerId, new Prisma.Decimal(row._sum.debit ?? 0).minus(row._sum.credit ?? 0)]));
-  return rows.map((row) => present(row, due.get(row.id) ?? new Prisma.Decimal(0)));
+  const rows = await prisma.customer.findMany({
+    where: {
+      organizationId,
+      ...(needle ? { OR: [{ name: { contains: needle } }, { phone: { contains: needle } }] } : {}),
+    },
+    orderBy: { name: "asc" },
+    take: 200,
+    select: customerSelect,
+  });
+  const balances = await partyBalances(prisma, { organizationId, partyType: "CUSTOMER", partyIds: rows.map((row) => row.id) });
+  return rows.map((row) => present(row, balances.get(row.id)?.balance ?? new Prisma.Decimal(0)));
 }
 
 export async function getCustomer(organizationId: string, id: string) {
@@ -133,21 +120,10 @@ export async function getCustomer(organizationId: string, id: string) {
   if (!row) {
     return null;
   }
-  const ledger = await prisma.customerLedger.findMany({
-    where: { organizationId, customerId: id },
-    orderBy: { businessDate: "desc" },
-    take: 50,
-  });
   return {
     ...present(row, await outstandingReceivable(organizationId, id)),
-    ledger: ledger.map((line) => ({
-      id: line.id,
-      businessDate: dateString(line.businessDate),
-      entryType: line.entryType,
-      debit: decimalString(line.debit, 2),
-      credit: decimalString(line.credit, 2),
-      referenceType: line.referenceType,
-    })),
+    wallet: decimalString(await customerWallet(organizationId, id), 2),
+    ledger: await recentPartyLines(prisma, { organizationId, partyType: "CUSTOMER", partyId: id }),
   };
 }
 
@@ -305,18 +281,6 @@ export async function createCustomer(input: {
       select: { id: true, name: true },
     });
     if (opening.gt(0)) {
-      await tx.customerLedger.create({
-        data: {
-          organizationId: input.organizationId,
-          branchId: input.branchId ?? null,
-          customerId: created.id,
-          businessDate: today(),
-          entryType: "OPENING",
-          debit: opening,
-          referenceType: "customer",
-          referenceId: created.id,
-        },
-      });
       if (input.branchId) {
         await postBalancedJournal(tx, {
           organizationId: input.organizationId,

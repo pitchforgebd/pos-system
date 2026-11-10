@@ -168,20 +168,6 @@ export async function postPurchaseReturn(
         });
         await tx.purchaseReturn.update({ where: { id: purchaseReturn.id }, data: { journalId } });
       }
-      if (applied.gt(0)) {
-        await tx.supplierLedger.create({
-          data: {
-            organizationId: input.organizationId,
-            branchId: input.branchId,
-            supplierId: purchase.supplierId,
-            businessDate: occurredDate(input.businessDate),
-            entryType: "RETURN",
-            debit: applied,
-            referenceType: "purchase_return",
-            referenceId: purchaseReturn.id,
-          },
-        });
-      }
       await saveIdempotency(tx, {
         organizationId: input.organizationId,
         userId: input.userId,
