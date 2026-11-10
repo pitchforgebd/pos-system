@@ -36,6 +36,7 @@ export type DocType =
   | "JOURNAL"
   | "BANK_OPENING"
   | "CASH_OPENING"
+  | "LEGACY_ADVANCE"
   | "DIRECT_RETURN"
   | "LOYALTY_REDEEM";
 
