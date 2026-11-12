@@ -310,6 +310,8 @@ model Organization {
 
   branches             Branch[]
   salesOrders          SalesOrder[]
+  receiptlessReturns   ReceiptlessReturn[]
+  receiptlessReturnItems ReceiptlessReturnItem[]
   salesOrderItems      SalesOrderItem[]
   orderEvents          OrderEvent[]
   warehouses           Warehouse[]
@@ -436,6 +438,7 @@ model Branch {
   sessions           Session[]
   stockBalances      StockBalance[]
   salesOrders        SalesOrder[]
+  receiptlessReturns ReceiptlessReturn[]
   stockLedgers       StockLedger[]
   transfersFrom      StockTransfer[]    @relation("TransferFromBranch")
   transfersTo        StockTransfer[]    @relation("TransferToBranch")
@@ -776,6 +779,7 @@ model Product {
   variants     ProductVariant[]
   images       ProductImage[]
   salesOrderItems SalesOrderItem[]
+  receiptlessReturnItems ReceiptlessReturnItem[]
   barcodes     ProductBarcode[]
   prices       ProductPrice[]
   balances     StockBalance[]
@@ -2877,4 +2881,55 @@ model OrderEvent {
 
   @@index([orderId, createdAt])
   @@map("order_events")
+}
+
+/// A return with no invoice to point to (N10): the customer has no receipt. It needs a permission and a second user's approval, refunds at
+/// most the current retail price, and takes the stock back at what it costs now.
+model ReceiptlessReturn {
+  id              String       @id @default(uuid()) @db.Char(36)
+  organizationId  String       @db.Char(36)
+  branchId        String       @db.Char(36)
+  customerId      String?      @db.Char(36)
+  number          String?      @db.VarChar(32)
+  businessDate    DateTime     @db.Date
+  total           Decimal      @default(0) @db.Decimal(18, 2)
+  vatTotal        Decimal      @default(0) @db.Decimal(18, 2)
+  refundMethod    RefundMethod
+  refundAccountId String?      @db.Char(36)
+  reason          String       @db.VarChar(255)
+  /// The second user who approved it.
+  approvedById    String       @db.Char(36)
+  createdById     String       @db.Char(36)
+  journalId       String?      @unique @db.Char(36)
+  createdAt       DateTime     @default(now())
+
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  branch       Branch                @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  items        ReceiptlessReturnItem[]
+
+  @@unique([organizationId, number])
+  @@index([organizationId, branchId, businessDate])
+  @@map("receiptless_returns")
+}
+
+model ReceiptlessReturnItem {
+  id             String  @id @default(uuid()) @db.Char(36)
+  organizationId String  @db.Char(36)
+  returnId       String  @db.Char(36)
+  productId      String  @db.Char(36)
+  variantId      String? @db.Char(36)
+  quantity       Decimal @db.Decimal(18, 4)
+  /// What one unit is refunded at (VAT included), never above the current retail price.
+  unitRefund     Decimal @db.Decimal(18, 2)
+  vatAmount      Decimal @default(0) @db.Decimal(18, 2)
+  /// What a unit is worth now (the average): the stock comes back at it.
+  unitCost       Decimal @db.Decimal(18, 4)
+  lineTotal      Decimal @db.Decimal(18, 2)
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  return       ReceiptlessReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  product      Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([returnId])
+  @@map("receiptless_return_items")
 }

@@ -5,6 +5,7 @@ import { dateOnly } from "@/core/time/business-date";
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
 
+import { paymentStatuses } from "@/core/payments";
 import { outstandingReceivable } from "@/modules/customers/customers";
 import { takeReceipt } from "@/modules/sales/receipts";
 import { hashPayload, idempotentTransaction, isKeyRace, readIdempotency, saveIdempotency } from "@/core/idempotency";
@@ -172,4 +173,22 @@ export async function listCustomerPayments(organizationId: string, branchId: str
     method: row.method,
     amount: decimalString(row.amount, 2),
   }));
+}
+
+/** The customer's invoices that still have something owed on them, oldest first, with how much (for choosing what a receipt is for). */
+export async function listOpenInvoices(organizationId: string, customerId: string) {
+  const sales = await prisma.sale.findMany({
+    where: { organizationId, customerId, status: "POSTED" },
+    orderBy: [{ businessDate: "asc" }, { createdAt: "asc" }],
+    take: 300,
+    select: { id: true, businessDate: true, total: true, invoice: { select: { number: true } } },
+  });
+  const status = await paymentStatuses(prisma, organizationId, "CUSTOMER", sales.map((sale) => ({ id: sale.id, total: sale.total })));
+  return sales.flatMap((sale) => {
+    const figures = status.get(sale.id);
+    if (!figures || figures.owed.lte(0)) {
+      return [];
+    }
+    return [{ id: sale.id, number: sale.invoice?.number ?? null, businessDate: dateOnly(sale.businessDate), total: decimalString(sale.total, 2), owed: decimalString(figures.owed, 2), status: figures.status }];
+  });
 }

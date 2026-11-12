@@ -9,6 +9,7 @@ import { postWithStock } from "@/core/posting/stock";
 import { sellSerial } from "@/core/stock";
 import { writeAudit } from "@/modules/auth/audit";
 import { customerWallet, outstandingReceivable } from "@/modules/customers/customers";
+import { prisma } from "@/lib/db/client";
 import { allocateNumber } from "@/modules/documents/numbers";
 import { resolveWarehouse, StockRuleError, type ConsumedLot } from "@/modules/inventory/stock";
 import { resolvePrice } from "@/modules/pricing";
@@ -499,4 +500,38 @@ export function postInvoice(input: InvoiceInput) {
       throw error;
     }
   })();
+}
+
+/** What a sale would come to, worked out exactly as posting it will (price level, quantity steps, discounts, VAT). Reads only; nothing is saved. */
+export async function previewSale(input: {
+  organizationId: string;
+  customerId?: string;
+  level?: string;
+  headerDiscount?: string;
+  chargesTotal?: string;
+  lines: InvoiceLine[];
+  allowDiscount?: boolean;
+  allowPriceOverride?: boolean;
+  allowPriceLevel?: boolean;
+}) {
+  if ((input.level) && input.allowPriceLevel === false) {
+    throw new StockRuleError("You may not change the price level.");
+  }
+  const customer = input.customerId ? await prisma.customer.findFirst({ where: { id: input.customerId, organizationId: input.organizationId }, select: { customerTypeId: true } }) : null;
+  const shop = await prisma.organization.findUniqueOrThrow({ where: { id: input.organizationId }, select: { maxDiscountPercent: true } });
+  const priced = await priceLines(prisma as unknown as Tx, input.organizationId, { customerTypeId: customer?.customerTypeId ?? null }, shop, amountOf(input.headerDiscount, "a discount"), amountOf(input.chargesTotal, "charges"), {
+    level: input.level,
+    lines: input.lines,
+    allowDiscount: input.allowDiscount,
+    allowPriceOverride: input.allowPriceOverride,
+  });
+  const two = (value: Prisma.Decimal) => decimalString(value, 2);
+  return {
+    gross: two(priced.grossTotal),
+    discount: two(priced.discountTotal),
+    vat: two(priced.vatTotal),
+    charges: two(amountOf(input.chargesTotal, "charges")),
+    total: two(priced.total),
+    lines: priced.lines.map((line) => ({ productId: line.resolved.productId, unitPrice: two(line.unitPrice), discount: two(line.discount), vat: two(line.vat), payable: two(line.payable), stocked: line.resolved.stocked })),
+  };
 }

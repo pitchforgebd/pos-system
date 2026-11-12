@@ -81,7 +81,7 @@ export async function holdTicket(
       });
       return { id: ticket.id, replayed: false };
     });
-    return { ok: true as const, ...data };
+    return { ok: true as const, ...data, warnings: await stockWarnings(input.organizationId, input.branchId, input.lines) };
   } catch (error) {
     if (error instanceof RuleError) {
       return {
@@ -124,4 +124,43 @@ export async function discardHeldTicket(organizationId: string, branchId: string
   }
   await prisma.heldTicket.delete({ where: { id: ticket.id } });
   return { ok: true as const };
+}
+
+/** B7: holding a ticket does not hold stock. If what is on it is more than what is available now, say so (the ticket is still held). */
+export async function stockWarnings(organizationId: string, branchId: string, lines: Array<{ productId: string; variantId?: string; quantity: string }>) {
+  const warnings: string[] = [];
+  for (const line of lines) {
+    const quantity = parseQuantity(line.quantity);
+    if (!quantity) {
+      continue;
+    }
+    const product = await prisma.product.findFirst({ where: { id: line.productId, organizationId }, select: { name: true, trackStock: true } });
+    if (!product?.trackStock) {
+      continue;
+    }
+    const rows = await prisma.stockBalance.findMany({ where: { organizationId, branchId, productId: line.productId, variantScope: line.variantId ?? "" }, select: { quantity: true, reservedQty: true } });
+    const available = rows.reduce((sum, row) => sum.plus(row.quantity).minus(row.reservedQty), new Prisma.Decimal(0));
+    if (available.lt(quantity)) {
+      warnings.push(`${product.name}: ${decimalString(Prisma.Decimal.max(available, 0), 4)} available, ${decimalString(quantity, 4)} on the ticket`);
+    }
+  }
+  return warnings;
+}
+
+/** A held ticket with its lines and what is available now, for resuming it at the register. */
+export async function getHeldTicket(organizationId: string, branchId: string, id: string) {
+  const row = await prisma.heldTicket.findFirst({
+    where: { id, organizationId, branchId },
+    include: { customer: { select: { id: true, name: true, phone: true } }, items: { include: { product: { select: { sku: true, name: true } } } } },
+  });
+  if (!row) {
+    return null;
+  }
+  const warnings = await stockWarnings(organizationId, branchId, row.items.map((item) => ({ productId: item.productId, variantId: item.variantId ?? undefined, quantity: item.quantity.toFixed(4) })));
+  return {
+    id: row.id,
+    customer: row.customer,
+    lines: row.items.map((item) => ({ productId: item.productId, variantId: item.variantId, label: `${item.product.sku} · ${item.product.name}`, quantity: decimalString(item.quantity, 4) })),
+    warnings,
+  };
 }

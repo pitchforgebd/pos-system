@@ -37,6 +37,8 @@ export type ProductHit = {
 export async function searchProducts(input: {
   organizationId: string;
   q: string;
+  /** Only products of this category; with no query, the first of them by name (the register's category buttons). */
+  categoryId?: string;
   branchId?: string | null;
   quantity?: string;
   level?: string;
@@ -44,24 +46,24 @@ export async function searchProducts(input: {
   customerTypeId?: string | null;
 }): Promise<ProductHit[]> {
   const q = input.q.trim();
-  if (q === "") {
+  if (q === "" && !input.categoryId) {
     return [];
   }
-  const base = { organizationId: input.organizationId, deletedAt: null, status: "ACTIVE" as const };
+  const base = { organizationId: input.organizationId, deletedAt: null, status: "ACTIVE" as const, ...(input.categoryId ? { categoryId: input.categoryId } : {}) };
   // A barcode (or a variant's barcode) that matches exactly is the product being scanned: it comes alone, first.
-  const exact = await prisma.productBarcode.findFirst({ where: { organizationId: input.organizationId, barcode: q, product: base }, select: { productId: true, variantId: true } });
+  const exact = q === "" ? null : await prisma.productBarcode.findFirst({ where: { organizationId: input.organizationId, barcode: q, product: base }, select: { productId: true, variantId: true } });
   const found = exact
     ? await prisma.product.findMany({ where: { id: exact.productId, ...base }, select: { id: true } })
     : await prisma.product.findMany({
         where: {
           ...base,
-          OR: [
+          ...(q === "" ? {} : { OR: [
             { name: { contains: q } },
             { sku: { contains: q } },
             { genericName: { contains: q } },
             { barcodes: { some: { barcode: { contains: q } } } },
             { variants: { some: { sku: { contains: q } } } },
-          ],
+          ] }),
         },
         orderBy: [{ name: "asc" }, { id: "asc" }],
         take: LIMIT,

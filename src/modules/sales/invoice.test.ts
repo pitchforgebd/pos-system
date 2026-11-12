@@ -181,3 +181,20 @@ test("the same request twice (a network retry): one invoice, one receipt, one st
     await assertBooksReconcile(t.org.id, prisma, { strictInventory: true });
   });
 });
+
+test("loyalty points are not earned unless the shop switched earning on (D14); the pages and tables stay", async () => {
+  await withTestOrg(async (t) => {
+    const product = await stockedProduct(t, { units: 20, cost: "6.00", price: "10.00" });
+    const customer = await factories(t).customer();
+    await prisma.organization.update({ where: { id: t.org.id }, data: { pointsPerHundred: "5" } });
+    const off = await sell(t, { customerId: customer.id, lines: [{ productId: product.id, quantity: "10" }], tenders: [{ method: "CASH", amount: "100.00" }] });
+    assert.equal(off.ok, true, JSON.stringify(off));
+    assert.equal(await prisma.loyaltyTransaction.count({ where: { organizationId: t.org.id } }), 0, "earning is off by default");
+    await prisma.organization.update({ where: { id: t.org.id }, data: { loyaltyEarn: true } });
+    const on = await sell(t, { customerId: customer.id, lines: [{ productId: product.id, quantity: "10" }], tenders: [{ method: "CASH", amount: "100.00" }] });
+    assert.equal(on.ok, true, JSON.stringify(on));
+    const earned = await prisma.loyaltyTransaction.findFirstOrThrow({ where: { organizationId: t.org.id } });
+    assert.deepEqual([earned.entryType, earned.points.toFixed(2)], ["EARN", "5.00"]);
+    await assertBooksReconcile(t.org.id, prisma, { strictInventory: true });
+  });
+});

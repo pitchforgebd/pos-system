@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
 
-import { PartyAmountForm } from "@/components/customers/party-search";
+import { CollectForm } from "@/components/customers/collect-form";
 import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
-import { listCustomers } from "@/modules/customers/customers";
+import { businessDate } from "@/core/time/business-date";
+import { moneyAccountOptions } from "@/modules/purchasing/lookups";
 import { listCustomerPayments } from "@/modules/customers/dues";
 
 export const metadata = { title: "Take Payment" };
@@ -15,27 +16,17 @@ export default async function CustomerPaymentsPage() {
   if (!session?.branchId) {
     redirect("/login");
   }
-  const [customers, payments] = await Promise.all([
-    listCustomers(session.organizationId),
-    listCustomerPayments(session.organizationId, session.branchId),
-  ]);
+  const [payments, accounts] = await Promise.all([listCustomerPayments(session.organizationId, session.branchId), moneyAccountOptions(session.organizationId)]);
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Take Payment"
-        description="Search by name or phone. A collection cannot exceed the outstanding due, and it is not split across invoices."
+        description="Find the customer, see what they owe invoice by invoice, choose the invoices the money is for (or let it settle the oldest first), the account it came into and the bank or mobile charge."
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Take Customer Due" }]}
       />
       {session.permissions.has("customers.payment") ? (
-        <PartyAmountForm
-          title="Take Payment"
-          url="/api/v1/customer-payments"
-          mode="due"
-          parties={customers
-            .filter((customer) => customer.status === "ACTIVE")
-            .map((customer) => ({ id: customer.id, name: customer.name, phone: customer.phone, outstanding: customer.outstanding }))}
-        />
+        <CollectForm today={businessDate()} accounts={accounts.map((account) => ({ id: account.id, label: `${account.code} · ${account.name}`, kind: account.kind }))} />
       ) : null}
       <DataTable
         caption="Payment vouchers"

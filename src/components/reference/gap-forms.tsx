@@ -110,36 +110,6 @@ export function ShipmentForm({ couriers, customers }: { couriers: Option[]; cust
   );
 }
 
-export function DirectReturnForm({ products }: { products: Option[] }) {
-  const form = useFormSubmit("/api/v1/direct-returns", (data) => ({
-    productId: data.get("productId"),
-    quantity: data.get("quantity"),
-    refundAmount: data.get("refundAmount"),
-    method: data.get("method"),
-    businessDate: data.get("businessDate"),
-  }));
-  return (
-    <form className="grid max-w-xl gap-3" onSubmit={form.onSubmit}>
-      <select name="productId" required aria-label="Product" className={selectClass}>
-        <option value="">Product</option>
-        {products.map((product) => (
-          <option key={product.id} value={product.id}>{product.label}</option>
-        ))}
-      </select>
-      <Input name="quantity" required placeholder="Quantity" aria-label="Quantity" />
-      <Input name="refundAmount" required placeholder="Refund" aria-label="Refund" />
-      <select name="method" required aria-label="Refund method" className={selectClass} defaultValue="CASH">
-        <option value="CASH">Cash</option>
-        <option value="BANK">Bank</option>
-      </select>
-      <Input name="businessDate" type="date" required aria-label="Date" />
-      <p className="text-sm text-muted">Stock comes back at the average stock-in cost. Cash or bank is refunded. There is no separate return rate.</p>
-      {form.message ? <p className="text-sm text-error">{form.message}</p> : null}
-      <Button type="submit" loading={form.pending}>Post direct return</Button>
-    </form>
-  );
-}
-
 export function DealerForm({ customers }: { customers: Option[] }) {
   const form = useFormSubmit("/api/v1/customers/dealers", (data) => ({ customerId: data.get("customerId") }));
   return (

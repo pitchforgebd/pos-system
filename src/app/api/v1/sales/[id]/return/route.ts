@@ -8,6 +8,9 @@ import { postSaleReturn } from "@/modules/sales/returns";
 
 const bodySchema = z.object({
   businessDate: isoDate,
+  /** Where the money goes: the way the customer paid when left out. */
+  refundMethod: z.enum(["CASH", "BANK", "MOBILE", "ADVANCE", "AR_ONLY"]).optional(),
+  refundAccountId: z.string().uuid().optional(),
   lines: z.array(z.object({ saleItemId: z.string().uuid(), quantity: z.string() })).min(1).max(100),
 });
 

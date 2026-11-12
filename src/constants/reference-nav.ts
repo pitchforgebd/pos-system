@@ -106,8 +106,6 @@ export const referenceNavigation: ReferenceEntry[] = [
       { label: "Add New Customer", href: "/customers/new" },
       { label: "All Customers", href: "/customers" },
       { label: "Installment Reminders", href: "/customers/installments" },
-      { label: "Loyalty Tiers", href: "/customers/loyalty/tiers" },
-      { label: "Loyalty Cards", href: "/customers/loyalty/cards" },
     ],
   },
   {

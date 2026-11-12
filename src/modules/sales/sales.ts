@@ -6,9 +6,10 @@ import { invoicePayment } from "@/core/payments";
 import { dateOnly } from "@/core/time/business-date";
 import { prisma } from "@/lib/db/client";
 import type { Actor } from "@/modules/purchasing/common";
+import { outstandingReceivable } from "@/modules/customers/customers";
 import { postInvoice, type InvoiceLine } from "@/modules/sales/invoice";
 
-export { postInvoice } from "@/modules/sales/invoice";
+export { postInvoice, previewSale } from "@/modules/sales/invoice";
 export type { InvoiceInput, InvoiceLine, TenderInput } from "@/modules/sales/invoice";
 
 export type SaleLine = InvoiceLine;
@@ -44,8 +45,10 @@ export async function listSales(
   organizationId: string,
   branchId: string,
   query: ListQuery = listQuery({}, { sorts: saleSorts }),
+  /** Only this cashier's sales, and/or only this business day (the register's own history). */
+  only: { createdById?: string; date?: string } = {},
 ): Promise<Paged<{ id: string; number: string | null; status: string; total: string; businessDate: string; customerName: string }>> {
-  const where = { organizationId, branchId };
+  const where: Prisma.SaleWhereInput = { organizationId, branchId, ...(only.createdById ? { createdById: only.createdById } : {}), ...(only.date ? { businessDate: new Date(`${only.date}T00:00:00.000Z`) } : {}) };
   const total = await prisma.sale.count({ where });
   const rows = await prisma.sale.findMany({
     where,
@@ -78,7 +81,7 @@ export async function getSale(organizationId: string, branchId: string, id: stri
   const row = await prisma.sale.findFirst({
     where: { id, organizationId, branchId },
     include: {
-      customer: { select: { id: true, name: true } },
+      customer: { select: { id: true, name: true, isSystem: true } },
       invoice: { select: { number: true } },
       items: { include: { product: { select: { sku: true, name: true } } } },
       payments: true,
@@ -91,7 +94,12 @@ export async function getSale(organizationId: string, branchId: string, id: stri
   const debit = row.journal?.lines.reduce((sum, line) => sum.plus(line.debit), zero()) ?? zero();
   const credit = row.journal?.lines.reduce((sum, line) => sum.plus(line.credit), zero()) ?? zero();
   const payment = await invoicePayment(prisma, organizationId, row.id);
+  const level = row.priceLevelId ? await prisma.priceLevel.findFirst({ where: { id: row.priceLevelId, organizationId }, select: { name: true } }) : null;
+  const customerDue = row.customer && !row.customer.isSystem ? await outstandingReceivable(organizationId, row.customer.id) : zero();
   return {
+    priceLevel: level?.name ?? null,
+    /** What this customer owes the shop altogether now (the invoice's own part is in `owed`). */
+    customerDue: decimalString(customerDue, 2),
     id: row.id,
     number: row.invoice?.number ?? null,
     /** PAID, PARTIAL or UNPAID; what is still owed on the invoice, and what receipts have settled since. */

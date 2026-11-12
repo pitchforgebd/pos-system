@@ -15,6 +15,8 @@ export function TicketList({ tickets, canDiscard }: { tickets: Ticket[]; canDisc
           <p className="text-sm">
             {ticket.createdOn} · {ticket.customerName} · {ticket.lines} lines · preview {ticket.previewTotal}
           </p>
+          <div className="flex gap-2">
+          <Button href={`/pos?ticket=${ticket.id}`}>Resume</Button>
           {canDiscard ? (
           <Button
             type="button"
@@ -27,6 +29,7 @@ export function TicketList({ tickets, canDiscard }: { tickets: Ticket[]; canDisc
             Discard
           </Button>
           ) : null}
+          </div>
         </article>
       ))}
       {message ? <p className="text-sm text-error">{message}</p> : null}

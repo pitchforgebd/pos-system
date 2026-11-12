@@ -1,15 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { runTx } from "@/core/tx/run";
 import { RuleError } from "@/core/errors/rule-error";
-import { dateOnly } from "@/core/time/business-date";
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
-import { moneyAccountFor } from "@/core/ledger/accounts";
 import { postBalancedJournal } from "@/modules/accounting/post";
-import { decimalString, parseQuantity } from "@/core/money";
-import { applyMovement, resolveWarehouse, StockRuleError } from "@/modules/inventory/stock";
+import { parseQuantity } from "@/core/money";
+import { StockRuleError } from "@/modules/inventory/stock";
 
 type Actor = {
   organizationId: string;
@@ -209,108 +207,6 @@ export async function addShipment(input: Actor & { courierId: string; customerId
       select: { id: true },
     });
     return { ok: true as const, id: row.id };
-  } catch (error) {
-    const mapped = failure(error);
-    if (mapped) return mapped;
-    throw error;
-  }
-}
-
-export async function listDirectReturns(organizationId: string, branchId: string) {
-  const rows = await prisma.directReturn.findMany({
-    where: { organizationId, branchId },
-    orderBy: { businessDate: "desc" },
-    take: 100,
-    select: { id: true, quantity: true, refundAmount: true, method: true, businessDate: true, product: { select: { name: true } } },
-  });
-  return rows.map((row) => ({
-    id: row.id,
-    productName: row.product.name,
-    quantity: decimalString(row.quantity, 4),
-    refundAmount: decimalString(row.refundAmount, 2),
-    method: row.method,
-    businessDate: dateOnly(row.businessDate),
-  }));
-}
-
-export async function postDirectReturn(input: Actor & { productId: string; quantity: string; refundAmount: string; method: "CASH" | "BANK"; businessDate: string }) {
-  try {
-    const data = await runTx(async (tx) => {
-      const quantity = parseQuantity(input.quantity);
-      const warehouse = await resolveWarehouse(input.organizationId, input.branchId);
-      if (!warehouse) {
-        throw new StockRuleError("Choose an active warehouse on the current branch.");
-      }
-      const rows = await tx.stockLedger.findMany({
-        where: { organizationId: input.organizationId, productId: input.productId, variantId: null, branchId: input.branchId, warehouseId: warehouse.id, direction: "IN" },
-        select: { unitCost: true, quantity: true },
-      });
-      if (rows.length === 0 || rows.some((row) => row.unitCost === null)) {
-        throw new StockRuleError("A direct return needs a stock-in cost for this product.");
-      }
-      let costQty = new Prisma.Decimal(0);
-      let costAmount = new Prisma.Decimal(0);
-      for (const row of rows) {
-        const rowQuantity = new Prisma.Decimal(row.quantity);
-        costQty = costQty.plus(rowQuantity);
-        costAmount = costAmount.plus(rowQuantity.mul(row.unitCost ?? 0));
-      }
-      if (costQty.lte(0)) {
-        throw new StockRuleError("A direct return needs a stock-in cost for this product.");
-      }
-      const unitCost = costAmount.div(costQty).toDecimalPlaces(4);
-      const refund = parseQuantity(input.refundAmount);
-      if (!quantity || !refund || refund.lte(0)) {
-        throw new StockRuleError("Enter a quantity and a refund greater than zero.");
-      }
-      const moneyRefund = refund.toDecimalPlaces(2);
-      const cost = unitCost.mul(quantity).toDecimalPlaces(2);
-      const cashAccount = await moneyAccountFor(tx, input.organizationId, { method: input.method });
-      const id = randomUUID();
-      const journalId = await postBalancedJournal(tx, {
-        organizationId: input.organizationId,
-        branchId: input.branchId,
-        businessDate: day(input.businessDate),
-        description: "Direct return",
-        createdById: input.userId,
-        doc: { type: "DIRECT_RETURN", id },
-        lines: [
-          { role: "SALES", debit: moneyRefund, credit: new Prisma.Decimal(0) },
-          { accountId: cashAccount, debit: new Prisma.Decimal(0), credit: moneyRefund },
-          { role: "INVENTORY", debit: cost, credit: new Prisma.Decimal(0) },
-          { role: "COGS", debit: new Prisma.Decimal(0), credit: cost },
-        ],
-      });
-      await applyMovement(tx, {
-        organizationId: input.organizationId,
-        productId: input.productId,
-        branchId: input.branchId,
-        warehouseId: warehouse.id,
-        quantity,
-        direction: "IN",
-        movementType: "CUSTOMER_RETURN",
-        referenceType: "direct_return",
-        referenceId: id,
-        userId: input.userId,
-        unitCost,
-      });
-      await tx.directReturn.create({
-        data: {
-          id,
-          organizationId: input.organizationId,
-          branchId: input.branchId,
-          warehouseId: warehouse.id,
-          productId: input.productId,
-          quantity,
-          refundAmount: moneyRefund,
-          method: input.method,
-          journalId,
-          businessDate: day(input.businessDate),
-        },
-      });
-      return { id };
-    });
-    return { ok: true as const, id: data.id };
   } catch (error) {
     const mapped = failure(error);
     if (mapped) return mapped;

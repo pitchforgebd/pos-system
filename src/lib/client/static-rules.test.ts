@@ -70,7 +70,9 @@ test("the public-page exception list only holds pages that still need it", () =>
 
 test("the money and stock forms use the shared hook", () => {
   const required = [
-    "components/sales/sale-form.tsx", // POS
+    "components/pos/register.tsx", // POS
+    "components/orders/order-form.tsx", // orders and quotations
+    "components/orders/order-actions.tsx", // order steps
     "components/returns/return-form.tsx", // sale and purchase returns
     "components/purchasing/purchase-form.tsx", // purchase, supplier payment
     "components/customers/forms.tsx", // customer forms
@@ -89,7 +91,7 @@ test("a form that uses the shared hook does not also reload or replace the page 
   // The hook refreshes the page data in place or navigates with the router. (The POS "try again" button after a
   // failed load is not a write and is the one allowed reload.)
   const offenders = files.filter(
-    (file) => file.startsWith("components/") && /use-submit|use-form-submit/.test(read(file)) && /window\.location\.(reload|replace|assign)\(/.test(read(file)) && file !== "components/sales/sale-form.tsx",
+    (file) => file.startsWith("components/") && /use-submit|use-form-submit/.test(read(file)) && /window\.location\.(reload|replace|assign)\(/.test(read(file)),
   );
   assert.deepEqual(offenders, []);
 });

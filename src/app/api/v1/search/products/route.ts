@@ -22,6 +22,7 @@ export const GET = defineRoute({
         organizationId: session.organizationId,
         branchId: session.branchId,
         q: (url.searchParams.get("q") ?? "").slice(0, 100),
+        categoryId: /^[0-9a-f-]{36}$/i.test(url.searchParams.get("categoryId") ?? "") ? (url.searchParams.get("categoryId") as string) : undefined,
         level: url.searchParams.get("level") ?? undefined,
         customerTypeId,
         quantity: qty,

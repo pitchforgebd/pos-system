@@ -43,6 +43,6 @@ export const POST = defineRoute({
     if (!result.ok) {
       return jsonError(result.code, result.message, result.status);
     }
-    return jsonOk({ id: result.id, replayed: result.replayed }, "Operation completed", result.replayed ? 200 : 201);
+    return jsonOk({ id: result.id, replayed: result.replayed, warnings: result.warnings }, "Operation completed", result.replayed ? 200 : 201);
   },
 });

@@ -37,7 +37,7 @@ export function ReturnForm({ lines, kind }: { lines: Line[]; kind: "sale" | "pur
             url: path,
             body: {
               businessDate: form.get("businessDate"),
-              refundMethod: kind === "purchase" && method ? method : undefined,
+              refundMethod: method ? method : undefined,
               lines: [line],
             },
           },
@@ -70,7 +70,18 @@ export function ReturnForm({ lines, kind }: { lines: Line[]; kind: "sale" | "pur
             <option value="BANK">Bank</option>
           </select>
         </label>
-      ) : null}
+      ) : (
+        <label className="grid gap-1 text-sm">
+          Refund
+          <select name="refundMethod" className="h-10 rounded-md border border-border bg-surface px-2" defaultValue="">
+            <option value="">The way the customer paid</option>
+            <option value="CASH">Cash</option>
+            <option value="BANK">Bank</option>
+            <option value="ADVANCE">To the customer&apos;s advance</option>
+            <option value="AR_ONLY">Leave as credit on their account</option>
+          </select>
+        </label>
+      )}
       <p className="text-sm text-muted">The return cannot exceed the quantity still eligible. A second return cannot use those units again.</p>
       {message ? <p className="text-sm text-error">{message}</p> : null}
       <Button type="submit" loading={pending} disabled={visible.length === 0}>
