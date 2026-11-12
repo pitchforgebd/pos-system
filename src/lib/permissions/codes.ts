@@ -34,6 +34,7 @@ export const permissionCodes = [
   "shipments.manage",
   "couriers.settle",
   "couriers.approve_difference",
+  "expenses.accrue",
   "purchase.view",
   "purchase.create",
   "purchase.edit",

@@ -11,6 +11,7 @@ import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
 import { PostingError, postBalancedJournal, type DocType } from "@/modules/accounting/post";
 import { allocateNumber } from "@/modules/documents/numbers";
+import { postContraTransfer } from "@/modules/treasury/contra";
 import { hashPayload, isKeyRace, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { decimalString, money, parseMoney, zero } from "@/core/money";
 import { isIsoDate, occurredDate } from "@/lib/format/date";
@@ -292,6 +293,7 @@ export async function postExpense(
           accountId: account.id,
           number,
           amount,
+          periodMonth: input.businessDate.slice(0, 7),
           businessDate: occurredDate(input.businessDate),
           journalId,
           note: input.note?.trim() || null,
@@ -325,75 +327,17 @@ export async function postExpense(
   }
 }
 
+/** Cash to the default bank account or back: the old two-button contra. The general transfer between any two money accounts is `postContraTransfer`. */
 export async function postContra(input: Actor & { businessDate: string; direction: "CASH_TO_BANK" | "BANK_TO_CASH"; amount: string }) {
-  const requestHash = hashPayload({ businessDate: input.businessDate, direction: input.direction, amount: input.amount });
-  try {
-    const data = await runTx(async (tx) => {
-      const existing = await begin(tx, input.organizationId, input.idempotencyKey, requestHash);
-      if (existing) {
-        return { id: existing.entityId, replayed: true, number: null as string | null };
-      }
-      const amount = parseMoney(input.amount);
-      if (!amount || amount.lte(0)) {
-        throw new PostingError("Enter an amount greater than zero.");
-      }
-      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: input.businessDate });
-      const cashAccount = await accountFor(tx, input.organizationId, "CASH");
-      const bankAccount = await accountFor(tx, input.organizationId, "BANK:DEFAULT");
-      const debitAccount = input.direction === "CASH_TO_BANK" ? bankAccount : cashAccount;
-      const creditAccount = input.direction === "CASH_TO_BANK" ? cashAccount : bankAccount;
-      const docId = randomUUID();
-      const journalId = await postBalancedJournal(tx, {
-        doc: { type: "CONTRA", id: docId },
-        organizationId: input.organizationId,
-        branchId: input.branchId,
-        businessDate: occurredDate(input.businessDate),
-        description: `Contra ${number}`,
-        createdById: input.userId,
-        lines: [
-          { accountId: debitAccount, debit: amount, credit: zero() },
-          { accountId: creditAccount, debit: zero(), credit: amount },
-        ],
-        number,
-      });
-      await tx.voucher.create({
-        data: {
-          organizationId: input.organizationId,
-          branchId: input.branchId,
-          number,
-          id: docId,
-          voucherType: "CONTRA",
-          amount,
-          businessDate: occurredDate(input.businessDate),
-          status: "POSTED",
-          journalId,
-        },
-      });
-      await remember(tx, { ...input, requestHash, entityType: "contra", entityId: journalId });
-      return { id: journalId, number, replayed: false };
-    });
-    if (!data.replayed) {
-      await writeAudit({
-        organizationId: input.organizationId,
-        branchId: input.branchId,
-        userId: input.userId,
-        action: "accounting post",
-        module: "accounting",
-        entityType: "contra",
-        entityId: data.id,
-        after: { number: data.number },
-        ip: input.ip,
-        userAgent: input.userAgent,
-      });
-    }
-    return { ok: true as const, ...data };
-  } catch (error) {
-    const mapped = failure(error);
-    if (mapped) {
-      return mapped;
-    }
-    throw error;
+  const [cash, bank] = await Promise.all([
+    prisma.accountRole.findFirst({ where: { organizationId: input.organizationId, role: "CASH" }, select: { accountId: true } }),
+    prisma.accountRole.findFirst({ where: { organizationId: input.organizationId, role: "BANK:DEFAULT" }, select: { accountId: true } }),
+  ]);
+  if (!cash || !bank) {
+    return { ok: false as const, status: 422 as const, code: "BUSINESS_RULE" as const, message: "The chart of accounts has no cash or bank account. Run the seed to set the chart up." };
   }
+  const toBank = input.direction === "CASH_TO_BANK";
+  return postContraTransfer({ ...input, fromAccountId: toBank ? cash.accountId : bank.accountId, toAccountId: toBank ? bank.accountId : cash.accountId });
 }
 
 export async function createAccount(input: { organizationId: string; code: string; name: string; groupCode: string }) {
@@ -831,7 +775,7 @@ export async function postIncome(
         throw new PostingError("Choose an income account other than sales.");
       }
       const moneyAccount = await resolveMoneyAccount(tx, input.organizationId, input.method, input.bankCode);
-      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: input.businessDate });
+      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "INC", businessDate: input.businessDate });
       const docId = randomUUID();
       const journalId = await postBalancedJournal(tx, {
         doc: { type: "INCOME", id: docId },
@@ -897,7 +841,7 @@ export async function postCapital(
       }
       const moneyAccount = await resolveMoneyAccount(tx, input.organizationId, input.method, input.bankCode);
       const equityAccount = await accountFor(tx, input.organizationId, input.capitalType === "ADDED" ? "CAPITAL" : "DRAWINGS");
-      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: input.businessDate });
+      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "CAP", businessDate: input.businessDate });
       const docId = randomUUID();
       const journalId = await postBalancedJournal(tx, {
         doc: { type: "CAPITAL", id: docId },
@@ -967,7 +911,7 @@ export async function postLoan(
         throw new PostingError("Enter a lender and an amount greater than zero.");
       }
       const moneyAccount = await resolveMoneyAccount(tx, input.organizationId, input.method, input.bankCode);
-      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: input.businessDate });
+      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "LON", businessDate: input.businessDate });
       const docId = randomUUID();
       const journalId = await postBalancedJournal(tx, {
         doc: { type: "LOAN", id: docId },
