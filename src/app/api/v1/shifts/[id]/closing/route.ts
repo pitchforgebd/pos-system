@@ -5,7 +5,13 @@ import { jsonError, jsonOk } from "@/lib/api/http";
 import { idempotencyKey, stockActor } from "@/modules/inventory/actor";
 import { countShift } from "@/modules/shifts/shifts";
 
-const bodySchema = z.object({ actualCash: z.string() });
+const bodySchema = z
+  .object({
+    actualCash: z.string().max(24).optional(),
+    /** The notes and coins counted, by value: {"1000": 2, "500": 1}. */
+    denominations: z.record(z.string(), z.number().int().min(0).max(1_000_000)).optional(),
+  })
+  .refine((value) => value.actualCash !== undefined || value.denominations !== undefined);
 
 export const POST = defineRoute<undefined, { id: string }>({
   permission: "shifts.manage",
@@ -17,7 +23,7 @@ export const POST = defineRoute<undefined, { id: string }>({
     if (!actor || !key || !z.string().uuid().safeParse(id).success || !parsed.success) {
       return jsonError("VALIDATION_ERROR", "A branch, an Idempotency-Key, and the counted cash are required.", 400);
     }
-    const result = await countShift({ ...actor, idempotencyKey: key, shiftId: id, actualCash: parsed.data.actualCash });
+    const result = await countShift({ ...actor, idempotencyKey: key, shiftId: id, actualCash: parsed.data.actualCash, denominations: parsed.data.denominations });
     if (!result.ok) {
       return jsonError(result.code, result.message, result.status);
     }

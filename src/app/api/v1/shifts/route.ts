@@ -5,7 +5,7 @@ import { jsonError, jsonOk } from "@/lib/api/http";
 import { idempotencyKey, stockActor } from "@/modules/inventory/actor";
 import { listShifts, openShift } from "@/modules/shifts/shifts";
 
-const bodySchema = z.object({ openingCash: z.string() });
+const bodySchema = z.object({ openingCash: z.string().max(24), cashAccountId: z.string().uuid().optional() });
 
 export const GET = defineRoute({
   permission: "shifts.manage",
@@ -26,7 +26,7 @@ export const POST = defineRoute({
     if (!actor || !key || !parsed.success) {
       return jsonError("VALIDATION_ERROR", "A branch, an Idempotency-Key, and opening cash are required.", 400);
     }
-    const result = await openShift({ ...actor, idempotencyKey: key, openingCash: parsed.data.openingCash });
+    const result = await openShift({ ...actor, idempotencyKey: key, openingCash: parsed.data.openingCash, cashAccountId: parsed.data.cashAccountId });
     if (!result.ok) {
       return jsonError(result.code, result.message, result.status);
     }

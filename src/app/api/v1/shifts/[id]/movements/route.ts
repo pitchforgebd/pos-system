@@ -7,7 +7,9 @@ import { postCashMovement } from "@/modules/shifts/shifts";
 
 const bodySchema = z.object({
   direction: z.enum(["IN", "OUT"]),
-  amount: z.string(),
+  amount: z.string().max(24),
+  /** The other account the cash comes from (bank, capital, income) or goes to (expense, bank). */
+  counterAccountId: z.string().uuid(),
   reason: z.string().trim().max(255).nullable().optional(),
 });
 

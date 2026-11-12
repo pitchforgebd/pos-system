@@ -7,7 +7,9 @@ import { handOverShift } from "@/modules/shifts/shifts";
 
 const bodySchema = z.object({
   toUserId: z.string().uuid(),
-  amount: z.string(),
+  amount: z.string().max(24),
+  /** The cash account the drawer's cash goes into (the main cash): a contra leaves the drawer. */
+  toAccountId: z.string().uuid().optional(),
 });
 
 export const POST = defineRoute<undefined, { id: string }>({

@@ -208,6 +208,29 @@ enum DocumentType {
   RCV
   SHP
   SET
+  CTR
+  INC
+  CAP
+  LON
+}
+
+enum ExpenseType {
+  MONTHLY_FIXED
+  VARIABLE
+  MISC
+}
+
+/// DRAFT: a recurring expense waiting to be paid; PAID: posted (cash or bank out); ACCRUED: owed at month end, posted against Accrued Expenses until it is paid.
+enum ExpenseStatus {
+  DRAFT
+  PAID
+  ACCRUED
+}
+
+/// Who bears the bank's or the mobile service's charge on a payment (D7).
+enum ChargeBearer {
+  SHOP
+  CUSTOMER
 }
 
 enum ShipmentStatus {
@@ -315,12 +338,18 @@ model Organization {
   maxDiscountPercent   Decimal   @default(100) @db.Decimal(5, 2)
   /// Loyalty points are earned on a sale only when this is on (D14: off in v2).
   loyaltyEarn          Boolean   @default(false)
+  /// A user may not take or pay cash without an active shift (D17). Off until the shop turns it on in Settings (the go-live checklist, P14).
+  requireShift         Boolean   @default(false)
   status    RecordStatus @default(ACTIVE)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   branches             Branch[]
   salesOrders          SalesOrder[]
+  expenseCategories    ExpenseCategory[]
+  recurringExpenses    RecurringExpense[]
+  contraTransfers      ContraTransfer[]
+  paymentMethodCharges PaymentMethodCharge[]
   shipmentEvents       ShipmentEvent[]
   courierSettlements   CourierSettlement[]
   courierSettlementItems CourierSettlementItem[]
@@ -452,6 +481,7 @@ model Branch {
   sessions           Session[]
   stockBalances      StockBalance[]
   salesOrders        SalesOrder[]
+  contraTransfers    ContraTransfer[]
   courierSettlements CourierSettlement[]
   receiptlessReturns ReceiptlessReturn[]
   stockLedgers       StockLedger[]
@@ -2118,6 +2148,19 @@ model Expense {
   accountId      String   @db.Char(36)
   number         String?  @db.VarChar(32)
   amount         Decimal  @db.Decimal(18, 2)
+  categoryId     String?  @db.Char(36)
+  status         ExpenseStatus @default(PAID)
+  /// The cash, bank or mobile account the money went out of.
+  moneyAccountId String?  @db.Char(36)
+  /// What the bank or mobile service took on top (6600 / 6610).
+  charge         Decimal  @default(0) @db.Decimal(18, 2)
+  /// Which month the expense belongs to (YYYY-MM): October's rent paid in November.
+  periodMonth    String?  @db.VarChar(7)
+  recurringId    String?  @db.Char(36)
+  shiftId        String?  @db.Char(36)
+  /// The journal that paid an accrued expense (Dr Accrued Expenses / Cr money).
+  settleJournalId String? @unique @db.Char(36)
+  settledOn      DateTime? @db.Date
   businessDate     DateTime @db.Date
   cashAccountId  String?  @db.Char(36)
   bankAccountId  String?  @db.Char(36)
@@ -2128,12 +2171,15 @@ model Expense {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   branch       Branch?      @relation(fields: [branchId], references: [id], onDelete: Restrict)
   account      Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  category     ExpenseCategory? @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   cashAccount  CashAccount? @relation(fields: [cashAccountId], references: [id], onDelete: Restrict)
   bankAccount  BankAccount? @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
   journal      Journal?     @relation(fields: [journalId], references: [id], onDelete: Restrict)
 
   @@unique([organizationId, number])
+  @@unique([recurringId, periodMonth])
   @@index([organizationId, businessDate])
+  @@index([organizationId, periodMonth, status])
   @@map("expenses")
 }
 
@@ -2302,6 +2348,12 @@ model Shift {
   organizationId String      @db.Char(36)
   branchId       String      @db.Char(36)
   userId         String      @db.Char(36)
+  /// The cash account the drawer is counted in (Cash in Hand unless the shop has others).
+  cashAccountId  String?     @db.Char(36)
+  /// The notes and coins counted, by value: {"1000": 2, "500": 1, ...}. Optional.
+  denominations  Json?
+  /// The journal that put the short or over cash in the books when the shift was closed (#39).
+  varianceJournalId String?  @unique @db.Char(36)
   status         ShiftStatus @default(OPEN)
   openingCash    Decimal?    @db.Decimal(18, 2)
   cashSales      Decimal?    @db.Decimal(18, 2)
@@ -3061,4 +3113,84 @@ model ReceiptlessReturnItem {
 
   @@index([returnId])
   @@map("receiptless_return_items")
+}
+
+/// What the shop spends on (P08, feature 10): each category posts to one expense account.
+model ExpenseCategory {
+  id             String       @id @default(uuid()) @db.Char(36)
+  organizationId String       @db.Char(36)
+  name           String       @db.VarChar(191)
+  /// The expense account its vouchers are debited to.
+  accountId      String       @db.Char(36)
+  type           ExpenseType  @default(VARIABLE)
+  status         RecordStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now())
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  expenses     Expense[]
+  recurring    RecurringExpense[]
+
+  @@unique([organizationId, name])
+  @@map("expense_categories")
+}
+
+/// A fixed expense that comes every month (rent, salary): at the start of the month a draft is made for it; "pay" posts it.
+model RecurringExpense {
+  id             String   @id @default(uuid()) @db.Char(36)
+  organizationId String   @db.Char(36)
+  branchId       String   @db.Char(36)
+  categoryId     String   @db.Char(36)
+  amount         Decimal  @db.Decimal(18, 2)
+  dayOfMonth     Int      @default(1)
+  active         Boolean  @default(true)
+  note           String?  @db.VarChar(255)
+  createdAt      DateTime @default(now())
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  category     ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, active])
+  @@map("recurring_expenses")
+}
+
+/// Money moved between the shop's own cash, bank and mobile accounts (#31), with the charge the sender's bank or mobile service took.
+model ContraTransfer {
+  id             String   @id @default(uuid()) @db.Char(36)
+  organizationId String   @db.Char(36)
+  branchId       String   @db.Char(36)
+  number         String?  @db.VarChar(32)
+  businessDate   DateTime @db.Date
+  fromAccountId  String   @db.Char(36)
+  toAccountId    String   @db.Char(36)
+  amount         Decimal  @db.Decimal(18, 2)
+  charge         Decimal  @default(0) @db.Decimal(18, 2)
+  shiftId        String?  @db.Char(36)
+  note           String?  @db.VarChar(255)
+  journalId      String?  @unique @db.Char(36)
+  createdById    String?  @db.Char(36)
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  branch       Branch       @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, number])
+  @@index([organizationId, branchId, businessDate])
+  @@map("contra_transfers")
+}
+
+/// What a bank or mobile account takes on a payment: a percentage and a fixed part, and who bears it (D7). The forms propose the charge from this.
+model PaymentMethodCharge {
+  id             String       @id @default(uuid()) @db.Char(36)
+  organizationId String       @db.Char(36)
+  accountId      String       @db.Char(36)
+  percent        Decimal      @default(0) @db.Decimal(5, 2)
+  fixed          Decimal      @default(0) @db.Decimal(18, 2)
+  bearer         ChargeBearer @default(SHOP)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, accountId])
+  @@map("payment_method_charges")
 }

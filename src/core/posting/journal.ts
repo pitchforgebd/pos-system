@@ -28,6 +28,8 @@ export type DocType =
   | "SUPPLIER_PAYMENT"
   | "SUPPLIER_ADVANCE"
   | "SHIPMENT"
+  | "SHIFT_VARIANCE"
+  | "CASH_MOVEMENT"
   | "SHIPMENT_RETURN"
   | "COURIER_SETTLEMENT"
   | "SUPPLIER_OPENING"
@@ -208,11 +210,41 @@ async function checkInventory(tx: Db, plan: JournalPlan, accountIds: string[]) {
   }
 }
 
-async function checkShifts(tx: Db, plan: JournalPlan) {
-  const shifts = new Set(plan.lines.flatMap((line) => (line.shiftId ? [line.shiftId] : [])));
-  if (shifts.size > 0 && (await tx.shift.count({ where: { id: { in: [...shifts] }, organizationId: plan.organizationId } })) !== shifts.size) {
+/** Postings that put cash in the books by themselves, with nobody at a till: they belong to no shift. */
+const NO_SHIFT: ReadonlySet<string> = new Set(["CASH_OPENING", "BANK_OPENING", "OPENING_RECLASS", "OPENING_STOCK", "STOCK_BOOKS_ADJUSTMENT", "LEGACY_ADVANCE", "JOURNAL"]);
+
+/**
+ * Which shift each line belongs to (P08, N7, D17). The cash a user takes or pays goes through their drawer: a line on a cash account with no
+ * shift named is put in the posting user's active shift on that branch. When the shop requires shifts (D17) and the user has none, the posting is
+ * refused, so no cash moves without a drawer that counts it. A shift the caller names must exist.
+ */
+async function attachShifts(tx: Db, plan: JournalPlan, accountIds: string[]): Promise<Array<string | null>> {
+  const named = new Set(plan.lines.flatMap((line) => (line.shiftId ? [line.shiftId] : [])));
+  if (named.size > 0 && (await tx.shift.count({ where: { id: { in: [...named] }, organizationId: plan.organizationId } })) !== named.size) {
     refuse("That record was not found.", 404);
   }
+  const result: Array<string | null> = plan.lines.map((line) => line.shiftId ?? null);
+  if (NO_SHIFT.has(plan.doc.type) || plan.kind === "REVERSAL") {
+    return result;
+  }
+  const cash = await tx.account.findMany({ where: { id: { in: [...new Set(accountIds)] }, organizationId: plan.organizationId, kind: "CASH" }, select: { id: true } });
+  const cashIds = new Set(cash.map((account) => account.id));
+  const open = plan.lines.map((line, index) => (!line.shiftId && cashIds.has(accountIds[index]) ? index : -1)).filter((index) => index >= 0);
+  if (open.length === 0) {
+    return result;
+  }
+  const shift = await tx.shift.findFirst({ where: { organizationId: plan.organizationId, branchId: plan.branchId, userId: plan.createdById, status: "ACTIVE" }, select: { id: true } });
+  if (shift) {
+    for (const index of open) {
+      result[index] = shift.id;
+    }
+    return result;
+  }
+  const shop = await tx.organization.findUnique({ where: { id: plan.organizationId }, select: { requireShift: true } });
+  if (shop?.requireShift) {
+    refuse("Open a shift before taking or paying cash.");
+  }
+  return result;
 }
 
 /**
@@ -226,7 +258,7 @@ export async function post(tx: Db, plan: JournalPlan): Promise<string> {
   const accountIds = await resolveAccounts(tx, plan);
   await checkParties(tx, plan, accountIds);
   await checkInventory(tx, plan, accountIds);
-  await checkShifts(tx, plan);
+  const shifts = await attachShifts(tx, plan, accountIds);
   try {
     const journal = await tx.journal.create({
       data: {
@@ -252,7 +284,7 @@ export async function post(tx: Db, plan: JournalPlan): Promise<string> {
             memo: line.memo ?? null,
             partyType: line.party?.type ?? null,
             partyId: line.party?.id ?? null,
-            shiftId: line.shiftId ?? null,
+            shiftId: shifts[index],
             assetId: line.assetId ?? null,
             // The date and branch of the journal are kept on every line, so reports need no join.
             businessDate: plan.businessDate,
