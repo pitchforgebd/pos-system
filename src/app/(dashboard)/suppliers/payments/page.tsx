@@ -24,7 +24,7 @@ export default async function SupplierPaymentsPage() {
       {session.permissions.has("suppliers.payment") ? (
         <PartyAmountForm
           title="Take payment"
-          url={(id) => `/api/v1/suppliers/${id}/payments`}
+          url="/api/v1/suppliers/:id/payments"
           mode="due"
           balanceLabel="Payable"
           parties={suppliers

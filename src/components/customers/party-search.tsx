@@ -25,7 +25,8 @@ export function PartyAmountForm({
   balanceLabel = "Due",
 }: {
   title: string;
-  url: string | ((id: string) => string);
+  /** The API path; `:id` in it is replaced by the chosen party's id (a function cannot be passed from a server page to this client form). */
+  url: string;
   parties: Party[];
   mode: "due" | "advance";
   balanceLabel?: string;
@@ -130,7 +131,7 @@ export function PartyAmountForm({
             return;
           }
           setLocalMessage("");
-          const target = typeof url === "function" ? url(selected.id) : url;
+          const target = url.replace(":id", selected.id);
           const body = typeof url === "function" ? { businessDate: postDate, amount, method } : { customerId: selected.id, businessDate: postDate, amount, method };
           // The balance shown for the chosen party is a snapshot, so clear the form once the payment is saved.
           void submit(
