@@ -109,7 +109,7 @@ test("an opening balance is the oldest debt: a receipt clears it before any invo
   });
 });
 
-test("a sale paid at the till is PAID, one part-paid is PARTIAL, a wallet-paid one is PAID; none of them has an allocation", async () => {
+test("a sale paid at the till is PAID, one part-paid is PARTIAL: the till payment is a receipt that settles the invoice (P06)", async () => {
   await withTestOrg(async (t) => {
     const product = await stocked(t);
     const customer = await factories(t).customer();
@@ -117,8 +117,9 @@ test("a sale paid at the till is PAID, one part-paid is PARTIAL, a wallet-paid o
     const part = await creditSale(t, product.id, customer.id, 5, 0, { paymentAmount: "20.00", paymentMethod: "CASH" });
     assert.equal((await invoicePayment(prisma, t.org.id, cash)).status, "PAID");
     const status = await invoicePayment(prisma, t.org.id, part);
-    assert.deepEqual([status.status, status.owed.toFixed(2), status.paidAtSale.toFixed(2)], ["PARTIAL", "30.00", "20.00"]);
-    assert.equal(await prisma.paymentAllocation.count({ where: { organizationId: t.org.id } }), 0);
+    assert.deepEqual([status.status, status.owed.toFixed(2), status.allocated.toFixed(2)], ["PARTIAL", "30.00", "20.00"]);
+    // the two receipts each settled their own invoice, nothing else
+    assert.equal(await prisma.paymentAllocation.count({ where: { organizationId: t.org.id } }), 2);
   });
 });
 

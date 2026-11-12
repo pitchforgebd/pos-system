@@ -10,7 +10,9 @@ const bodySchema = z.object({
   customerId: z.string().uuid(),
   businessDate: isoDate,
   amount: z.string(),
-  method: z.enum(["CASH", "BANK"]),
+  method: z.enum(["CASH", "BANK", "MOBILE"]),
+  accountId: z.string().uuid().optional(),
+  charge: z.string().max(24).optional(),
   /** The invoices this receipt is for; the rest settles the oldest debt. */
   allocations: z.array(z.object({ invoiceId: z.string().uuid(), amount: z.string() })).max(100).optional(),
 });

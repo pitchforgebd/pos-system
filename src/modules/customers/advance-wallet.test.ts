@@ -55,7 +55,7 @@ test("an advance goes to the Customer Advance account with the customer on the l
   });
 });
 
-test("buying from the wallet lowers the advance and leaves the receivable at zero; the journal has no receivable line", async () => {
+test("buying from the wallet lowers the advance and leaves the receivable at zero: the wallet settles the invoice by a receipt (Dr Customer Advance / Cr Receivable)", async () => {
   await withTestOrg(async (t) => {
     const product = await shopWithStock(t);
     const customer = await factories(t).customer();
@@ -64,10 +64,9 @@ test("buying from the wallet lowers the advance and leaves the receivable at zer
     assert.equal(bought.ok, true, JSON.stringify(bought));
     assert.equal(await wallet(t, customer.id), "40.00");
     assert.equal(await owes(t, customer.id), "0.00");
-    const journal = await prisma.journal.findFirstOrThrow({ where: { organizationId: t.org.id, docType: "SALE" }, include: { lines: { include: { account: { include: { roles: true } } } } } });
-    const roles = journal.lines.map((l) => l.account.roles[0]?.role).sort();
-    assert.ok(!roles.includes("AR"), "no receivable line: the wallet paid for it directly");
-    assert.ok(roles.includes("CUSTOMER_ADVANCE"));
+    const receipt = await prisma.journal.findFirstOrThrow({ where: { organizationId: t.org.id, docType: "CUSTOMER_PAYMENT" }, include: { lines: { include: { account: { include: { roles: true } } } } } });
+    const roles = receipt.lines.map((l) => l.account.roles[0]?.role).sort();
+    assert.deepEqual(roles, ["AR", "CUSTOMER_ADVANCE"], "the wallet pays the invoice through the receivable");
     await assertBooksReconcile(t.org.id);
   });
 });

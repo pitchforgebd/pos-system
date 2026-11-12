@@ -26,7 +26,9 @@ test("a service sells with no stock row, no stock movement, and no cost of goods
     assert.equal(await prisma.stockLedger.count({ where: { organizationId: t.org.id } }), 0);
     assert.equal(await prisma.stockBalance.count({ where: { organizationId: t.org.id } }), 0);
     const lines = await prisma.journalLine.findMany({ where: { organizationId: t.org.id, journal: { docType: "SALE" } }, include: { account: { include: { roles: true } } } });
-    assert.deepEqual(lines.map((l) => l.account.roles[0]?.role).sort(), ["CASH", "SALES"], "cash in, sales out: no COGS, no inventory");
+    assert.deepEqual(lines.map((l) => l.account.roles[0]?.role).sort(), ["AR", "SALES"], "receivable and sales: no COGS, no inventory");
+    const receipt = await prisma.journalLine.findMany({ where: { organizationId: t.org.id, journal: { docType: "CUSTOMER_PAYMENT" } }, include: { account: { include: { roles: true } } } });
+    assert.deepEqual(receipt.map((l) => l.account.roles[0]?.role).sort(), ["AR", "CASH"], "the cash comes in by the receipt");
     await assertBooksReconcile(t.org.id, prisma, { strictInventory: true });
   });
 });

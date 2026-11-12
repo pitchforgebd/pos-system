@@ -214,7 +214,7 @@ test("phase 07 sales post stock, invoice, and a balanced journal", async () => {
     assert.equal(afterMixed?.quantity.toFixed(4), "3.0000");
 
     const journals = await prisma.journal.findMany({ where: { organizationId: org.id }, include: { lines: true } });
-    assert.equal(journals.length, 3);
+    assert.equal(journals.length, 6, "stock in, and each of the two sales with its receipt");
     for (const journal of journals) {
       const debit = journal.lines.reduce((sum, line) => sum + Number(line.debit), 0);
       const creditAmount = journal.lines.reduce((sum, line) => sum + Number(line.credit), 0);

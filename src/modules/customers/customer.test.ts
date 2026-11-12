@@ -68,7 +68,7 @@ test("phase 10 posts customer due and advance without inventing points", async (
     });
     assert.equal(payment.ok, true);
     if (payment.ok) {
-      assert.equal(payment.number?.startsWith("PAY-2627-"), true);
+      assert.equal(payment.number?.startsWith("RCV-2627-"), true, "a customer receipt takes an RCV number (P06)");
     }
     const replay = await postCustomerPayment({
       ...actor,

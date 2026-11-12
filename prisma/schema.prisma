@@ -204,6 +204,41 @@ enum DocumentType {
   PAY
   EXP
   VCH
+  ORD
+  RCV
+}
+
+enum OrderStatus {
+  DRAFT
+  CONFIRMED
+  PACKED
+  DISPATCHED
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
+enum OrderChannel {
+  POS
+  PHONE
+  FACEBOOK
+  WEBSITE
+  OTHER
+}
+
+enum DeliveryMethod {
+  PICKUP
+  OWN_VEHICLE
+  COURIER
+}
+
+/// Where the money of a sale return goes (N12). The original way of paying is the default.
+enum RefundMethod {
+  CASH
+  BANK
+  MOBILE
+  ADVANCE
+  AR_ONLY
 }
 
 enum QuotationStatus {
@@ -265,11 +300,18 @@ model Organization {
   lockedThrough        DateTime? @db.Date
   /// A posting dated further back than this many days needs the posting.backdate permission (D18).
   backdateDays         Int       @default(3)
+  /// The most a sale may be discounted, in percent of what it would sell for (a line or the whole invoice).
+  maxDiscountPercent   Decimal   @default(100) @db.Decimal(5, 2)
+  /// Loyalty points are earned on a sale only when this is on (D14: off in v2).
+  loyaltyEarn          Boolean   @default(false)
   status    RecordStatus @default(ACTIVE)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   branches             Branch[]
+  salesOrders          SalesOrder[]
+  salesOrderItems      SalesOrderItem[]
+  orderEvents          OrderEvent[]
   warehouses           Warehouse[]
   racks                Rack[]
   users                User[]
@@ -393,6 +435,7 @@ model Branch {
   userAccess         UserBranchAccess[]
   sessions           Session[]
   stockBalances      StockBalance[]
+  salesOrders        SalesOrder[]
   stockLedgers       StockLedger[]
   transfersFrom      StockTransfer[]    @relation("TransferFromBranch")
   transfersTo        StockTransfer[]    @relation("TransferToBranch")
@@ -732,6 +775,7 @@ model Product {
   updatedBy    User?         @relation("ProductUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
   variants     ProductVariant[]
   images       ProductImage[]
+  salesOrderItems SalesOrderItem[]
   barcodes     ProductBarcode[]
   prices       ProductPrice[]
   balances     StockBalance[]
@@ -1222,6 +1266,8 @@ model Customer {
   openingBalance  Decimal      @default(0) @db.Decimal(18, 2)
   creditLimit     Decimal?     @db.Decimal(18, 2)
   paymentTerms    String?      @db.VarChar(64)
+  /// The system customer every cash sale without a named customer is made to (Walk-in): all sales go through a receivable.
+  isSystem        Boolean      @default(false)
   status          RecordStatus @default(ACTIVE)
   createdById     String?      @db.Char(36)
   updatedById     String?      @db.Char(36)
@@ -1243,6 +1289,7 @@ model Customer {
   loyaltyCards LoyaltyCard[]
   loyaltyTransactions LoyaltyTransaction[]
   quotations   Quotation[]
+  salesOrders  SalesOrder[]
   warrantyClaims WarrantyClaim[]
   shipments    Shipment[]
 
@@ -1297,6 +1344,11 @@ model CustomerPayment {
   businessDate     DateTime @db.Date
   method         String   @db.VarChar(32)
   amount         Decimal  @db.Decimal(18, 2)
+  /// The cash, bank or mobile account the money came into.
+  accountId      String?  @db.Char(36)
+  /// What the bank or the mobile service kept (D7: the shop bears it, an expense).
+  charge         Decimal  @default(0) @db.Decimal(18, 2)
+  shiftId        String?  @db.Char(36)
   journalId      String?  @unique @db.Char(36)
   createdAt      DateTime @default(now())
 
@@ -1514,6 +1566,12 @@ model Sale {
   organizationId String         @db.Char(36)
   branchId       String         @db.Char(36)
   warehouseId    String?        @db.Char(36)
+  /// The order this invoice was made from when it was dispatched.
+  orderId        String?        @unique @db.Char(36)
+  shiftId        String?        @db.Char(36)
+  priceLevelId   String?        @db.Char(36)
+  /// Copied from the order so a report by district needs no join.
+  districtId     String?        @db.Char(36)
   customerId     String?        @db.Char(36)
   journalId      String?        @unique @db.Char(36)
   status         DocumentStatus @default(DRAFT)
@@ -1537,6 +1595,7 @@ model Sale {
   payments     SalePayment[]
   returns      SaleReturn[]
   invoice      Invoice?
+  order        SalesOrder?   @relation("OrderInvoice", fields: [orderId], references: [id], onDelete: Restrict)
   quotation    Quotation?
   allocations  PaymentAllocation[]
   serials      ProductSerial[]
@@ -1555,6 +1614,11 @@ model SaleItem {
   quantity       Decimal @db.Decimal(18, 4)
   unitPrice      Decimal @db.Decimal(18, 2)
   discountAmount Decimal? @db.Decimal(18, 2)
+  priceLevelId   String?  @db.Char(36)
+  /// What a unit cost when it was sold (the average then, four decimals).
+  unitCost       Decimal? @db.Decimal(18, 4)
+  /// For an expiry-tracked product: the lots the sale took the stock from (lot, dates, quantity), so a return puts it back in the same lots.
+  lots           Json?
   vatAmount      Decimal? @db.Decimal(18, 2)
   lineTotal      Decimal @db.Decimal(18, 2)
 
@@ -1574,6 +1638,8 @@ model SalePayment {
   saleId         String   @db.Char(36)
   method         String   @db.VarChar(32)
   amount         Decimal  @db.Decimal(18, 2)
+  accountId      String?  @db.Char(36)
+  charge         Decimal  @default(0) @db.Decimal(18, 2)
   createdAt      DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
@@ -1593,6 +1659,8 @@ model SaleReturn {
   status         DocumentStatus @default(DRAFT)
   businessDate     DateTime       @db.Date
   total          Decimal        @default(0) @db.Decimal(18, 2)
+  refundMethod   RefundMethod?
+  refundAccountId String?       @db.Char(36)
   journalId      String?        @unique @db.Char(36)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
@@ -2718,4 +2786,95 @@ model DirectReturn {
 
   @@index([organizationId, branchId, businessDate])
   @@map("direct_returns")
+}
+
+/// A sales order (feature 14): written down (DRAFT, or a quotation), confirmed (stock reserved), packed, dispatched (the invoice posts and
+/// the stock goes out), delivered; or cancelled before it was dispatched. A quotation is a draft order with a valid-until date.
+model SalesOrder {
+  id              String         @id @default(uuid()) @db.Char(36)
+  organizationId  String         @db.Char(36)
+  branchId        String         @db.Char(36)
+  warehouseId     String?        @db.Char(36)
+  customerId      String         @db.Char(36)
+  /// ORD-..., taken when the order is confirmed.
+  number          String?        @db.VarChar(32)
+  /// QUO-..., taken when the draft is saved as a quotation.
+  quotationNumber String?        @db.VarChar(32)
+  isQuotation     Boolean        @default(false)
+  validUntil      DateTime?      @db.Date
+  status          OrderStatus    @default(DRAFT)
+  channel         OrderChannel   @default(PHONE)
+  priceLevelId    String?        @db.Char(36)
+  deliveryMethod  DeliveryMethod @default(PICKUP)
+  shippingAddress String?        @db.VarChar(255)
+  districtId      String?        @db.Char(36)
+  upazilaId       String?        @db.Char(36)
+  externalRef     String?        @db.VarChar(64)
+  expectedDate    DateTime?      @db.Date
+  businessDate    DateTime       @db.Date
+  note            String?        @db.VarChar(500)
+  subtotal        Decimal        @default(0) @db.Decimal(18, 2)
+  discountTotal   Decimal        @default(0) @db.Decimal(18, 2)
+  headerDiscount  Decimal        @default(0) @db.Decimal(18, 2)
+  vatTotal        Decimal        @default(0) @db.Decimal(18, 2)
+  /// Delivery and other charges (income, account 4200).
+  chargesTotal    Decimal        @default(0) @db.Decimal(18, 2)
+  total           Decimal        @default(0) @db.Decimal(18, 2)
+  createdById     String?        @db.Char(36)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  branch       Branch           @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  customer     Customer         @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  items        SalesOrderItem[]
+  events       OrderEvent[]
+  invoice      Sale?            @relation("OrderInvoice")
+
+  @@unique([organizationId, number])
+  @@unique([organizationId, quotationNumber])
+  @@index([organizationId, branchId, status, businessDate])
+  @@index([organizationId, channel, status])
+  @@index([organizationId, customerId])
+  @@map("sales_orders")
+}
+
+model SalesOrderItem {
+  id             String  @id @default(uuid()) @db.Char(36)
+  organizationId String  @db.Char(36)
+  orderId        String  @db.Char(36)
+  position       Int     @default(0)
+  productId      String  @db.Char(36)
+  variantId      String? @db.Char(36)
+  quantity       Decimal @db.Decimal(18, 4)
+  unitPrice      Decimal @db.Decimal(18, 2)
+  priceLevelId   String? @db.Char(36)
+  discountAmount Decimal @default(0) @db.Decimal(18, 2)
+  vatAmount      Decimal @default(0) @db.Decimal(18, 2)
+  lineTotal      Decimal @db.Decimal(18, 2)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  order        SalesOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product      Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@map("sales_order_items")
+}
+
+/// Every change of an order: who, when, from which status to which.
+model OrderEvent {
+  id             String       @id @default(uuid()) @db.Char(36)
+  organizationId String       @db.Char(36)
+  orderId        String       @db.Char(36)
+  fromStatus     OrderStatus?
+  toStatus       OrderStatus
+  userId         String?      @db.Char(36)
+  note           String?      @db.VarChar(255)
+  createdAt      DateTime     @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  order        SalesOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@map("order_events")
 }

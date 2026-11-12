@@ -4,17 +4,12 @@ import { dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
-import { randomUUID } from "node:crypto";
 
-import { moneyAccountFor } from "@/core/ledger/accounts";
-import { allocatePayment } from "@/core/payments";
-import { postBalancedJournal } from "@/modules/accounting/post";
 import { outstandingReceivable } from "@/modules/customers/customers";
-import { allocateNumber } from "@/modules/documents/numbers";
+import { takeReceipt } from "@/modules/sales/receipts";
 import { hashPayload, idempotentTransaction, isKeyRace, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { decimalString, parseMoney } from "@/core/money";
 import { StockRuleError } from "@/modules/inventory/stock";
-import { occurredDate } from "@/lib/format/date";
 
 type Failure = { ok: false; status: 404 | 409 | 422; code: "NOT_FOUND" | "CONFLICT" | "BUSINESS_RULE"; message: string };
 
@@ -63,7 +58,11 @@ export async function postCustomerPayment(
     customerId: string;
     businessDate: string;
     amount: string;
-    method: "CASH" | "BANK";
+    method: "CASH" | "BANK" | "MOBILE";
+    /** The cash, bank or mobile account the money came into (the default drawer or bank when left out). */
+    accountId?: string;
+    /** What the bank or mobile service kept (D7). */
+    charge?: string;
     /** The invoices this receipt is for; what they do not cover settles the oldest debt first. */
     allocations?: Array<{ invoiceId: string; amount: string }>;
   },
@@ -73,6 +72,8 @@ export async function postCustomerPayment(
     businessDate: input.businessDate,
     amount: input.amount,
     method: input.method,
+    accountId: input.accountId ?? null,
+    charge: input.charge ?? null,
     allocations: input.allocations ?? null,
   });
   try {
@@ -101,44 +102,18 @@ export async function postCustomerPayment(
       if (amount.gt(balance)) {
         throw new StockRuleError("The payment is greater than the outstanding due.");
       }
-      const number = await allocateNumber(tx, {
-        organizationId: input.organizationId,
-        documentType: "PAY",
-        businessDate: input.businessDate,
-      });
-      const paymentId = randomUUID();
-      const journalId = await postBalancedJournal(tx, {
+      // D7: a bank or mobile charge is the shop's expense; the customer is credited the whole amount
+      const charge = parseMoney(input.charge ?? "0.00");
+      if (!charge || charge.isNeg()) {
+        throw new StockRuleError("Enter a charge with up to two decimals.");
+      }
+      const payment = await takeReceipt(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
-        businessDate: occurredDate(input.businessDate),
-        description: `Customer payment ${number}`,
-        createdById: input.userId,
-        doc: { type: "CUSTOMER_PAYMENT", id: paymentId },
-        lines: [
-          { accountId: await moneyAccountFor(tx, input.organizationId, { method: input.method }), debit: amount, credit: new Prisma.Decimal(0) },
-          { role: "AR", debit: new Prisma.Decimal(0), credit: amount, party: { type: "CUSTOMER" as const, id: input.customerId } },
-        ],
-      });
-      const payment = await tx.customerPayment.create({
-        data: {
-          id: paymentId,
-          organizationId: input.organizationId,
-          branchId: input.branchId,
-          customerId: input.customerId,
-          number,
-          businessDate: occurredDate(input.businessDate),
-          method: input.method,
-          amount,
-          journalId,
-        },
-        select: { id: true, number: true },
-      });
-      await allocatePayment(tx, {
-        organizationId: input.organizationId,
-        kind: "CUSTOMER",
-        partyId: input.customerId,
-        journalId,
-        amount,
+        userId: input.userId,
+        customerId: input.customerId,
+        businessDate: input.businessDate,
+        tender: { method: input.method, accountId: input.accountId, amount, charge },
         named: input.allocations?.map((row) => ({ documentId: row.invoiceId, amount: row.amount })),
       });
       await saveIdempotency(tx, {

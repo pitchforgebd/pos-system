@@ -44,6 +44,11 @@ export type MovementInput = {
   lotsOut?: ConsumedLot[];
   /** The day the movement belongs to (Dhaka): tells whether a lot is in date, and is written on the ledger row. Defaults to today. */
   businessDate?: Date;
+  /**
+   * An OUT movement that is an order being dispatched: this much of what the order reserved is given up by the movement itself
+   * (the reservation is consumed). Any other movement may not take stock that is reserved for an order.
+   */
+  releaseReserved?: Prisma.Decimal;
 };
 
 export type MovementResult = {
@@ -227,8 +232,8 @@ export async function applyMovement(tx: Prisma.TransactionClient, input: Movemen
     VALUES (${randomUUID()}, ${input.organizationId}, ${input.productId}, ${input.variantId ?? null}, ${variantScope}, ${input.branchId}, ${input.warehouseId}, 0, NOW(3))
     ON DUPLICATE KEY UPDATE id = id
   `;
-  const locked = await tx.$queryRaw<Array<{ id: string; quantity: Prisma.Decimal; averageCost: Prisma.Decimal | null }>>`
-    SELECT id, quantity, averageCost FROM stock_balances
+  const locked = await tx.$queryRaw<Array<{ id: string; quantity: Prisma.Decimal; averageCost: Prisma.Decimal | null; reservedQty: Prisma.Decimal }>>`
+    SELECT id, quantity, averageCost, reservedQty FROM stock_balances
     WHERE organizationId = ${input.organizationId}
       AND productId = ${input.productId}
       AND variantScope = ${variantScope}
@@ -245,13 +250,20 @@ export async function applyMovement(tx: Prisma.TransactionClient, input: Movemen
   if (next.isNeg()) {
     throw new StockRuleError("Insufficient stock.");
   }
+  // Stock held for confirmed orders is not for sale: what is left after the movement must still cover what is reserved (an order's own
+  // dispatch gives up its reservation in the same movement).
+  const reservedBefore = new Prisma.Decimal(locked[0].reservedQty ?? 0);
+  const reservedAfter = Prisma.Decimal.max(reservedBefore.minus(input.releaseReserved ?? 0), 0);
+  if (input.direction === "OUT" && next.lt(reservedAfter)) {
+    throw new StockRuleError("Insufficient stock: the rest is reserved for orders.");
+  }
 
   // What this movement is worth: the cost it was given, else the average, else (stock that never had a cost) the purchase price.
   const unitCost = (input.unitCost ?? average ?? new Prisma.Decimal(product.purchasePrice ?? 0)).toDecimalPlaces(4);
   const totalCost = input.quantity.mul(unitCost).toDecimalPlaces(2);
   const averageCost = nextAverageCost({ onHand: current, average, direction: input.direction, quantity: input.quantity, unitCost });
 
-  await tx.stockBalance.updateMany({ where: { id: locked[0].id }, data: { quantity: next, averageCost } });
+  await tx.stockBalance.updateMany({ where: { id: locked[0].id }, data: { quantity: next, averageCost, ...(input.releaseReserved ? { reservedQty: reservedAfter } : {}) } });
 
   const day = input.businessDate ?? today();
   if (input.direction === "OUT" && input.lotId) {
