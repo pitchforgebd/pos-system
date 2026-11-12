@@ -15,11 +15,12 @@ import { prisma } from "@/lib/db/client";
 //       check when stock valuation is complete (P03)
 //   I7  the quantity in expiry lots of a warehouse does not exceed the stock on hand in that warehouse
 //   I8  no invoice or bill is settled for more than it put on the books, no receipt settles more than it was
+//   I16 the stock held for orders (reservedQty) is exactly what the active reservations add up to, and never more than is on hand
 //   I15 the trial balance balances, and assets = liabilities + equity + profit so far
 
 type Db = Prisma.TransactionClient | PrismaClient;
 
-export type Finding = { invariant: "I1" | "I2" | "I4" | "I6" | "I7" | "I8" | "I15"; subject: string; message: string };
+export type Finding = { invariant: "I1" | "I2" | "I4" | "I6" | "I7" | "I8" | "I15" | "I16"; subject: string; message: string };
 export type ReconcileResult = { findings: Finding[]; warnings: Finding[] };
 
 const dec = (value: unknown) => new Prisma.Decimal(String(value ?? 0));
@@ -161,6 +162,26 @@ async function lotsAboveStock(db: Db, organizationId: string): Promise<Finding[]
   }));
 }
 
+/** I16: what is held for orders is what the active reservations say, and no more than the stock on hand. */
+async function reservationsOffStock(db: Db, organizationId: string): Promise<Finding[]> {
+  const rows = await db.$queryRaw<Array<{ productId: string; warehouseId: string; held: Prisma.Decimal | string; active: Prisma.Decimal | string; onHand: Prisma.Decimal | string }>>`
+    SELECT b.productId AS productId, b.warehouseId AS warehouseId, b.reservedQty AS held, b.quantity AS onHand,
+           COALESCE((SELECT SUM(r.quantity) FROM stock_reservations r
+                     WHERE r.organizationId = b.organizationId AND r.productId = b.productId AND r.warehouseId = b.warehouseId
+                       AND COALESCE(r.variantId, '') = b.variantScope AND r.status = 'ACTIVE'), 0) AS active
+    FROM stock_balances b
+    WHERE b.organizationId = ${organizationId}
+    HAVING held <> active OR held > onHand
+    ORDER BY b.productId
+  `;
+  const names = await productNames(db, organizationId, rows.map((row) => row.productId));
+  return rows.map((row) => ({
+    invariant: "I16" as const,
+    subject: names.get(row.productId) ?? row.productId,
+    message: `${dec(row.held).toFixed(4)} is held for orders, the active reservations add up to ${dec(row.active).toFixed(4)}, ${dec(row.onHand).toFixed(4)} is on hand`,
+  }));
+}
+
 async function inventoryAgainstStock(db: Db, organizationId: string): Promise<Finding[]> {
   const books = await db.$queryRaw<Array<{ branchId: string | null; value: Prisma.Decimal | string | null }>>`
     SELECT l.branchId AS branchId, SUM(l.debit - l.credit) AS value
@@ -206,6 +227,7 @@ export async function reconcileBooks(db: Db, organizationId: string): Promise<Re
     ...(await partyLineViolations(db, organizationId)).map((row) => ({ invariant: "I2" as const, subject: `line ${row.lineId}`, message: row.problem })),
     ...(await stockOffItsMovements(db, organizationId)),
     ...(await lotsAboveStock(db, organizationId)),
+    ...(await reservationsOffStock(db, organizationId)),
     ...(await allocationViolations(db, organizationId)).map((row) => ({ invariant: "I8" as const, subject: row.id, message: row.problem })),
     ...(await trialBalanceFindings(db, organizationId)),
   ];

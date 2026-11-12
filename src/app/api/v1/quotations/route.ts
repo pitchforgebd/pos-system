@@ -1,34 +1,23 @@
-import { z } from "zod";
 import { defineRoute } from "@/core/http/define-route";
-import { isoDate } from "@/core/time/iso-date";
+import { listQuery } from "@/core/list";
 
 import { jsonError, jsonOk } from "@/lib/api/http";
-import { createQuotation, listQuotations } from "@/modules/commerce/quotations";
 import { idempotencyKey, stockActor } from "@/modules/inventory/actor";
+import { createOrder, listOrders, orderSorts } from "@/modules/orders/orders";
+import { orderBody } from "@/modules/orders/schema";
 
-const bodySchema = z.object({
-  customerId: z.string().uuid(),
-  businessDate: isoDate,
-  note: z.string().trim().max(255).nullable().optional(),
-  lines: z
-    .array(
-      z.object({
-        productId: z.string().uuid(),
-        quantity: z.string(),
-        unitPrice: z.string(),
-      }),
-    )
-    .max(50)
-    .optional(),
-});
-
+// A quotation is a draft order with its own QUO number and a valid-until date (P06 task 4).
 export const GET = defineRoute({
   permission: "quotations.manage",
-  handler: async ({ session }) => {
-    if (!session.branchId) {
+  handler: async ({ request, session }) => {
+    const actor = stockActor(session, request);
+    if (!actor) {
       return jsonError("VALIDATION_ERROR", "A branch is required.", 400);
     }
-    return jsonOk(await listQuotations(session.organizationId, session.branchId));
+    const params = new URL(request.url).searchParams;
+    const query = listQuery({ page: params.get("page"), pageSize: params.get("pageSize"), sort: params.get("sort") }, { sorts: orderSorts });
+    const { rows, page } = await listOrders(actor.organizationId, actor.branchId, query, { quotations: true, q: params.get("q") ?? undefined });
+    return jsonOk(rows, "Operation completed", 200, { page });
   },
 });
 
@@ -37,14 +26,18 @@ export const POST = defineRoute({
   handler: async ({ request, session }) => {
     const actor = stockActor(session, request);
     const key = idempotencyKey(request);
-    const parsed = bodySchema.safeParse(await request.json().catch(() => null));
+    const parsed = orderBody.safeParse(await request.json().catch(() => null));
     if (!actor || !key || !parsed.success) {
-      return jsonError("VALIDATION_ERROR", "A branch, an Idempotency-Key, and a quotation are required.", 400);
+      return jsonError("VALIDATION_ERROR", "A branch, an Idempotency-Key, a customer and a quotation are required.", 400);
     }
-    const result = await createQuotation({ ...actor, idempotencyKey: key, ...parsed.data });
+    const result = await createOrder({ ...actor, idempotencyKey: key }, { ...parsed.data, isQuotation: true }, {
+      allowDiscount: session.permissions.has("sales.discount"),
+      allowPriceOverride: session.permissions.has("sales.price_override"),
+      allowPriceLevel: session.permissions.has("sales.price_level"),
+    });
     if (!result.ok) {
       return jsonError(result.code, result.message, result.status);
     }
-    return jsonOk({ id: result.id, number: result.number, replayed: result.replayed }, "Operation completed", result.replayed ? 200 : 201);
+    return jsonOk({ id: result.id, status: result.status, replayed: result.replayed }, "Operation completed", result.replayed ? 200 : 201);
   },
 });

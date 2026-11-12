@@ -2,7 +2,7 @@ import { z } from "zod";
 import { defineRoute } from "@/core/http/define-route";
 
 import { jsonError, jsonOk } from "@/lib/api/http";
-import { getQuotation } from "@/modules/commerce/quotations";
+import { getOrder } from "@/modules/orders/orders";
 
 export const GET = defineRoute<undefined, { id: string }>({
   permission: "quotations.manage",
@@ -11,10 +11,10 @@ export const GET = defineRoute<undefined, { id: string }>({
     if (!session.branchId || !z.string().uuid().safeParse(id).success) {
       return jsonError("NOT_FOUND", "That record was not found.", 404);
     }
-    const quotation = await getQuotation(session.organizationId, session.branchId, id);
-    if (!quotation) {
+    const order = await getOrder(session.organizationId, session.branchId, id);
+    if (!order || !order.isQuotation) {
       return jsonError("NOT_FOUND", "That record was not found.", 404);
     }
-    return jsonOk(quotation);
+    return jsonOk(order);
   },
 });

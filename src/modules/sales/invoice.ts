@@ -158,6 +158,116 @@ const amountOf = (value: string | undefined, what: string) => {
   return parsed;
 };
 
+export type PricingInput = {
+  level?: string;
+  levelId?: string;
+  fixedPrices?: boolean;
+  allowPriceOverride?: boolean;
+  allowDiscount?: boolean;
+  lines: InvoiceLine[];
+};
+
+/**
+ * Prices the lines of a sale or an order: the product, the price at the level and the quantity, the discount (and the most it may be), the
+ * VAT on what is really charged, and the totals. Used by the invoice and by an order when it is written down.
+ */
+export async function priceLines(tx: Tx, organizationId: string, customer: { customerTypeId: string | null }, shop: { maxDiscountPercent: Prisma.Decimal }, headerDiscount: Prisma.Decimal, charges: Prisma.Decimal, input: PricingInput) {
+  // each line: the product, the price at the level and quantity, the discount, the VAT
+  const priced = [];
+  for (const line of input.lines) {
+    const quantity = parseQuantity(line.quantity);
+    if (!quantity) {
+      throw new StockRuleError("Enter a quantity greater than zero.");
+    }
+    const resolved = await resolveLineProduct(tx, organizationId, line);
+    let unitPrice = new Prisma.Decimal(resolved.sellingPrice);
+    let priceLevelId: string | null = null;
+    if (!input.fixedPrices) {
+      const picked = await resolvePrice(tx, {
+        organizationId: organizationId,
+        productId: resolved.productId,
+        variantId: resolved.variantId,
+        quantity: decimalString(quantity, 4),
+        level: input.level,
+        levelId: input.levelId,
+        customerTypeId: customer.customerTypeId,
+      });
+      if (picked) {
+        unitPrice = picked.price;
+        priceLevelId = picked.levelId;
+      }
+    }
+    if (line.unitPrice) {
+      const offered = parseMoney(line.unitPrice);
+      if (!offered) {
+        throw new StockRuleError("Enter a unit price with up to two decimals.");
+      }
+      if (!money(offered).eq(money(unitPrice))) {
+        if (!input.allowPriceOverride && !input.fixedPrices) {
+          throw new StockRuleError("The unit price must match the selling price. Price override is not available.");
+        }
+        if (!input.fixedPrices && offered.lt(new Prisma.Decimal(resolved.minimumPrice))) {
+          throw new StockRuleError("The unit price is below the minimum price.");
+        }
+        unitPrice = offered;
+      }
+    }
+    const gross = money(quantity.mul(unitPrice));
+    let discount = amountOf(line.discountAmount, "a discount");
+    if (line.discountPercent) {
+      const percent = new Prisma.Decimal(/^\d{1,3}(\.\d{1,2})?$/.test(line.discountPercent) ? line.discountPercent : "NaN");
+      if (percent.isNaN() || percent.gt(100)) {
+        throw new StockRuleError("A discount percentage is between 0 and 100.");
+      }
+      discount = money(gross.mul(percent).div(100));
+    }
+    if (discount.gt(0) && input.allowDiscount === false) {
+      throw new StockRuleError("You may not give a discount.");
+    }
+    if (discount.gt(gross)) {
+      throw new StockRuleError("Discount is greater than the line.");
+    }
+    if (gross.gt(0) && discount.mul(100).gt(gross.mul(shop.maxDiscountPercent))) {
+      throw new StockRuleError(`A discount can be at most ${decimalString(shop.maxDiscountPercent, 2)}% of the line.`);
+    }
+    if (resolved.trackSerial && (!line.serial?.trim() || !quantity.eq(1))) {
+      throw new StockRuleError("Enter one IMEI or serial, and sell that product one unit at a time.");
+    }
+    priced.push({ resolved, quantity, unitPrice: money(unitPrice), priceLevelId, gross, discount, serial: resolved.trackSerial ? (line.serial?.trim() as string) : null, offeredVat: line.vatAmount });
+  }
+  // the discount on the whole invoice is shared over the lines by value, so each line's VAT is on what is really charged
+  const afterLine = priced.map((line) => money(line.gross.minus(line.discount)));
+  const grossTotal = money(priced.reduce((sum, line) => sum.plus(line.gross), zero()));
+  const lineDiscounts = money(priced.reduce((sum, line) => sum.plus(line.discount), zero()));
+  if (headerDiscount.gt(0) && input.allowDiscount === false) {
+    throw new StockRuleError("You may not give a discount.");
+  }
+  if (headerDiscount.gt(afterLine.reduce((sum, value) => sum.plus(value), zero()))) {
+    throw new StockRuleError("Discount is greater than the sale.");
+  }
+  if (grossTotal.gt(0) && lineDiscounts.plus(headerDiscount).mul(100).gt(grossTotal.mul(shop.maxDiscountPercent))) {
+    throw new StockRuleError(`A discount can be at most ${decimalString(shop.maxDiscountPercent, 2)}% of the sale.`);
+  }
+  const headerShares = allocateByWeight(headerDiscount, afterLine);
+  const lines = priced.map((line, index) => {
+    const base = money(afterLine[index].minus(headerShares[index]));
+    const vat = productVat(line.resolved.vatType, line.resolved.vatValue, base);
+    if (line.offeredVat) {
+      const offered = parseMoney(line.offeredVat);
+      if (!offered || !money(offered).eq(vat)) {
+        throw new StockRuleError("The VAT does not match the product.");
+      }
+    }
+    const inclusive = (line.resolved.vatType ?? "").toUpperCase() === "INCLUSIVE";
+    return { ...line, vat, salesAmount: inclusive ? money(base.minus(vat)) : base, payable: inclusive ? base : money(base.plus(vat)), id: randomUUID() };
+  });
+  const discountTotal = money(lineDiscounts.plus(headerDiscount));
+  const vatTotal = money(lines.reduce((sum, line) => sum.plus(line.vat), zero()));
+  const salesCredit = money(lines.reduce((sum, line) => sum.plus(line.salesAmount), zero()));
+  const total = money(lines.reduce((sum, line) => sum.plus(line.payable), zero()).plus(charges));
+  return { lines, grossTotal, discountTotal, vatTotal, salesCredit, total };
+}
+
 export function postInvoice(input: InvoiceInput) {
   const requestHash = hashPayload({
     businessDate: input.businessDate,
@@ -198,99 +308,7 @@ export function postInvoice(input: InvoiceInput) {
           throw new StockRuleError("You may not change the price level.");
         }
 
-        // each line: the product, the price at the level and quantity, the discount, the VAT
-        const priced = [];
-        for (const line of input.lines) {
-          const quantity = parseQuantity(line.quantity);
-          if (!quantity) {
-            throw new StockRuleError("Enter a quantity greater than zero.");
-          }
-          const resolved = await resolveLineProduct(tx, input.organizationId, line);
-          let unitPrice = new Prisma.Decimal(resolved.sellingPrice);
-          let priceLevelId: string | null = null;
-          if (!input.fixedPrices) {
-            const picked = await resolvePrice(tx, {
-              organizationId: input.organizationId,
-              productId: resolved.productId,
-              variantId: resolved.variantId,
-              quantity: decimalString(quantity, 4),
-              level: input.level,
-              levelId: input.levelId,
-              customerTypeId: customer.customerTypeId,
-            });
-            if (picked) {
-              unitPrice = picked.price;
-              priceLevelId = picked.levelId;
-            }
-          }
-          if (line.unitPrice) {
-            const offered = parseMoney(line.unitPrice);
-            if (!offered) {
-              throw new StockRuleError("Enter a unit price with up to two decimals.");
-            }
-            if (!money(offered).eq(money(unitPrice))) {
-              if (!input.allowPriceOverride && !input.fixedPrices) {
-                throw new StockRuleError("The unit price must match the selling price. Price override is not available.");
-              }
-              if (!input.fixedPrices && offered.lt(new Prisma.Decimal(resolved.minimumPrice))) {
-                throw new StockRuleError("The unit price is below the minimum price.");
-              }
-              unitPrice = offered;
-            }
-          }
-          const gross = money(quantity.mul(unitPrice));
-          let discount = amountOf(line.discountAmount, "a discount");
-          if (line.discountPercent) {
-            const percent = new Prisma.Decimal(/^\d{1,3}(\.\d{1,2})?$/.test(line.discountPercent) ? line.discountPercent : "NaN");
-            if (percent.isNaN() || percent.gt(100)) {
-              throw new StockRuleError("A discount percentage is between 0 and 100.");
-            }
-            discount = money(gross.mul(percent).div(100));
-          }
-          if (discount.gt(0) && input.allowDiscount === false) {
-            throw new StockRuleError("You may not give a discount.");
-          }
-          if (discount.gt(gross)) {
-            throw new StockRuleError("Discount is greater than the line.");
-          }
-          if (gross.gt(0) && discount.mul(100).gt(gross.mul(shop.maxDiscountPercent))) {
-            throw new StockRuleError(`A discount can be at most ${decimalString(shop.maxDiscountPercent, 2)}% of the line.`);
-          }
-          if (resolved.trackSerial && (!line.serial?.trim() || !quantity.eq(1))) {
-            throw new StockRuleError("Enter one IMEI or serial, and sell that product one unit at a time.");
-          }
-          priced.push({ resolved, quantity, unitPrice: money(unitPrice), priceLevelId, gross, discount, serial: resolved.trackSerial ? (line.serial?.trim() as string) : null, offeredVat: line.vatAmount });
-        }
-        // the discount on the whole invoice is shared over the lines by value, so each line's VAT is on what is really charged
-        const afterLine = priced.map((line) => money(line.gross.minus(line.discount)));
-        const grossTotal = money(priced.reduce((sum, line) => sum.plus(line.gross), zero()));
-        const lineDiscounts = money(priced.reduce((sum, line) => sum.plus(line.discount), zero()));
-        if (headerDiscount.gt(0) && input.allowDiscount === false) {
-          throw new StockRuleError("You may not give a discount.");
-        }
-        if (headerDiscount.gt(afterLine.reduce((sum, value) => sum.plus(value), zero()))) {
-          throw new StockRuleError("Discount is greater than the sale.");
-        }
-        if (grossTotal.gt(0) && lineDiscounts.plus(headerDiscount).mul(100).gt(grossTotal.mul(shop.maxDiscountPercent))) {
-          throw new StockRuleError(`A discount can be at most ${decimalString(shop.maxDiscountPercent, 2)}% of the sale.`);
-        }
-        const headerShares = allocateByWeight(headerDiscount, afterLine);
-        const lines = priced.map((line, index) => {
-          const base = money(afterLine[index].minus(headerShares[index]));
-          const vat = productVat(line.resolved.vatType, line.resolved.vatValue, base);
-          if (line.offeredVat) {
-            const offered = parseMoney(line.offeredVat);
-            if (!offered || !money(offered).eq(vat)) {
-              throw new StockRuleError("The VAT does not match the product.");
-            }
-          }
-          const inclusive = (line.resolved.vatType ?? "").toUpperCase() === "INCLUSIVE";
-          return { ...line, vat, salesAmount: inclusive ? money(base.minus(vat)) : base, payable: inclusive ? base : money(base.plus(vat)), id: randomUUID() };
-        });
-        const discountTotal = money(lineDiscounts.plus(headerDiscount));
-        const vatTotal = money(lines.reduce((sum, line) => sum.plus(line.vat), zero()));
-        const salesCredit = money(lines.reduce((sum, line) => sum.plus(line.salesAmount), zero()));
-        const total = money(lines.reduce((sum, line) => sum.plus(line.payable), zero()).plus(charges));
+        const { lines, grossTotal, discountTotal, vatTotal, salesCredit, total } = await priceLines(tx, input.organizationId, customer, shop, headerDiscount, charges, input);
 
         // what is paid now
         const tenders: Tender[] = (input.tenders ?? [])

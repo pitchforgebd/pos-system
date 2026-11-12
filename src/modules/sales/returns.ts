@@ -12,6 +12,7 @@ import { allocateNumber } from "@/modules/documents/numbers";
 import { hashPayload, idempotentTransaction, isKeyRace, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { decimalString, money, parseQuantity, zero } from "@/core/money";
 import { addExpiryLots, StockRuleError } from "@/modules/inventory/stock";
+import { markOrderReturned } from "@/modules/orders/orders";
 import { returnLineAmount } from "@/modules/returns/amount";
 import { occurredDate } from "@/lib/format/date";
 
@@ -210,6 +211,7 @@ export async function postSaleReturn(
       if (journalId) {
         await tx.saleReturn.update({ where: { id: saleReturn.id }, data: { journalId } });
       }
+      await markOrderReturned(tx, input.organizationId, input.userId, sale.id);
       await saveIdempotency(tx, { organizationId: input.organizationId, userId: input.userId, key: input.idempotencyKey, requestHash, entityType: "sale_return", entityId: saleReturn.id });
       return { id: saleReturn.id, number: saleReturn.number, replayed: false, total: decimalString(total, 2) };
     });

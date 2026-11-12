@@ -72,6 +72,7 @@ const bangla: Record<string, string> = {
   "Returned Invoice": "ফেরত চালান",
   Requisition: "রিকুইজিশন",
   Quotation: "কোটেশন",
+  Orders: "অর্ডার",
   "Create Quotation": "কোটেশন তৈরি",
   "All Quotation": "সব কোটেশন",
   "Due Date Invoice": "বকেয়ার তারিখ",

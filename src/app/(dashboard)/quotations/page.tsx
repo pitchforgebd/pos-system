@@ -1,46 +1,34 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { QuotationForm } from "@/components/commerce/forms";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
+import { Pagination } from "@/components/ui/pagination";
 import { EmptyState } from "@/components/ui/states";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { listQuery } from "@/core/list";
 import { getSession } from "@/modules/auth/current-session";
-import { listProducts } from "@/modules/catalog/products";
-import { listQuotations } from "@/modules/commerce/quotations";
-import { listCustomers } from "@/modules/customers/customers";
+import { listOrders, orderSorts } from "@/modules/orders/orders";
 
 export const metadata = { title: "Quotation" };
 
-export default async function QuotationsPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+export default async function QuotationsPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string; pageSize?: string; sort?: string }> }) {
   const session = await getSession();
   if (!session?.branchId) {
     redirect("/login");
   }
   const params = await searchParams;
-  const q = params.q?.trim().toLowerCase() ?? "";
-  const [customers, quotations, products] = await Promise.all([
-    listCustomers(session.organizationId),
-    listQuotations(session.organizationId, session.branchId),
-    listProducts(session.organizationId),
-  ]);
-  const rows = quotations.filter((row) => !q || `${row.number ?? ""} ${row.customerName}`.toLowerCase().includes(q));
+  const { rows, page } = await listOrders(session.organizationId, session.branchId, listQuery(params, { sorts: orderSorts }), { quotations: true, q: params.q });
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Create Quotation"
-        description="A quotation can store a product, a quantity, and a unit price. Convert turns those lines into a due sale."
+        title="Quotations"
+        description="A quotation is a draft order with its own number and a valid-until date. Open it to print it or to confirm it when the customer says yes."
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Quotations" }]}
+        actions={<Button href="/orders/new?quotation=1">New quotation</Button>}
       />
-      {session.permissions.has("quotations.manage") ? (
-        <QuotationForm
-          customers={customers.filter((customer) => customer.status === "ACTIVE").map((customer) => ({ id: customer.id, label: customer.name }))}
-          products={products.filter((product) => product.status === "ACTIVE").map((product) => ({ id: product.id, label: `${product.sku} · ${product.name}` }))}
-        />
-      ) : null}
-      <h2 className="text-lg font-semibold">All Quotation</h2>
       <form className="flex flex-wrap items-end gap-2" action="/quotations">
         <label className="grid min-w-56 flex-1 gap-1 text-sm">
           Search
@@ -53,16 +41,17 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
       <DataTable
         caption="Quotations"
         columns={[
-          { key: "number", header: "Quotation", cell: (row) => <Link href={`/quotations/${row.id}`}>{row.number}</Link> },
+          { key: "number", header: "Quotation", cell: (row) => <Link href={`/orders/${row.id}`}>{row.quotationNumber ?? "Quotation"}</Link> },
           { key: "date", header: "Date", cell: (row) => row.businessDate },
           { key: "customer", header: "Customer", cell: (row) => row.customerName },
-          { key: "lines", header: "Lines", cell: (row) => String(row.lineCount) },
-          { key: "status", header: "Status", cell: (row) => row.status },
+          { key: "total", header: "Total", cell: (row) => row.total },
+          { key: "status", header: "Status", cell: (row) => <StatusBadge tone={row.status === "DRAFT" ? "neutral" : "success"}>{row.status === "DRAFT" ? "OPEN" : `CONFIRMED · ${row.number ?? ""}`}</StatusBadge> },
         ]}
         rows={rows}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No quotations" description="A quotation is a draft until it is sent." />}
+        empty={<EmptyState title="No quotations" description="Write a quotation for a customer." />}
       />
+      {page.total > page.pageSize ? <Pagination page={page.page} pageCount={page.pageCount} total={page.total} pageSize={page.pageSize} path="/quotations" params={params.q ? { q: params.q } : {}} /> : null}
     </div>
   );
 }

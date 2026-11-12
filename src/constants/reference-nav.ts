@@ -144,12 +144,13 @@ export const referenceNavigation: ReferenceEntry[] = [
       { label: "Returned Invoice", href: "/sales/returns" },
     ],
   },
+  { kind: "link", label: "Orders", href: "/orders" },
   { kind: "link", label: "Requisition", href: "/requisitions" },
   {
     kind: "group",
     label: "Quotation",
     children: [
-      { label: "Create Quotation", href: "/quotations" },
+      { label: "Create Quotation", href: "/orders/new?quotation=1" },
       { label: "All Quotation", href: "/quotations" },
     ],
   },

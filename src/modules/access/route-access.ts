@@ -15,6 +15,7 @@ const rules: Rule[] = [
   { prefix: "/accounting", permission: "accounting.view" },
   { prefix: "/reports", permission: "reports.view" },
   { prefix: "/quotations", permission: "quotations.manage" },
+  { prefix: "/orders", permission: "orders.view" },
   { prefix: "/requisitions", permission: "requisitions.manage" },
   { prefix: "/shifts", permission: "shifts.manage" },
   { prefix: "/sms", permission: "sms.manage" },
