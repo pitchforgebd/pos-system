@@ -146,7 +146,7 @@ test("phase 18 checks money, numbers, permissions, and the sale path", async () 
     });
     assert.equal(collected.ok, true);
     if (collected.ok) {
-      assert.match(collected.number ?? "", /^PAY-2627-/);
+      assert.match(collected.number ?? "", /^RCV-2627-/);
     }
 
     const balance = await prisma.stockBalance.findFirst({ where: { productId: created.product.id } });
@@ -154,7 +154,7 @@ test("phase 18 checks money, numbers, permissions, and the sale path", async () 
     assert.equal(await ledgerMatchesBalance(org.id, branch.id), true);
     assert.equal((await outstandingReceivable(org.id, customer.id)).toFixed(2), "6.00");
     const journals = await prisma.journal.findMany({ where: { organizationId: org.id }, include: { lines: true } });
-    assert.equal(journals.length, 3, "the opening stock, the sale and the receipt");
+    assert.equal(journals.length, 4, "the opening stock, the sale, the receipt taken at the till, and the due collected later");
     for (const journal of journals) {
       const debit = journal.lines.reduce((sum, line) => sum.plus(line.debit), new Prisma.Decimal(0));
       const credit = journal.lines.reduce((sum, line) => sum.plus(line.credit), new Prisma.Decimal(0));

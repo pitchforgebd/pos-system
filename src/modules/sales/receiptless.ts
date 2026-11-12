@@ -5,6 +5,7 @@ import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } 
 import { moneyAccountFor } from "@/core/ledger/accounts";
 import { decimalString, money, parseMoney, parseQuantity, zero } from "@/core/money";
 import { postWithStock } from "@/core/posting/stock";
+import { dateOnly } from "@/core/time/business-date";
 import { prisma } from "@/lib/db/client";
 import { occurredDate } from "@/lib/format/date";
 import { writeAudit } from "@/modules/auth/audit";
@@ -184,5 +185,5 @@ export function postReceiptlessReturn(input: ReceiptlessInput) {
 
 export async function listReceiptlessReturns(organizationId: string, branchId: string) {
   const rows = await prisma.receiptlessReturn.findMany({ where: { organizationId, branchId }, orderBy: [{ businessDate: "desc" }, { createdAt: "desc" }], take: 50, select: { id: true, number: true, businessDate: true, total: true, reason: true, refundMethod: true } });
-  return rows.map((row) => ({ id: row.id, number: row.number, businessDate: row.businessDate.toISOString().slice(0, 10), total: decimalString(row.total, 2), reason: row.reason, refundMethod: row.refundMethod }));
+  return rows.map((row) => ({ id: row.id, number: row.number, businessDate: dateOnly(row.businessDate), total: decimalString(row.total, 2), reason: row.reason, refundMethod: row.refundMethod }));
 }

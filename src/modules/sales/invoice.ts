@@ -6,6 +6,7 @@ import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } 
 import { decimalString, money, parseMoney, parseQuantity, zero } from "@/core/money";
 import type { PostLine } from "@/core/posting/journal";
 import { postWithStock } from "@/core/posting/stock";
+import { dateOnly } from "@/core/time/business-date";
 import { sellSerial } from "@/core/stock";
 import { writeAudit } from "@/modules/auth/audit";
 import { customerWallet, outstandingReceivable } from "@/modules/customers/customers";
@@ -424,7 +425,7 @@ export function postInvoice(input: InvoiceInput) {
                 unitCost: moved.results[index].unitCost,
                 // an expiry-tracked product: which lots it came from (a return puts it back there)
                 ...(lotsTaken[index].length > 0
-                  ? { lots: lotsTaken[index].map((lot) => ({ lot: lot.lot, expiresOn: lot.expiresOn.toISOString().slice(0, 10), manufacturedOn: lot.manufacturedOn?.toISOString().slice(0, 10) ?? null, quantity: lot.quantity.toFixed(4) })) }
+                  ? { lots: lotsTaken[index].map((lot) => ({ lot: lot.lot, expiresOn: dateOnly(lot.expiresOn), manufacturedOn: lot.manufacturedOn ? dateOnly(lot.manufacturedOn) : null, quantity: lot.quantity.toFixed(4) })) }
                   : {}),
               },
             }),
