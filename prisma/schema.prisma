@@ -206,6 +206,17 @@ enum DocumentType {
   VCH
   ORD
   RCV
+  SHP
+  SET
+}
+
+enum ShipmentStatus {
+  CREATED
+  PICKED
+  IN_TRANSIT
+  DELIVERED
+  RETURNED
+  LOST
 }
 
 enum OrderStatus {
@@ -310,6 +321,9 @@ model Organization {
 
   branches             Branch[]
   salesOrders          SalesOrder[]
+  shipmentEvents       ShipmentEvent[]
+  courierSettlements   CourierSettlement[]
+  courierSettlementItems CourierSettlementItem[]
   receiptlessReturns   ReceiptlessReturn[]
   receiptlessReturnItems ReceiptlessReturnItem[]
   salesOrderItems      SalesOrderItem[]
@@ -438,6 +452,7 @@ model Branch {
   sessions           Session[]
   stockBalances      StockBalance[]
   salesOrders        SalesOrder[]
+  courierSettlements CourierSettlement[]
   receiptlessReturns ReceiptlessReturn[]
   stockLedgers       StockLedger[]
   transfersFrom      StockTransfer[]    @relation("TransferFromBranch")
@@ -1599,6 +1614,7 @@ model Sale {
   payments     SalePayment[]
   returns      SaleReturn[]
   invoice      Invoice?
+  shipment     Shipment?     @relation("SaleShipment")
   order        SalesOrder?   @relation("OrderInvoice", fields: [orderId], references: [id], onDelete: Restrict)
   quotation    Quotation?
   allocations  PaymentAllocation[]
@@ -2735,37 +2751,150 @@ model WarrantyClaim {
 }
 
 model Courier {
-  id             String   @id @default(uuid()) @db.Char(36)
-  organizationId String   @db.Char(36)
-  name           String   @db.VarChar(191)
-  phone          String?  @db.VarChar(32)
-  createdAt      DateTime @default(now())
+  id             String       @id @default(uuid()) @db.Char(36)
+  organizationId String       @db.Char(36)
+  name           String       @db.VarChar(191)
+  phone          String?      @db.VarChar(32)
+  status         RecordStatus @default(ACTIVE)
+  /// What the courier keeps of the cash it collects (condition charge), in percent; a shipment may change it.
+  defaultConditionPercent Decimal @default(0) @db.Decimal(5, 2)
+  /// What the courier charges to deliver a parcel, inside Dhaka and outside it.
+  defaultDeliveryCharge   Decimal @default(0) @db.Decimal(18, 2)
+  outsideDeliveryCharge   Decimal @default(0) @db.Decimal(18, 2)
+  /// The courier's own system (Steadfast, ...) when one is connected; empty for entries by hand (D13).
+  apiProvider    String?      @db.VarChar(32)
+  createdAt      DateTime     @default(now())
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   shipments    Shipment[]
+  settlements  CourierSettlement[]
 
   @@index([organizationId, name])
   @@map("couriers")
 }
 
+/// A sale's delivery (P07, feature 7): by the shop's own vehicle or by a courier, which collects the customer's cash on delivery (COD) and
+/// owes it to the shop until it settles. The money is in the books as the courier's receivable (account 1350).
 model Shipment {
-  id             String   @id @default(uuid()) @db.Char(36)
-  organizationId String   @db.Char(36)
-  branchId       String   @db.Char(36)
-  courierId      String   @db.Char(36)
-  customerId     String?  @db.Char(36)
-  reference      String?  @db.VarChar(64)
-  trackingCode   String?  @db.VarChar(64)
-  status         String   @default("PENDING") @db.VarChar(16)
-  createdAt      DateTime @default(now())
+  id             String         @id @default(uuid()) @db.Char(36)
+  organizationId String         @db.Char(36)
+  branchId       String         @db.Char(36)
+  /// SHP-..., taken when the shipment is made.
+  number         String?        @db.VarChar(32)
+  saleId         String?        @unique @db.Char(36)
+  orderId        String?        @db.Char(36)
+  method         DeliveryMethod @default(COURIER)
+  courierId      String?        @db.Char(36)
+  customerId     String?        @db.Char(36)
+  reference      String?        @db.VarChar(64)
+  trackingCode   String?        @db.VarChar(64)
+  vehicleNo      String?        @db.VarChar(32)
+  driverName     String?        @db.VarChar(191)
+  driverPhone    String?        @db.VarChar(32)
+  address        String?        @db.VarChar(255)
+  status         ShipmentStatus @default(CREATED)
+  /// The cash the courier collects from the customer: what was still owed on the invoice when it was handed over.
+  codAmount      Decimal        @default(0) @db.Decimal(18, 2)
+  /// What the courier (or the vehicle) charges for the delivery: an expense (6700).
+  deliveryCharge Decimal        @default(0) @db.Decimal(18, 2)
+  conditionPercent Decimal      @default(0) @db.Decimal(5, 2)
+  /// What the courier keeps of the COD (6710).
+  conditionCharge Decimal       @default(0) @db.Decimal(18, 2)
+  /// Charged on a parcel that came back (6700).
+  returnCharge   Decimal        @default(0) @db.Decimal(18, 2)
+  /// How the delivery charge is paid: DEDUCT (kept out of the settlement), CASH or BANK (paid now).
+  deliveryPaidWith String?      @db.VarChar(8)
+  deliveryAccountId String?     @db.Char(36)
+  dispatchedOn   DateTime?      @db.Date
+  deliveredOn    DateTime?      @db.Date
+  returnedOn     DateTime?      @db.Date
+  journalId      String?        @unique @db.Char(36)
+  createdById    String?        @db.Char(36)
+  createdAt      DateTime       @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  branch       Branch        @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  courier      Courier?      @relation(fields: [courierId], references: [id], onDelete: Restrict)
+  customer     Customer?     @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  sale         Sale?         @relation("SaleShipment", fields: [saleId], references: [id], onDelete: Restrict)
+  events       ShipmentEvent[]
+  settlementItem CourierSettlementItem?
+
+  @@unique([organizationId, number])
+  @@index([organizationId, branchId])
+  @@index([organizationId, status, courierId])
+  @@map("shipments")
+}
+
+/// The timeline of a shipment: every status it passed, when, and who said so.
+model ShipmentEvent {
+  id             String         @id @default(uuid()) @db.Char(36)
+  organizationId String         @db.Char(36)
+  shipmentId     String         @db.Char(36)
+  status         ShipmentStatus
+  note           String?        @db.VarChar(255)
+  userId         String?        @db.Char(36)
+  at             DateTime       @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  shipment     Shipment     @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@index([shipmentId, at])
+  @@map("shipment_events")
+}
+
+/// The courier pays the shop what it collected, less its charges (#27). Each delivered or returned shipment is in at most one settlement.
+model CourierSettlement {
+  id               String   @id @default(uuid()) @db.Char(36)
+  organizationId   String   @db.Char(36)
+  branchId         String   @db.Char(36)
+  courierId        String   @db.Char(36)
+  /// The cash, bank or mobile account the money came into.
+  accountId        String   @db.Char(36)
+  number           String?  @db.VarChar(32)
+  businessDate     DateTime @db.Date
+  grossCod         Decimal  @default(0) @db.Decimal(18, 2)
+  deliveryCharges  Decimal  @default(0) @db.Decimal(18, 2)
+  conditionCharges Decimal  @default(0) @db.Decimal(18, 2)
+  /// What the settlement should bring (cash collected less the charges, and less what was owed back on returned parcels).
+  expected         Decimal  @default(0) @db.Decimal(18, 2)
+  netReceived      Decimal  @default(0) @db.Decimal(18, 2)
+  /// netReceived - expected; not zero only with a reason and an approval.
+  difference       Decimal  @default(0) @db.Decimal(18, 2)
+  differenceReason String?  @db.VarChar(255)
+  approvedById     String?  @db.Char(36)
+  journalId        String?  @unique @db.Char(36)
+  createdById      String?  @db.Char(36)
+  createdAt        DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   branch       Branch       @relation(fields: [branchId], references: [id], onDelete: Restrict)
   courier      Courier      @relation(fields: [courierId], references: [id], onDelete: Restrict)
-  customer     Customer?    @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  items        CourierSettlementItem[]
 
-  @@index([organizationId, branchId])
-  @@map("shipments")
+  @@unique([organizationId, number])
+  @@index([organizationId, courierId, businessDate])
+  @@map("courier_settlements")
+}
+
+model CourierSettlementItem {
+  id             String  @id @default(uuid()) @db.Char(36)
+  organizationId String  @db.Char(36)
+  settlementId   String  @db.Char(36)
+  /// A shipment can be settled once: this is unique.
+  shipmentId     String  @unique @db.Char(36)
+  codAmount      Decimal @default(0) @db.Decimal(18, 2)
+  deliveryCharge Decimal @default(0) @db.Decimal(18, 2)
+  conditionCharge Decimal @default(0) @db.Decimal(18, 2)
+  /// What this shipment settles on the courier's account: cod - charges (a returned parcel: minus what is owed back for it).
+  amount         Decimal @default(0) @db.Decimal(18, 2)
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  settlement   CourierSettlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  shipment     Shipment          @relation(fields: [shipmentId], references: [id], onDelete: Restrict)
+
+  @@index([settlementId])
+  @@map("courier_settlement_items")
 }
 
 model DirectReturn {

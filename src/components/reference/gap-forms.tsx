@@ -65,51 +65,6 @@ export function CloseClaim({ id }: { id: string }) {
   );
 }
 
-export function CourierForm() {
-  const form = useFormSubmit("/api/v1/couriers", (data) => ({
-    name: data.get("name"),
-    phone: String(data.get("phone") || "") || undefined,
-  }));
-  return (
-    <form className="grid max-w-xl gap-3" onSubmit={form.onSubmit}>
-      <Input name="name" required placeholder="Courier name" aria-label="Courier name" />
-      <Input name="phone" placeholder="Phone" aria-label="Phone" />
-      {form.message ? <p className="text-sm text-error">{form.message}</p> : null}
-      <Button type="submit" loading={form.pending}>Save courier</Button>
-    </form>
-  );
-}
-
-export function ShipmentForm({ couriers, customers }: { couriers: Option[]; customers: Option[] }) {
-  const form = useFormSubmit("/api/v1/shipments", (data) => ({
-    courierId: data.get("courierId"),
-    customerId: String(data.get("customerId") || "") || undefined,
-    reference: String(data.get("reference") || "") || undefined,
-    trackingCode: String(data.get("trackingCode") || "") || undefined,
-  }));
-  return (
-    <form className="grid max-w-xl gap-3" onSubmit={form.onSubmit}>
-      <select name="courierId" required aria-label="Courier" className={selectClass}>
-        <option value="">Courier</option>
-        {couriers.map((courier) => (
-          <option key={courier.id} value={courier.id}>{courier.label}</option>
-        ))}
-      </select>
-      <select name="customerId" aria-label="Customer" className={selectClass}>
-        <option value="">Customer, optional</option>
-        {customers.map((customer) => (
-          <option key={customer.id} value={customer.id}>{customer.label}</option>
-        ))}
-      </select>
-      <Input name="reference" placeholder="Reference" aria-label="Reference" />
-      <Input name="trackingCode" placeholder="Tracking code" aria-label="Tracking code" />
-      <p className="text-sm text-muted">The shipment is stored here. No courier service is called.</p>
-      {form.message ? <p className="text-sm text-error">{form.message}</p> : null}
-      <Button type="submit" loading={form.pending}>Save shipment</Button>
-    </form>
-  );
-}
-
 export function DealerForm({ customers }: { customers: Option[] }) {
   const form = useFormSubmit("/api/v1/customers/dealers", (data) => ({ customerId: data.get("customerId") }));
   return (

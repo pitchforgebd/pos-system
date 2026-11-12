@@ -1,65 +1,44 @@
 import { redirect } from "next/navigation";
 
-import { CourierForm, ShipmentForm } from "@/components/reference/gap-forms";
-import { DataTable } from "@/components/ui/data-table";
+import { CourierForm } from "@/components/shipping/courier-forms";
 import { PageHeader } from "@/components/ui/page-header";
-import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
-import { listCustomers } from "@/modules/customers/customers";
-import { listCouriers, listShipments } from "@/modules/reference/extras";
+import { listCouriers } from "@/modules/shipping/couriers";
 
 export const metadata = { title: "Courier" };
 
-export default async function CourierPage() {
+export default async function CourierSettingsPage() {
   const session = await getSession();
   if (!session?.branchId) {
     redirect("/login");
   }
-  const [couriers, shipments, customers] = await Promise.all([
-    listCouriers(session.organizationId),
-    listShipments(session.organizationId, session.branchId),
-    listCustomers(session.organizationId),
-  ]);
+  const couriers = await listCouriers(session.organizationId);
+  const canEdit = session.permissions.has("settings.manage");
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Courier"
-        description="Save a courier and a shipment on this branch. The row is stored here. No outside courier service is called."
+        title="Couriers"
+        description="The couriers the shop sends parcels by. The condition percentage is what the courier keeps of the cash it collects; the delivery charge is what it charges per parcel. They are the default for each shipment, which may change them. Nothing is sent to an outside courier service: parcels are entered by hand."
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Settings", href: "/settings" }, { label: "Courier" }]}
       />
-      {session.permissions.has("settings.manage") ? (
-        <>
+      {canEdit ? (
+        <section className="space-y-3" aria-label="Add a courier">
+          <h2 className="text-lg font-semibold">Add a courier</h2>
           <CourierForm />
-          <ShipmentForm
-            couriers={couriers.map((courier) => ({ id: courier.id, label: courier.name }))}
-            customers={customers.filter((customer) => customer.status === "ACTIVE").map((customer) => ({ id: customer.id, label: customer.name }))}
-          />
-        </>
+        </section>
       ) : null}
-      <DataTable
-        caption="Couriers"
-        columns={[
-          { key: "name", header: "Courier", cell: (row) => row.name },
-          { key: "phone", header: "Phone", cell: (row) => row.phone ?? "" },
-        ]}
-        rows={couriers}
-        getRowKey={(row) => row.id}
-        empty={<EmptyState title="No courier" description="Save a courier name before creating a shipment." />}
-      />
-      <DataTable
-        caption="Shipments"
-        columns={[
-          { key: "courier", header: "Courier", cell: (row) => row.courierName },
-          { key: "customer", header: "Customer", cell: (row) => row.customerName },
-          { key: "reference", header: "Reference", cell: (row) => row.reference },
-          { key: "tracking", header: "Tracking", cell: (row) => row.trackingCode },
-          { key: "status", header: "Status", cell: (row) => row.status },
-        ]}
-        rows={shipments}
-        getRowKey={(row) => row.id}
-        empty={<EmptyState title="No shipments" description="A shipment stores a courier, an optional customer, and a tracking code." />}
-      />
+      <section className="space-y-3" aria-label="Couriers">
+        {couriers.map((courier) =>
+          canEdit ? (
+            <CourierForm key={courier.id} initial={{ id: courier.id, name: courier.name, phone: courier.phone ?? "", status: courier.status, defaultConditionPercent: courier.defaultConditionPercent, defaultDeliveryCharge: courier.defaultDeliveryCharge, outsideDeliveryCharge: courier.outsideDeliveryCharge }} />
+          ) : (
+            <p key={courier.id} className="rounded-md border border-border p-3 text-sm">
+              {courier.name} · condition {courier.defaultConditionPercent}% · delivery {courier.defaultDeliveryCharge} / outside {courier.outsideDeliveryCharge}
+            </p>
+          ),
+        )}
+      </section>
     </div>
   );
 }

@@ -35,7 +35,8 @@ export const referenceNavigation: ReferenceEntry[] = [
       { label: "Roles", href: "/roles" },
       { label: "Price Levels", href: "/settings/price-levels" },
       { label: "Courier Settings", href: "/settings/courier" },
-      { label: "Shipments", href: "/settings/courier" },
+      { label: "Shipments", href: "/shipments" },
+      { label: "Courier Dues", href: "/couriers" },
     ],
   },
   {

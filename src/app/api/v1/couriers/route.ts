@@ -1,22 +1,25 @@
-import { z } from "zod";
 import { defineRoute } from "@/core/http/define-route";
 
 import { jsonError, jsonOk } from "@/lib/api/http";
-import { addCourier } from "@/modules/reference/extras";
+import { stockActor } from "@/modules/inventory/actor";
+import { listCouriers, saveCourier } from "@/modules/shipping/couriers";
+import { courierBody } from "@/modules/shipping/schema";
 
-const bodySchema = z.object({
-  name: z.string().trim().min(1).max(191),
-  phone: z.string().trim().max(32).optional(),
+export const GET = defineRoute({
+  permission: "shipments.view",
+  handler: async ({ session }) => jsonOk(await listCouriers(session.organizationId)),
 });
 
+// POST /api/v1/couriers: a courier with the condition percentage it keeps and what it charges to deliver.
 export const POST = defineRoute({
   permission: "settings.manage",
   handler: async ({ request, session }) => {
-    const parsed = bodySchema.safeParse(await request.json().catch(() => null));
-    if (!parsed.success) {
+    const actor = stockActor(session, request);
+    const parsed = courierBody.safeParse(await request.json().catch(() => null));
+    if (!actor || !parsed.success) {
       return jsonError("VALIDATION_ERROR", "A courier name is required.", 400);
     }
-    const result = await addCourier({ organizationId: session.organizationId, ...parsed.data });
+    const result = await saveCourier({ organizationId: actor.organizationId, userId: actor.userId, ip: actor.ip, userAgent: actor.userAgent }, parsed.data);
     if (!result.ok) {
       return jsonError(result.code, result.message, result.status);
     }

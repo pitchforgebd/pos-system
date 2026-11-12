@@ -375,7 +375,7 @@ export async function allocationViolations(db: Db, organizationId: string): Prom
   const strangers = await db.$queryRaw<Array<{ id: string }>>`
     SELECT a.id AS id
     FROM payment_allocations a
-    JOIN journal_lines l ON l.journalId = a.journalId AND l.partyId IS NOT NULL
+    JOIN journal_lines l ON l.journalId = a.journalId AND l.partyId IS NOT NULL AND l.partyType IN ('CUSTOMER', 'VENDOR')
     LEFT JOIN sales s ON s.id = a.invoiceId
     LEFT JOIN purchases p ON p.id = a.billId
     WHERE a.organizationId = ${organizationId}

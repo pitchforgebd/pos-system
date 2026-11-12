@@ -14,6 +14,7 @@ const bangla: Record<string, string> = {
   Settings: "সেটিংস",
   Roles: "রোল",
   "Courier Settings": "কুরিয়ার সেটিং",
+  "Courier Dues": "কুরিয়ারের পাওনা",
   Shipments: "শিপমেন্ট",
   "Shop Branch": "শাখা",
   Branch: "শাখা",

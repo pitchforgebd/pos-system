@@ -11,6 +11,7 @@ import { writeAudit } from "@/modules/auth/audit";
 import { allocateNumber } from "@/modules/documents/numbers";
 import { resolveWarehouse, StockRuleError } from "@/modules/inventory/stock";
 import { failure, type Actor } from "@/modules/purchasing/common";
+import type { ShipmentInput } from "@/modules/shipping/shipments";
 import { postInvoice, priceLines, type InvoiceLine, type TenderInput } from "@/modules/sales/invoice";
 
 // A sales order (P06 task 3, feature 14): written down (DRAFT, or a quotation), confirmed (the stock is reserved, so two orders cannot
@@ -276,7 +277,7 @@ export function cancelOrder(actor: Actor, id: string, note?: string) {
   });
 }
 
-export type DispatchInput = { dispatchedOn: string; tenders?: TenderInput[]; shiftId?: string };
+export type DispatchInput = { dispatchedOn: string; tenders?: TenderInput[]; shiftId?: string; /** How it goes: the courier and the charges, or the vehicle (the order's delivery method says which). */ shipment?: ShipmentInput };
 
 /**
  * CONFIRMED or PACKED -> DISPATCHED (D4): the invoice posts at the order's prices, the stock goes out, the reservation is consumed (the
@@ -288,7 +289,11 @@ export async function dispatchOrder(actor: Actor, id: string, input: DispatchInp
     return { ok: false as const, status: 404 as const, code: "NOT_FOUND" as const, message: "That record was not found." };
   }
   if (order.status !== "CONFIRMED" && order.status !== "PACKED") {
-    return { ok: false as const, status: 409 as const, code: "CONFLICT" as const, message: "Only a confirmed or packed order can be dispatched." };
+    // a retry with the key of the dispatch that already happened gets that dispatch's answer back
+    const retried = await prisma.idempotencyKey.findFirst({ where: { organizationId: actor.organizationId, key: actor.idempotencyKey }, select: { id: true } });
+    if (!retried) {
+      return { ok: false as const, status: 409 as const, code: "CONFLICT" as const, message: "Only a confirmed or packed order can be dispatched." };
+    }
   }
   const invoice = await postInvoice({
     ...actor,
@@ -312,6 +317,9 @@ export async function dispatchOrder(actor: Actor, id: string, input: DispatchInp
       await tx.stockReservation.updateMany({ where: { orderId: id, organizationId: actor.organizationId, status: "ACTIVE" }, data: { status: "CONSUMED" } });
       await tx.salesOrder.update({ where: { id }, data: { status: "DISPATCHED" } });
       await addEvent(tx, actor, id, locked.status, "DISPATCHED", `Invoice ${sale.id}`);
+      // by the shop's vehicle or by courier: the shipment, its handover and its charges, in this same transaction
+      const { createShipmentInTx } = await import("@/modules/shipping/shipments");
+      await createShipmentInTx(tx, actor, { saleId: sale.id, customerId: sale.customerId, businessDate: input.dispatchedOn, order: { id, deliveryMethod: order.deliveryMethod, shippingAddress: order.shippingAddress }, shipment: input.shipment });
     },
   });
   if (!invoice.ok) {
@@ -325,6 +333,15 @@ export function deliverOrder(actor: Actor, id: string) {
     const current = await lockOrder(tx, actor, id);
     if (current.status !== "DISPATCHED") {
       throw new RuleError("Only a dispatched order can be delivered.", 409);
+    }
+    // a parcel with a courier is delivered on its shipment (the order follows); the shop's own vehicle is delivered with the order
+    const shipment = await tx.shipment.findFirst({ where: { orderId: id, organizationId: actor.organizationId }, select: { id: true, method: true, status: true } });
+    if (shipment?.method === "COURIER" && shipment.status !== "DELIVERED") {
+      throw new RuleError("This order goes by courier: mark its parcel delivered on the shipment.", 409);
+    }
+    if (shipment && shipment.status !== "DELIVERED") {
+      await tx.shipment.update({ where: { id: shipment.id }, data: { status: "DELIVERED", deliveredOn: occurredDate(dateOnly(new Date())) } });
+      await tx.shipmentEvent.create({ data: { organizationId: actor.organizationId, shipmentId: shipment.id, status: "DELIVERED", userId: actor.userId, note: "With the order" } });
     }
     await tx.salesOrder.update({ where: { id }, data: { status: "DELIVERED" } });
     await addEvent(tx, actor, id, "DISPATCHED", "DELIVERED");
@@ -413,7 +430,9 @@ export async function getOrder(organizationId: string, branchId: string, id: str
   }
   const users = await prisma.user.findMany({ where: { id: { in: [...new Set(row.events.flatMap((event) => (event.userId ? [event.userId] : [])))] }, organizationId }, select: { id: true, name: true } });
   const byUser = new Map(users.map((user) => [user.id, user.name]));
+  const shipment = await prisma.shipment.findFirst({ where: { orderId: row.id, organizationId }, select: { id: true, number: true, status: true, method: true } });
   return {
+    shipment,
     id: row.id,
     number: row.number,
     quotationNumber: row.quotationNumber,

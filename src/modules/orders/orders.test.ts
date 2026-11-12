@@ -32,7 +32,7 @@ test("the life of an order: confirm reserves, pack, dispatch posts the invoice a
   await withTestOrg(async (t) => {
     const product = await stockedProduct(t, { units: 10, cost: "6.00", price: "10.00" });
     const customer = await factories(t).customer();
-    const id = await draft(t, product.id, customer.id, "4", { channel: "FACEBOOK", externalRef: "FB-1001", chargesTotal: "5.00", deliveryMethod: "COURIER" });
+    const id = await draft(t, product.id, customer.id, "4", { channel: "FACEBOOK", externalRef: "FB-1001", chargesTotal: "5.00", deliveryMethod: "PICKUP" });
     assert.equal((await prisma.journal.count({ where: { organizationId: t.org.id, docType: "SALE" } })), 0, "a draft posts nothing");
     assert.equal(await reserved(t, product.id), "0.0000");
 

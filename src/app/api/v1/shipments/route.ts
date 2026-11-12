@@ -1,29 +1,28 @@
-import { z } from "zod";
 import { defineRoute } from "@/core/http/define-route";
+import { listQuery } from "@/core/list";
 
 import { jsonError, jsonOk } from "@/lib/api/http";
 import { stockActor } from "@/modules/inventory/actor";
-import { addShipment } from "@/modules/reference/extras";
+import { listShipments, shipmentSorts } from "@/modules/shipping/shipments";
 
-const bodySchema = z.object({
-  courierId: z.string().uuid(),
-  customerId: z.string().uuid().optional(),
-  reference: z.string().trim().max(64).optional(),
-  trackingCode: z.string().trim().max(64).optional(),
-});
+const STATUSES = ["CREATED", "PICKED", "IN_TRANSIT", "DELIVERED", "RETURNED", "LOST"] as const;
 
-export const POST = defineRoute({
-  permission: "settings.manage",
+// GET /api/v1/shipments?status=&courierId=&q=&page=: the branch's shipments, newest first. (A shipment is made by dispatching an order.)
+export const GET = defineRoute({
+  permission: "shipments.view",
   handler: async ({ request, session }) => {
     const actor = stockActor(session, request);
-    const parsed = bodySchema.safeParse(await request.json().catch(() => null));
-    if (!actor || !parsed.success) {
-      return jsonError("VALIDATION_ERROR", "A branch and a courier are required.", 400);
+    if (!actor) {
+      return jsonError("BUSINESS_RULE", "Select a branch before viewing shipments.", 422);
     }
-    const result = await addShipment({ ...actor, ...parsed.data, customerId: parsed.data.customerId });
-    if (!result.ok) {
-      return jsonError(result.code, result.message, result.status);
-    }
-    return jsonOk({ id: result.id }, "Operation completed", 201);
+    const params = new URL(request.url).searchParams;
+    const query = listQuery({ page: params.get("page"), pageSize: params.get("pageSize"), sort: params.get("sort") }, { sorts: shipmentSorts });
+    const courier = params.get("courierId") ?? undefined;
+    const { rows, page } = await listShipments(actor.organizationId, actor.branchId, query, {
+      status: STATUSES.find((value) => value === params.get("status")),
+      courierId: courier && /^[0-9a-f-]{36}$/i.test(courier) ? courier : undefined,
+      q: params.get("q") ?? undefined,
+    });
+    return jsonOk(rows, "Operation completed", 200, { page });
   },
 });

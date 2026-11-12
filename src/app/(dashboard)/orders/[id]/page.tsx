@@ -9,6 +9,7 @@ import { customerWallet } from "@/modules/customers/customers";
 import { businessDate } from "@/core/time/business-date";
 import { getSession } from "@/modules/auth/current-session";
 import { getOrder } from "@/modules/orders/orders";
+import { listCouriers } from "@/modules/shipping/couriers";
 
 export const metadata = { title: "Order" };
 
@@ -25,6 +26,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     notFound();
   }
   const advance = (await customerWallet(session.organizationId, order.customer.id)).toFixed(2);
+  const couriers = order.deliveryMethod === "COURIER" && order.status !== "DISPATCHED" ? (await listCouriers(session.organizationId)).filter((courier) => courier.status === "ACTIVE") : [];
   const title = order.number ?? order.quotationNumber ?? "Draft order";
 
   return (
@@ -35,7 +37,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Orders", href: "/orders" }, { label: title }]}
         actions={<StatusBadge tone={TONE[order.status]}>{order.status}</StatusBadge>}
       />
-      <OrderActions id={order.id} status={order.status} today={businessDate()} advance={advance} can={{ create: session.permissions.has("orders.create"), manage: session.permissions.has("orders.manage") }} />
+      <OrderActions id={order.id} status={order.status} today={businessDate()} advance={advance} can={{ create: session.permissions.has("orders.create"), manage: session.permissions.has("orders.manage") }} deliveryMethod={order.deliveryMethod} couriers={couriers} shipment={order.shipment} />
       {order.invoice ? (
         <p className="text-sm">
           Invoice <Link href={`/sales/${order.invoice.id}`}>{order.invoice.number}</Link>
@@ -68,6 +70,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         <dd className="text-right font-medium tabular-nums">{order.total}</dd>
       </dl>
       {order.shippingAddress ? <p className="text-sm">Deliver to: {order.shippingAddress}</p> : null}
+      {order.shipment ? (
+        <p className="text-sm">
+          Shipment <Link href={`/shipments/${order.shipment.id}`}>{order.shipment.number}</Link> ({order.shipment.status.toLowerCase().replace("_", " ")})
+        </p>
+      ) : null}
       {order.note ? <p className="text-sm">{order.note}</p> : null}
       <section aria-label="History">
         <h2 className="mb-2 text-sm font-semibold">History</h2>

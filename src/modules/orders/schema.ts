@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { isoDate } from "@/core/time/iso-date";
+import { shipmentBody } from "@/modules/shipping/schema";
 
 // What an order request carries. Amounts stay text; their decimals are checked by the sales and orders modules.
 
@@ -37,6 +38,8 @@ export const orderBody = z.object({
 
 export const dispatchBody = z.object({
   dispatchedOn: isoDate,
+  /** How it goes: the courier and its charges, or the vehicle; the order's delivery method says which. */
+  shipment: shipmentBody.optional(),
   tenders: z
     .array(z.object({ method: z.enum(["CASH", "BANK", "MOBILE", "CARD", "WALLET"]), accountId: id.optional(), amount: z.string().max(24), charge: z.string().max(24).optional() }))
     .max(8)
