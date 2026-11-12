@@ -1,7 +1,7 @@
 import { Prisma, type DeliveryMethod, type OrderChannel, type OrderStatus } from "@prisma/client";
 
 import { RuleError } from "@/core/errors/rule-error";
-import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } from "@/core/idempotency";
+import { hashPayload, idempotentTransaction, keyWasUsed, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { documentSorts, listQuery, pageInfo, type ListQuery, type Paged } from "@/core/list";
 import { decimalString, parseMoney, zero } from "@/core/money";
 import { dateOnly, isIsoDate } from "@/core/time/business-date";
@@ -290,8 +290,7 @@ export async function dispatchOrder(actor: Actor, id: string, input: DispatchInp
   }
   if (order.status !== "CONFIRMED" && order.status !== "PACKED") {
     // a retry with the key of the dispatch that already happened gets that dispatch's answer back
-    const retried = await prisma.idempotencyKey.findFirst({ where: { organizationId: actor.organizationId, key: actor.idempotencyKey }, select: { id: true } });
-    if (!retried) {
+    if (!(await keyWasUsed(prisma, actor.organizationId, actor.idempotencyKey))) {
       return { ok: false as const, status: 409 as const, code: "CONFLICT" as const, message: "Only a confirmed or packed order can be dispatched." };
     }
   }

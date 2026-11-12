@@ -60,6 +60,11 @@ export async function readIdempotency(
   return existing;
 }
 
+/** Whether this key was already used by a request that committed (a retry, whatever it asked): for a pre-check that must not refuse a retry. */
+export async function keyWasUsed(db: Pick<Prisma.TransactionClient, "idempotencyKey">, organizationId: string, key: string) {
+  return (await db.idempotencyKey.findFirst({ where: { organizationId, key }, select: { id: true } })) !== null;
+}
+
 // Errors raised because another request with the same key committed first.
 const keyRaces = (shared[Symbol.for("meridian.idempotencyKeyRaces")] ??= new WeakSet<object>()) as WeakSet<object>;
 
