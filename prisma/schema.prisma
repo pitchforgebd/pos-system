@@ -30,6 +30,15 @@ enum DocumentStatus {
   CANCELLED
 }
 
+/// A purchase: written down (DRAFT), sent to the vendor (ORDERED, nothing posted yet), received (RECEIVED: stock and books), or cancelled
+/// before it was received.
+enum PurchaseStatus {
+  DRAFT
+  ORDERED
+  RECEIVED
+  CANCELLED
+}
+
 enum JournalStatus {
   DRAFT
   POSTED
@@ -291,6 +300,7 @@ model Organization {
   priceLevels          PriceLevel[]
   stockDocuments       StockDocument[]
   stockReservations    StockReservation[]
+  supplierAdvances     SupplierAdvance[]
   openingStocks        OpeningStock[]
   ownStockInvoices     OwnStockInvoice[]
   customers            Customer[]
@@ -390,6 +400,7 @@ model Branch {
   damageRecords      DamageRecord[]
   expiryBatches      ExpiryBatch[]
   stockDocuments     StockDocument[]
+  supplierAdvances   SupplierAdvance[]
   openingStocks      OpeningStock[]
   ownStockInvoices   OwnStockInvoice[]
   sales              Sale[]
@@ -1360,6 +1371,7 @@ model Supplier {
   updatedBy    User?            @relation("SupplierUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
   ledgers      SupplierLedger[]
   payments     SupplierPayment[]
+  advances     SupplierAdvance[]
   purchases    Purchase[]
 
   @@index([organizationId, name])
@@ -1387,6 +1399,29 @@ model SupplierLedger {
   @@map("supplier_ledgers")
 }
 
+/// Money paid to a vendor ahead of a bill (Dr Vendor Advance): a separate asset, applied to bills later.
+model SupplierAdvance {
+  id             String   @id @default(uuid()) @db.Char(36)
+  organizationId String   @db.Char(36)
+  branchId       String   @db.Char(36)
+  supplierId     String   @db.Char(36)
+  number         String?  @db.VarChar(32)
+  businessDate   DateTime @db.Date
+  accountId      String   @db.Char(36)
+  amount         Decimal  @db.Decimal(18, 2)
+  journalId      String?  @unique @db.Char(36)
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  branch       Branch       @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  supplier     Supplier     @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  journal      Journal?     @relation("SupplierAdvanceJournal", fields: [journalId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, number])
+  @@index([organizationId, supplierId, businessDate])
+  @@map("supplier_advances")
+}
+
 model SupplierPayment {
   id             String   @id @default(uuid()) @db.Char(36)
   organizationId String   @db.Char(36)
@@ -1395,7 +1430,11 @@ model SupplierPayment {
   number         String?  @db.VarChar(32)
   businessDate     DateTime @db.Date
   method         String   @db.VarChar(32)
+  /// The cash, bank or mobile account the money left from.
+  accountId      String?  @db.Char(36)
   amount         Decimal  @db.Decimal(18, 2)
+  /// What the bank or the mobile service took on top (it is an expense, not part of what the vendor is paid).
+  charge         Decimal  @default(0) @db.Decimal(18, 2)
   journalId      String?  @unique @db.Char(36)
   createdAt      DateTime @default(now())
 
@@ -1698,15 +1737,32 @@ model Purchase {
   branchId       String         @db.Char(36)
   warehouseId    String?        @db.Char(36)
   supplierId     String         @db.Char(36)
+  /// Given when the purchase leaves DRAFT (ordered, or received at once), so draft work never leaves a gap in the numbers.
   number         String?        @db.VarChar(32)
+  /// The vendor's own invoice number.
+  supplierInvoiceNo String?     @db.VarChar(64)
   journalId      String?        @unique @db.Char(36)
-  status         DocumentStatus @default(DRAFT)
+  status         PurchaseStatus @default(DRAFT)
+  /// Sum of quantity x unit cost, before any discount.
   subtotal       Decimal        @default(0) @db.Decimal(18, 2)
+  /// Line discounts plus the header discount.
   discountTotal  Decimal        @default(0) @db.Decimal(18, 2)
+  headerDiscount Decimal        @default(0) @db.Decimal(18, 2)
   vatTotal       Decimal        @default(0) @db.Decimal(18, 2)
+  /// What the purchase cost to bring in: haulage and labour/other costs (chargesTotal = transportCost + otherCost).
   chargesTotal   Decimal        @default(0) @db.Decimal(18, 2)
+  transportCost  Decimal        @default(0) @db.Decimal(18, 2)
+  otherCost      Decimal        @default(0) @db.Decimal(18, 2)
+  /// What the vendor is owed for this bill: the goods less discounts, plus VAT (D2: the VAT is part of the cost). Not the haulage.
   total          Decimal        @default(0) @db.Decimal(18, 2)
   businessDate     DateTime       @db.Date
+  /// The day the goods were received (the stock and the journal are dated by it).
+  receivedOn     DateTime?      @db.Date
+  /// The carrier is a vendor too; the haulage and other costs are paid in cash or bank now (transportPaidWith) or owed to the carrier (CREDIT).
+  transporterId  String?        @db.Char(36)
+  vehicleNo      String?        @db.VarChar(32)
+  transportPaidWith String?     @db.VarChar(16)
+  note           String?        @db.VarChar(500)
   createdById    String?        @db.Char(36)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
@@ -1724,6 +1780,7 @@ model Purchase {
 
   @@unique([organizationId, number])
   @@index([organizationId, branchId, businessDate])
+  @@index([organizationId, branchId, status, businessDate])
   @@map("purchases")
 }
 
@@ -1731,11 +1788,25 @@ model PurchaseItem {
   id             String  @id @default(uuid()) @db.Char(36)
   organizationId String  @db.Char(36)
   purchaseId     String  @db.Char(36)
+  /// The line's place on the document (a list, a printed order, keeps the order the lines were typed in).
+  position       Int     @default(0)
   productId      String  @db.Char(36)
   variantId      String? @db.Char(36)
   quantity       Decimal @db.Decimal(18, 4)
-  unitCost       Decimal @db.Decimal(18, 2)
+  unitCost       Decimal @db.Decimal(18, 4)
+  /// The line's discount (an amount) and VAT (a rate and the amount).
+  discount       Decimal @default(0) @db.Decimal(18, 2)
+  vatRate        Decimal @default(0) @db.Decimal(5, 2)
+  vatAmount      Decimal @default(0) @db.Decimal(18, 2)
+  /// quantity x unit cost less the line discount.
   lineTotal      Decimal @db.Decimal(18, 2)
+  /// What one unit cost to bring in: the line, its share of the header discount, its VAT and its share of the haulage (four decimals).
+  landedUnitCost Decimal? @db.Decimal(18, 4)
+  lot            String? @db.VarChar(64)
+  manufacturedOn DateTime? @db.Date
+  expiresOn      DateTime? @db.Date
+  /// IMEIs or serial numbers that come in with the line, until it is received.
+  serials        Json?
 
   organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   purchase     Purchase           @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
@@ -1871,6 +1942,7 @@ model Journal {
   branch         Branch?            @relation(fields: [branchId], references: [id], onDelete: Restrict)
   paymentAllocations PaymentAllocation[]
   stockDocument  StockDocument?
+  supplierAdvance SupplierAdvance? @relation("SupplierAdvanceJournal")
   reversalOf     Journal?           @relation("JournalReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
   reversals      Journal[]          @relation("JournalReversal")
   createdBy      User?              @relation("JournalCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)

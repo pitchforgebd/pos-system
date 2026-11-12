@@ -62,6 +62,14 @@ function table(kind: PartyKind) {
 
 type Net = { docId: string; net: Prisma.Decimal | string | null };
 
+/**
+ * A purchase's journal can owe money to two parties: the vendor (the bill) and the carrier (the haulage, when it is on credit, P05). Only
+ * the vendor's payable lines are the bill; the carrier's are a debt of their own, settled by payments to the carrier.
+ */
+function billOwnLines(docType: string) {
+  return docType === "PURCHASE" ? Prisma.sql`AND l.partyId = (SELECT b.supplierId FROM purchases b WHERE b.id = j.docId)` : Prisma.empty;
+}
+
 /** The net debit (debit - credit) of the party-account lines of each document of a type, by document id. */
 async function netByDocument(db: Db, organizationId: string, cfg: Config, docType: string, docIds: string[]): Promise<Map<string, Prisma.Decimal>> {
   const result = new Map<string, Prisma.Decimal>();
@@ -73,7 +81,7 @@ async function netByDocument(db: Db, organizationId: string, cfg: Config, docTyp
     FROM journals j
     JOIN journal_lines l ON l.journalId = j.id
     JOIN account_roles r ON r.organizationId = l.organizationId AND r.accountId = l.accountId AND r.role = ${cfg.role}
-    WHERE j.organizationId = ${organizationId} AND j.docType = ${docType} AND j.docId IN (${Prisma.join(docIds)})
+    WHERE j.organizationId = ${organizationId} AND j.docType = ${docType} AND j.docId IN (${Prisma.join(docIds)}) ${billOwnLines(docType)}
     GROUP BY j.docId
   `;
   for (const row of rows) {
@@ -229,7 +237,7 @@ async function documentsOldestFirst(db: Db, organizationId: string, kind: PartyK
   const rows =
     kind === "CUSTOMER"
       ? await db.sale.findMany({ where: { organizationId, customerId: partyId, status: "POSTED", ...date }, orderBy, skip, take: CHUNK, select: { id: true, total: true } })
-      : await db.purchase.findMany({ where: { organizationId, supplierId: partyId, status: "POSTED", ...date }, orderBy, skip, take: CHUNK, select: { id: true, total: true } });
+      : await db.purchase.findMany({ where: { organizationId, supplierId: partyId, status: "RECEIVED", ...date }, orderBy, skip, take: CHUNK, select: { id: true, total: true } });
   return rows.map((row) => ({ id: row.id, total: dec(row.total) }));
 }
 
@@ -266,7 +274,7 @@ export async function allocatePayment(
     const own =
       input.kind === "CUSTOMER"
         ? await tx.sale.findMany({ where: { id: { in: ids }, organizationId: input.organizationId, customerId: input.partyId, status: "POSTED" }, select: { id: true, total: true } })
-        : await tx.purchase.findMany({ where: { id: { in: ids }, organizationId: input.organizationId, supplierId: input.partyId, status: "POSTED" }, select: { id: true, total: true } });
+        : await tx.purchase.findMany({ where: { id: { in: ids }, organizationId: input.organizationId, supplierId: input.partyId, status: "RECEIVED" }, select: { id: true, total: true } });
     if (own.length !== ids.length) {
       throw new RuleError(`That ${cfg.noun} is not one of this ${input.kind === "CUSTOMER" ? "customer" : "supplier"}'s.`);
     }
@@ -333,7 +341,7 @@ export async function allocationViolations(db: Db, organizationId: string): Prom
         FROM journals j
         JOIN journal_lines l ON l.journalId = j.id
         JOIN account_roles r ON r.organizationId = l.organizationId AND r.accountId = l.accountId AND r.role = ${cfg.role}
-        WHERE j.organizationId = ${organizationId} AND j.docType = ${cfg.invoiceDoc}
+        WHERE j.organizationId = ${organizationId} AND j.docType = ${cfg.invoiceDoc} ${billOwnLines(cfg.invoiceDoc)}
         GROUP BY j.docId
       ) c ON c.docId = a.${Prisma.raw(column)}
       WHERE a.organizationId = ${organizationId} AND a.${Prisma.raw(column)} IS NOT NULL

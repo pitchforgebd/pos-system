@@ -75,8 +75,8 @@ export async function postPurchaseReturn(
       if (!purchase || purchase.branchId !== input.branchId) {
         throw new StockRuleError("That record was not found.", 404);
       }
-      if (purchase.status !== "POSTED" || !purchase.warehouseId) {
-        throw new StockRuleError("Only a posted purchase can be returned.");
+      if (purchase.status !== "RECEIVED" || !purchase.warehouseId) {
+        throw new StockRuleError("Only a received purchase can be returned.");
       }
       if (new Set(input.lines.map((line) => line.purchaseItemId)).size !== input.lines.length) {
         throw new StockRuleError("Each purchase line can appear once on a return.");
@@ -103,7 +103,8 @@ export async function postPurchaseReturn(
         });
         const amount = returnLineAmount({
           sourceQuantity: new Prisma.Decimal(item.quantity),
-          unitAmount: new Prisma.Decimal(item.unitCost),
+          // what the vendor charged per unit, after discounts and with VAT (the unit price when there were none)
+          unitAmount: new Prisma.Decimal(item.lineTotal).div(new Prisma.Decimal(item.quantity)),
           sourceTotal: new Prisma.Decimal(item.lineTotal),
           priorQuantities: prior.map((row) => new Prisma.Decimal(row.quantity)),
           quantity,
@@ -225,7 +226,7 @@ export async function listPurchaseReturns(organizationId: string, branchId: stri
 
 export async function listReturnablePurchaseLines(organizationId: string, branchId: string) {
   const rows = await prisma.purchaseItem.findMany({
-    where: { organizationId, purchase: { branchId, status: "POSTED" } },
+    where: { organizationId, purchase: { branchId, status: "RECEIVED" } },
     orderBy: { purchase: { businessDate: "desc" } },
     take: 100,
     select: {

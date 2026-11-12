@@ -70,7 +70,7 @@ async function legacyShop(t: T) {
 
   // Old Mill: bought 200, paid 50, opening payable 30 => owes 180
   const buy = await oldJournal(t, "Purchase", [["INVENTORY", "debit", "200.00"], ["AP", "credit", "200.00"]]);
-  const buyRow = await prisma.purchase.create({ data: { organizationId: t.org.id, branchId: t.branch.id, supplierId: v1.id, status: "POSTED", total: "200.00", businessDate: day, journalId: buy.id } });
+  const buyRow = await prisma.purchase.create({ data: { organizationId: t.org.id, branchId: t.branch.id, supplierId: v1.id, status: "RECEIVED", total: "200.00", businessDate: day, journalId: buy.id } });
   await prisma.supplierLedger.create({ data: { organizationId: t.org.id, branchId: t.branch.id, supplierId: v1.id, businessDate: day, entryType: "PURCHASE", credit: "200.00", referenceType: "purchase", referenceId: buyRow.id } });
   const spay = await oldJournal(t, "Supplier payment", [["AP", "debit", "50.00"], ["CASH", "credit", "50.00"]]);
   const spayRow = await prisma.supplierPayment.create({ data: { organizationId: t.org.id, branchId: t.branch.id, supplierId: v1.id, number: "PAY-OLD-2", businessDate: day, method: "CASH", amount: "50.00", journalId: spay.id } });

@@ -78,10 +78,11 @@ test("phase 14 reports sum posted rows and keep the trial balance equal", async 
         organizationId: org.id,
         branchId: branch.id,
         supplierId: supplier.id,
-        status: "POSTED",
+        status: "RECEIVED",
         number: `PUR-${stamp}`,
         total: "7.00",
         businessDate: new Date("2026-10-01T00:00:00.000Z"),
+        receivedOn: new Date("2026-10-01T00:00:00.000Z"),
       },
     });
 

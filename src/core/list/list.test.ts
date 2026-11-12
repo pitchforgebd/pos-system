@@ -139,7 +139,7 @@ test("the purchases list pages the same way, and its search runs in SQL across a
           branchId: t.branch.id,
           supplierId: n % 10 === 0 ? rice.id : salt.id,
           number: `PUR-2627-${String(n).padStart(6, "0")}`,
-          status: "POSTED",
+          status: "RECEIVED",
           total: "5.00",
           businessDate: new Date(`2026-10-${String(1 + Math.floor((n - 1) / 3)).padStart(2, "0")}T00:00:00.000Z`),
         },

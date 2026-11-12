@@ -81,16 +81,17 @@ export async function purchaseReport(scope: ReportScope) {
   const where = {
     organizationId: scope.organizationId,
     branchId: scope.branchId,
-    status: "POSTED" as const,
-    businessDate: reportWindow(scope) ?? undefined,
+    // only a received purchase is a purchase of the books; it is dated by the day the goods came
+    status: "RECEIVED" as const,
+    receivedOn: reportWindow(scope) ?? undefined,
   };
   const [sum, rows] = await Promise.all([
     prisma.purchase.aggregate({ where, _sum: { total: true }, _count: true }),
     prisma.purchase.findMany({
       where,
-      orderBy: [{ businessDate: "desc" }, { createdAt: "desc" }],
+      orderBy: [{ receivedOn: "desc" }, { createdAt: "desc" }],
       take: listLimit,
-      select: { id: true, number: true, total: true, businessDate: true, supplier: { select: { name: true } } },
+      select: { id: true, number: true, total: true, businessDate: true, receivedOn: true, supplier: { select: { name: true } } },
     }),
   ]);
   return {
@@ -98,7 +99,7 @@ export async function purchaseReport(scope: ReportScope) {
     count: sum._count,
     rows: rows.map((row) => ({
       id: row.id,
-      businessDate: dateOnly(row.businessDate),
+      businessDate: dateOnly(row.receivedOn ?? row.businessDate),
       number: row.number ?? "Purchase",
       party: row.supplier.name,
       total: moneyText(row.total),

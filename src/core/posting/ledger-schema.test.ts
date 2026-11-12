@@ -111,7 +111,7 @@ test("a payment is split over invoices or bills in payment_allocations, each row
     const ok = await prisma.paymentAllocation.create({ data: { organizationId: t.org.id, journalId: journal.id, invoiceId: sale.id, amount: "30.00" } });
     assert.equal(ok.amount.toFixed(2), "30.00");
     await assert.rejects(prisma.paymentAllocation.create({ data: { organizationId: t.org.id, journalId: journal.id, amount: "1.00" } }), (e: unknown) => e instanceof Error, "neither an invoice nor a bill");
-    const purchase = await prisma.purchase.create({ data: { organizationId: t.org.id, branchId: t.branch.id, supplierId: (await prisma.supplier.create({ data: { organizationId: t.org.id, name: "S" } })).id, status: "POSTED", total: "1.00", businessDate: day } });
+    const purchase = await prisma.purchase.create({ data: { organizationId: t.org.id, branchId: t.branch.id, supplierId: (await prisma.supplier.create({ data: { organizationId: t.org.id, name: "S" } })).id, status: "RECEIVED", total: "1.00", businessDate: day } });
     await assert.rejects(prisma.paymentAllocation.create({ data: { organizationId: t.org.id, journalId: journal.id, invoiceId: sale.id, billId: purchase.id, amount: "1.00" } }), (e: unknown) => e instanceof Error, "both");
     await assert.rejects(prisma.paymentAllocation.create({ data: { organizationId: t.org.id, journalId: journal.id, invoiceId: sale.id, amount: "0.00" } }), (e: unknown) => e instanceof Error, "an amount of zero");
   });

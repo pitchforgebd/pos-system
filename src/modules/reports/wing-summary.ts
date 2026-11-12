@@ -157,7 +157,7 @@ export async function wingSummary(
       where: { ...posted, sale: { businessDate: { lt: businessDate } } },
       _sum: { total: true },
     }),
-    prisma.purchase.aggregate({ where: posted, _sum: { total: true } }),
+    prisma.purchase.aggregate({ where: { organizationId, status: "RECEIVED", receivedOn: businessDate, ...branchFilter(branchId, branchIds) }, _sum: { total: true } }),
     prisma.expense.aggregate({
       where: { organizationId, businessDate, ...branchFilter(branchId, branchIds) },
       _sum: { amount: true },

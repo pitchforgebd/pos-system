@@ -113,7 +113,7 @@ export async function reorderList(organizationId: string, branchId: string, limi
     FROM purchase_items pi
     JOIN purchases pu ON pu.id = pi.purchaseId
     JOIN suppliers s ON s.id = pu.supplierId
-    WHERE pi.organizationId = ${organizationId} AND pu.branchId = ${branchId} AND pu.status = 'POSTED' AND pi.productId IN (${Prisma.join(ids)})
+    WHERE pi.organizationId = ${organizationId} AND pu.branchId = ${branchId} AND pu.status = 'RECEIVED' AND pi.productId IN (${Prisma.join(ids)})
     ORDER BY pu.businessDate DESC, pu.createdAt DESC`;
   const last = new Map<string, { unitCost: Prisma.Decimal; supplierName: string }>();
   for (const row of purchases) {
