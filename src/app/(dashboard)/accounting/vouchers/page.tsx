@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { CashVoucherForm, ContraForm } from "@/components/accounting/forms";
+import { CashVoucherForm } from "@/components/accounting/forms";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
@@ -46,12 +46,11 @@ export default async function VouchersPage({ searchParams }: { searchParams: Pro
     <div className="space-y-6">
       <PageHeader
         title="Vouchers"
-        description="A payment credits cash or bank. A receipt debits cash or bank. Customer dues and supplier payables stay on their own screens."
+        description="A payment credits cash or bank. A receipt debits cash or bank. Customer dues and supplier payables stay on their own screens. Money moved between your own cash, bank and mobile accounts is on Bank & Cash."
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Accounting", href: "/accounting" }, { label: "Vouchers" }]}
       />
       {session.permissions.has("accounting.post") ? (
         <>
-          <ContraForm />
           <CashVoucherForm accounts={voucherAccounts} moneyAccounts={moneyAccounts} />
         </>
       ) : null}

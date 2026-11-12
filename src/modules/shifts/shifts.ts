@@ -425,6 +425,7 @@ const LABEL: Record<string, string> = {
   CUSTOMER_ADVANCE: "Advances taken",
   SALE_RETURN: "Refunds",
   EXPENSE: "Expenses paid",
+  EXPENSE_SETTLEMENT: "Owed expenses paid",
   SUPPLIER_PAYMENT: "Paid to vendors",
   SUPPLIER_ADVANCE: "Advances paid to vendors",
   CONTRA: "Moved to or from other accounts",
@@ -460,4 +461,11 @@ export async function getShift(organizationId: string, branchId: string, id: str
 export async function listHandoverUsers(organizationId: string) {
   const rows = await prisma.user.findMany({ where: { organizationId, status: "ACTIVE" }, orderBy: { name: "asc" }, select: { id: true, name: true } });
   return rows;
+}
+
+/** The owner turns the rule on or off: cash is taken or paid only while the user has an open shift (D17). Old entries are not changed. */
+export async function setRequireShift(who: { organizationId: string; userId: string; ip: string; userAgent: string | null }, requireShift: boolean) {
+  await prisma.organization.update({ where: { id: who.organizationId }, data: { requireShift } });
+  await writeAudit({ organizationId: who.organizationId, userId: who.userId, action: "require-shift", module: "settings", entityType: "organization", entityId: who.organizationId, after: { requireShift }, ip: who.ip, userAgent: who.userAgent });
+  return { ok: true as const, requireShift };
 }

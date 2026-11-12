@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { ChargeInput } from "@/components/treasury/charge-input";
 import { Input } from "@/components/ui/input";
 import { useSubmit } from "@/lib/client/use-submit";
 
@@ -26,6 +27,7 @@ export function CollectForm({ accounts, today }: { accounts: Account[]; today: s
   const [date, setDate] = useState(today);
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
   const [charge, setCharge] = useState("");
+  const [chargeTyped, setChargeTyped] = useState(false);
   const account = accounts.find((row) => row.id === accountId);
 
   useEffect(() => {
@@ -103,7 +105,7 @@ export function CollectForm({ accounts, today }: { accounts: Account[]; today: s
             </label>
             <label className="grid gap-1 text-sm">
               Came into
-              <select value={accountId} onChange={(event) => setAccountId(event.target.value)} className={select}>
+              <select value={accountId} onChange={(event) => { setAccountId(event.target.value); setChargeTyped(false); setCharge(""); }} className={select}>
                 {accounts.map((row) => (
                   <option key={row.id} value={row.id}>
                     {row.label}
@@ -112,10 +114,7 @@ export function CollectForm({ accounts, today }: { accounts: Account[]; today: s
               </select>
             </label>
             {account && account.kind !== "CASH" ? (
-              <label className="grid gap-1 text-sm">
-                Bank or mobile charge kept
-                <Input inputMode="decimal" value={charge} onChange={(event) => setCharge(event.target.value)} placeholder="0.00" />
-              </label>
+              <ChargeInput accountId={accountId} amount={amount} value={charge} typed={chargeTyped} label="Bank or mobile charge kept" onChange={(value, typed) => { setCharge(value); setChargeTyped(typed); }} />
             ) : null}
           </div>
           {invoices.length > 0 ? (

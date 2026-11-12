@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import type { AccountOption } from "@/components/purchasing/purchase-form";
 import { Button } from "@/components/ui/button";
+import { ChargeInput } from "@/components/treasury/charge-input";
 import { Input } from "@/components/ui/input";
 import { useSubmit } from "@/lib/client/use-submit";
 
@@ -52,6 +53,7 @@ export function VendorPayForm({ supplierId, accounts, bills, today }: { supplier
   const [amount, setAmount] = useState("");
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
   const [charge, setCharge] = useState("");
+  const [chargeTyped, setChargeTyped] = useState(false);
   const [shares, setShares] = useState<Record<string, string>>({});
   const account = accounts.find((row) => row.id === accountId);
 
@@ -81,7 +83,7 @@ export function VendorPayForm({ supplierId, accounts, bills, today }: { supplier
         </label>
         <label className="grid gap-1 text-sm">
           Paid from
-          <select value={accountId} onChange={(event) => setAccountId(event.target.value)} className={select}>
+          <select value={accountId} onChange={(event) => { setAccountId(event.target.value); setChargeTyped(false); setCharge(""); }} className={select}>
             {accounts.map((row) => (
               <option key={row.id} value={row.id}>
                 {row.label}
@@ -90,10 +92,7 @@ export function VendorPayForm({ supplierId, accounts, bills, today }: { supplier
           </select>
         </label>
         {account && account.kind !== "CASH" ? (
-          <label className="grid gap-1 text-sm">
-            Bank or mobile charge
-            <Input inputMode="decimal" value={charge} onChange={(event) => setCharge(event.target.value)} placeholder="0.00" />
-          </label>
+          <ChargeInput accountId={accountId} amount={amount} value={charge} typed={chargeTyped} onChange={(value, typed) => { setCharge(value); setChargeTyped(typed); }} />
         ) : null}
       </div>
       <BillShares bills={bills} shares={shares} onChange={setShares} />

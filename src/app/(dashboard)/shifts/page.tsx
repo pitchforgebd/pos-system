@@ -7,7 +7,8 @@ import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
-import { listShifts } from "@/modules/shifts/shifts";
+import { activeShiftOf, listShifts, shiftRequired } from "@/modules/shifts/shifts";
+import { moneyPickerOptions } from "@/modules/treasury/dashboard";
 
 export const metadata = { title: "Shifts" };
 
@@ -34,15 +35,22 @@ export default async function ShiftsPage({ searchParams }: { searchParams: Promi
     return row.cashierName.toLowerCase().includes(q);
   });
   const title = view === "close" ? "Close My Shift" : view === "history" ? "Shift History" : "My Active Shift";
+  const [mine, cashAccounts, required] = await Promise.all([activeShiftOf(session.organizationId, session.branchId, session.userId), moneyPickerOptions(session.organizationId), shiftRequired(session.organizationId)]);
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={title}
-        description="Open, start, count, then close. Expected cash is opening plus cash sales plus cash in, minus cash out and refunds. A handover stays on the closing shift and does not change that figure."
+        description="Open a shift with the cash in the drawer, work, then count and close. The drawer should hold the opening cash plus what this shift took in cash, less what it paid out. Two cashiers can work at the same time: each has a drawer of their own."
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Shifts" }]}
       />
-      {session.permissions.has("shifts.manage") && view === "active" ? <OpenShiftForm /> : null}
+      {required && !mine ? <p className="rounded-md border border-border p-3 text-sm">This shop needs an open shift to take or pay cash. Open one to start.</p> : null}
+      {mine && view === "active" ? (
+        <p className="text-sm">
+          You have a shift open. <Link href={`/shifts/${mine.id}`}>Open it</Link> to move cash, count the drawer and close.
+        </p>
+      ) : null}
+      {session.permissions.has("shifts.manage") && view === "active" && !mine ? <OpenShiftForm cashAccounts={cashAccounts.filter((account) => account.kind === "CASH").map((account) => ({ id: account.id, label: account.label }))} /> : null}
       <div className="flex flex-wrap gap-3 text-sm">
         <Link href="/shifts?view=active" className={view === "active" ? "font-semibold" : "text-muted"}>
           My Active Shift

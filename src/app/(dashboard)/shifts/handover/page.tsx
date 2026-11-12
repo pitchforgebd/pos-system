@@ -20,7 +20,7 @@ export default async function HandoverPage() {
     <div className="space-y-6">
       <PageHeader
         title="Cash Handover"
-        description="A handover is recorded on a closing shift. It does not change expected cash and it does not post a journal."
+        description="A handover is recorded when a counted shift gives its drawer to another user. When the cash goes into another cash account (the main cash, a safe) it is a transfer and leaves the drawer."
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Shifts", href: "/shifts" }, { label: "Cash Handover" }]}
       />
       <p className="text-sm">
@@ -37,7 +37,7 @@ export default async function HandoverPage() {
         ]}
         rows={rows}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No handover" description="Record one from a shift that is closing. Expected cash stays the same." />}
+        empty={<EmptyState title="No handover" description="Record one from a shift that is counted and not yet closed." />}
       />
     </div>
   );

@@ -5,6 +5,7 @@ import { Prisma, type ExpenseStatus, type ExpenseType } from "@prisma/client";
 import { RuleError } from "@/core/errors/rule-error";
 import { hashPayload } from "@/core/idempotency";
 import { accountFor } from "@/core/ledger/accounts";
+import type { AccountRole } from "@/core/ledger/roles";
 import { GROUP } from "@/core/ledger/groups";
 import { decimalString, zero } from "@/core/money";
 import { dateOnly, businessDate as today } from "@/core/time/business-date";
@@ -24,15 +25,16 @@ import { chargeLines, checkCharge, checkDate, checkMonth, dateInMonth, lastDayOf
 
 type Who = { organizationId: string; branchId: string; userId: string; ip: string; userAgent: string | null };
 
-const DEFAULT_CATEGORIES: ReadonlyArray<{ name: string; code: string; type: ExpenseType }> = [
-  { name: "Rent", code: "6100", type: "MONTHLY_FIXED" },
-  { name: "Salary", code: "6200", type: "MONTHLY_FIXED" },
-  { name: "Electricity", code: "6300", type: "VARIABLE" },
-  { name: "Internet", code: "6300", type: "MONTHLY_FIXED" },
-  { name: "Transport", code: "6700", type: "VARIABLE" },
-  { name: "Labour", code: "6900", type: "VARIABLE" },
-  { name: "Marketing", code: "6400", type: "VARIABLE" },
-  { name: "Miscellaneous", code: "6900", type: "MISC" },
+// Each usual category and the account of the chart it posts to: by role where the chart has one, otherwise by the account's name (never by number, B8).
+const DEFAULT_CATEGORIES: ReadonlyArray<{ name: string; type: ExpenseType; role?: AccountRole; accountName?: string }> = [
+  { name: "Rent", type: "MONTHLY_FIXED", accountName: "Rent" },
+  { name: "Salary", type: "MONTHLY_FIXED", accountName: "Salary" },
+  { name: "Electricity", type: "VARIABLE", accountName: "Utilities" },
+  { name: "Internet", type: "MONTHLY_FIXED", accountName: "Utilities" },
+  { name: "Transport", type: "VARIABLE", role: "TRANSPORT" },
+  { name: "Labour", type: "VARIABLE", role: "MISC" },
+  { name: "Marketing", type: "VARIABLE", accountName: "Marketing & Offers" },
+  { name: "Miscellaneous", type: "MISC", role: "MISC" },
 ];
 
 const text = (value: Prisma.Decimal | null | undefined) => decimalString(value ?? zero(), 2);
@@ -44,10 +46,12 @@ export async function ensureCategories(organizationId: string) {
   if ((await prisma.expenseCategory.count({ where: { organizationId } })) > 0) {
     return;
   }
-  const accounts = await prisma.account.findMany({ where: { organizationId, code: { in: [...new Set(DEFAULT_CATEGORIES.map((category) => category.code))] } }, select: { id: true, code: true } });
-  const byCode = new Map(accounts.map((account) => [account.code, account.id]));
+  const roles = await prisma.accountRole.findMany({ where: { organizationId, role: { in: ["TRANSPORT", "MISC"] } }, select: { role: true, accountId: true } });
+  const byRole = new Map<string, string>(roles.map((row) => [row.role, row.accountId]));
+  const named = await prisma.account.findMany({ where: { organizationId, group: { code: GROUP.EXPENSE }, name: { in: DEFAULT_CATEGORIES.flatMap((category) => (category.accountName ? [category.accountName] : [])) } }, select: { id: true, name: true } });
+  const byName = new Map(named.map((account) => [account.name, account.id]));
   const data = DEFAULT_CATEGORIES.flatMap((category) => {
-    const accountId = byCode.get(category.code);
+    const accountId = category.role ? byRole.get(category.role) : byName.get(category.accountName ?? "");
     return accountId ? [{ organizationId, name: category.name, accountId, type: category.type }] : [];
   });
   if (data.length > 0) {

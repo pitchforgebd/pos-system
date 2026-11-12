@@ -61,7 +61,8 @@ test("no route that changes data switches the origin check off", () => {
 
 // Routes without a permission line. A session is enough for the first two (any signed-in user may change their own
 // language or branch); the others decide by the user's permissions inside the handler (any of several, or by method).
-const sessionOnly = new Set(["v1/locale/route.ts", "v1/session/branch/route.ts"]);
+// The charge a bank or mobile account takes is only a proposal for a form (a cashier needs it at the register); it writes nothing.
+const sessionOnly = new Set(["v1/locale/route.ts", "v1/session/branch/route.ts", "v1/money-accounts/charge/route.ts"]);
 const checksInside = new Set(["v1/pos/barcode/route.ts", "v1/products/[id]/image/route.ts", "v1/users/[id]/route.ts"]);
 
 test("every route except the public list names the permission it needs", () => {

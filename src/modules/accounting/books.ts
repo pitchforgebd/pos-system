@@ -570,6 +570,7 @@ export async function listCashBankLines(organizationId: string, branchId: string
         select: {
           number: true,
           description: true,
+          docType: true,
           businessDate: true,
           createdBy: { select: { email: true } },
           sale: { select: { id: true } },
@@ -602,7 +603,18 @@ export async function listCashBankLines(organizationId: string, branchId: string
   }));
 }
 
+const DOC_SOURCE: Record<string, string> = {
+  CONTRA: "Transfer",
+  CASH_MOVEMENT: "Cash in/out",
+  SHIFT_VARIANCE: "Shift difference",
+  EXPENSE_SETTLEMENT: "Expense paid",
+  COURIER_SETTLEMENT: "Courier settlement",
+  SHIPMENT_RETURN: "Returned parcel",
+  LOAN: "Loan",
+};
+
 function cashBankSource(journal: {
+  docType?: string | null;
   sale: { id: string } | null;
   purchase: { id: string } | null;
   saleReturn: { id: string } | null;
@@ -615,6 +627,8 @@ function cashBankSource(journal: {
   capitalTransaction?: { id: string } | null;
   voucher: { voucherType: string } | null;
 }) {
+  const named = journal.docType ? DOC_SOURCE[journal.docType] : undefined;
+  if (named) return named;
   if (journal.sale) return "Sale";
   if (journal.purchase) return "Purchase";
   if (journal.saleReturn) return "Sale return";

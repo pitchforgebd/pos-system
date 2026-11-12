@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { ChargeInput } from "@/components/treasury/charge-input";
 import { Input } from "@/components/ui/input";
 import { useSubmit } from "@/lib/client/use-submit";
 
@@ -14,7 +15,7 @@ export type RegisterAccount = { id: string; label: string; kind: "CASH" | "BANK"
 type Customer = { id: string; name: string; phone: string | null; outstanding: string; advance: string; customerTypeId: string | null };
 type Hit = { id: string; sku: string; name: string; price: string; levelName: string; available: string | null; isService: boolean; trackSerial: boolean; matchedVariantId: string | null; hasImage: boolean };
 type Line = { key: number; productId: string; variantId: string | null; label: string; quantity: string; discount: string; serial: string; available: string | null; trackSerial: boolean };
-type Tender = { key: number; source: string; amount: string; charge: string };
+type Tender = { key: number; source: string; amount: string; charge: string; chargeTyped?: boolean };
 type Preview = { gross: string; discount: string; vat: string; charges: string; total: string; lines: Array<{ productId: string; unitPrice: string; discount: string; vat: string; payable: string }> };
 
 export type RegisterInitial = { ticketId: string; customer: { id: string; name: string; phone: string | null } | null; lines: Array<{ productId: string; variantId: string | null; label: string; quantity: string }>; warnings: string[] } | null;
@@ -399,7 +400,7 @@ export function Register({ accounts, categories, levels, canLevel, canDiscount, 
               <div key={tender.key} className="grid grid-cols-[1fr_6rem_5rem_auto] items-center gap-1 text-sm">
                 <span>{tender.source === "WALLET" ? "Advance" : (account?.label ?? "")}</span>
                 <input className={cell} inputMode="decimal" aria-label="Amount" value={tender.amount} onChange={(event) => setTenders((current) => current.map((row) => (row.key === tender.key ? { ...row, amount: event.target.value } : row)))} />
-                {account && account.kind !== "CASH" ? <input className={cell} inputMode="decimal" aria-label="Charge" placeholder="charge" value={tender.charge} onChange={(event) => setTenders((current) => current.map((row) => (row.key === tender.key ? { ...row, charge: event.target.value } : row)))} /> : <span />}
+                {account && account.kind !== "CASH" ? <ChargeInput bare className={cell} accountId={tender.source} amount={tender.amount} value={tender.charge} typed={tender.chargeTyped === true} onChange={(value, typed) => setTenders((current) => current.map((row) => (row.key === tender.key ? { ...row, charge: value, chargeTyped: typed } : row)))} /> : <span />}
                 <Button variant="ghost" size="sm" aria-label="Remove payment" onClick={() => setTenders((current) => current.filter((row) => row.key !== tender.key))}>
                   ✕
                 </Button>

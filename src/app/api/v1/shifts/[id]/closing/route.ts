@@ -8,7 +8,7 @@ import { countShift } from "@/modules/shifts/shifts";
 const bodySchema = z
   .object({
     actualCash: z.string().max(24).optional(),
-    /** The notes and coins counted, by value: {"1000": 2, "500": 1}. */
+    /** The notes and coins counted, by value, for example two notes of one thousand and one of five hundred. */
     denominations: z.record(z.string(), z.number().int().min(0).max(1_000_000)).optional(),
   })
   .refine((value) => value.actualCash !== undefined || value.denominations !== undefined);

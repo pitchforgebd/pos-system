@@ -3,17 +3,23 @@ import { defineRoute } from "@/core/http/define-route";
 import { isoDate } from "@/core/time/iso-date";
 
 import { jsonError, jsonOk } from "@/lib/api/http";
-import { idempotencyKey, stockActor } from "@/modules/inventory/actor";
-import { listExpenses, postExpense } from "@/modules/accounting/books";
+import { stockActor } from "@/modules/inventory/actor";
+import { listExpenseRows, payExpense } from "@/modules/treasury/expenses";
+
+const month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
 
 const bodySchema = z.object({
   businessDate: isoDate,
-  accountCode: z.string().trim().min(1).max(16),
-  amount: z.string(),
-  method: z.enum(["CASH", "BANK"]),
+  categoryId: z.string().uuid(),
+  moneyAccountId: z.string().uuid(),
+  amount: z.string().max(24),
+  charge: z.string().max(24).optional(),
+  /** The month the expense belongs to (YYYY-MM); the month of the date when left out. */
+  periodMonth: month.optional(),
   note: z.string().trim().max(255).optional(),
 });
 
+// GET /api/v1/accounting/expenses?periodMonth=&status=: the expenses of the branch, drafts and owed ones included.
 export const GET = defineRoute({
   permission: "accounting.view",
   handler: async ({ request, session }) => {
@@ -21,20 +27,24 @@ export const GET = defineRoute({
     if (!actor) {
       return jsonError("BUSINESS_RULE", "Select a branch before viewing expenses.", 422);
     }
-    return jsonOk(await listExpenses(actor.organizationId, actor.branchId));
+    const url = new URL(request.url);
+    const period = month.safeParse(url.searchParams.get("periodMonth") ?? undefined);
+    const status = z.enum(["DRAFT", "PAID", "ACCRUED"]).safeParse(url.searchParams.get("status") ?? undefined);
+    return jsonOk(await listExpenseRows(actor.organizationId, actor.branchId, { periodMonth: period.success ? period.data : undefined, status: status.success ? status.data : undefined }));
   },
 });
 
+// POST /api/v1/accounting/expenses: an expense paid now from a cash, bank or mobile account (with the service's charge, if any).
 export const POST = defineRoute({
   permission: "accounting.post",
-  handler: async ({ request, session }) => {
+  body: bodySchema,
+  idempotent: true,
+  handler: async ({ request, session, body, idempotencyKey }) => {
     const actor = stockActor(session, request);
-    const key = idempotencyKey(request);
-    const parsed = bodySchema.safeParse(await request.json().catch(() => null));
-    if (!actor || !key || !parsed.success) {
-      return jsonError("VALIDATION_ERROR", "A branch, an Idempotency-Key, and an expense amount are required.", 400);
+    if (!actor || !idempotencyKey) {
+      return jsonError("VALIDATION_ERROR", "A branch and an Idempotency-Key are required.", 400);
     }
-    const result = await postExpense({ ...actor, idempotencyKey: key, ...parsed.data });
+    const result = await payExpense({ ...actor, idempotencyKey, ...body });
     if (!result.ok) {
       return jsonError(result.code, result.message, result.status);
     }

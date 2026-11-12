@@ -1,13 +1,16 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { CustomerForm } from "@/components/pos/customer-form";
 import { Register, type RegisterInitial } from "@/components/pos/register";
+import { Alert } from "@/components/ui/alert";
 import { businessDate } from "@/core/time/business-date";
 import { getSession } from "@/modules/auth/current-session";
 import { listCategories } from "@/modules/catalog/references";
 import { listPriceLevels } from "@/modules/pricing/admin";
 import { moneyAccountOptions } from "@/modules/purchasing/lookups";
 import { getHeldTicket } from "@/modules/sales/tickets";
+import { activeShiftOf, shiftRequired } from "@/modules/shifts/shifts";
 
 export const metadata = { title: "Sell" };
 
@@ -17,17 +20,24 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
     redirect("/login");
   }
   const params = await searchParams;
-  const [accounts, categories, levels, ticket] = await Promise.all([
+  const [accounts, categories, levels, ticket, needShift, myShift] = await Promise.all([
     moneyAccountOptions(session.organizationId),
     listCategories(session.organizationId),
     listPriceLevels(session.organizationId),
     params.ticket && /^[0-9a-f-]{36}$/i.test(params.ticket) ? getHeldTicket(session.organizationId, session.branchId, params.ticket) : Promise.resolve(null),
+    shiftRequired(session.organizationId),
+    activeShiftOf(session.organizationId, session.branchId, session.userId),
   ]);
   const branchName = session.branches.find((branch) => branch.id === session.branchId)?.name ?? "Branch";
   const initial: RegisterInitial = ticket ? { ticketId: ticket.id, customer: ticket.customer, lines: ticket.lines, warnings: ticket.warnings } : null;
 
   return (
     <div className="space-y-4">
+      {needShift && !myShift ? (
+        <Alert tone="warning" title="Open a shift first">
+          This shop takes cash only inside a shift, so a cash sale is refused until you open one. <Link href="/shifts">Open a shift</Link>
+        </Alert>
+      ) : null}
       {session.permissions.has("sales.create") ? (
         <Register
           key={initial?.ticketId ?? "new"}

@@ -20,7 +20,7 @@ export default async function HandoverReportPage() {
     <div className="space-y-6">
       <PageHeader
         title="Handover Report"
-        description="This list is the stored handover amounts. Expected cash is not recalculated here."
+        description="The handovers of the branch: who gave the drawer to whom, and how much."
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Shifts", href: "/shifts" }, { label: "Handover Report" }]}
       />
       <DataTable

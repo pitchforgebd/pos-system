@@ -2,11 +2,14 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { BankForm, OpeningCashForm } from "@/components/accounting/forms";
+import { TransferForm } from "@/components/treasury/forms";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { getSession } from "@/modules/auth/current-session";
+import { businessDate } from "@/core/time/business-date";
 import { cashBankBalances, cashFlow, openingCashEntered } from "@/modules/accounting/books";
+import { listTransfers, moneyPickerOptions, moneyDashboard } from "@/modules/treasury/dashboard";
 
 export const metadata = { title: "Bank & Cash" };
 
@@ -21,10 +24,14 @@ export default async function BankCashPage({ searchParams }: { searchParams: Pro
   }
   const query = await searchParams;
   const range = dated(query.from, query.to);
-  const [balances, flow, openingDone] = await Promise.all([
+  const today = businessDate();
+  const [balances, flow, openingDone, dash, transfers, options] = await Promise.all([
     cashBankBalances(session.organizationId, session.branchId),
     cashFlow(session.organizationId, session.branchId, range ? query.from : undefined, range ? query.to : undefined),
     openingCashEntered(session.organizationId, session.branchId),
+    moneyDashboard(session.organizationId, session.branchId, today),
+    listTransfers(session.organizationId, session.branchId),
+    moneyPickerOptions(session.organizationId),
   ]);
   const cash = balances.find((row) => row.kind === "CASH");
   // The bank figure on this page is the default bank account, as before; each account has its own row in the table below.
@@ -49,6 +56,13 @@ export default async function BankCashPage({ searchParams }: { searchParams: Pro
         <section className="space-y-2">
           <h2 className="text-lg font-semibold">Add a bank or mobile account</h2>
           <BankForm />
+        </section>
+      ) : null}
+      {canPost && options.length > 1 ? (
+        <section className="space-y-2">
+          <h2 className="text-lg font-semibold">Move money between your accounts</h2>
+          <p className="text-sm text-muted">Cash to bank, bank to bKash, ... The money is still yours, so nothing is income or expense but the charge the sending bank or mobile service takes.</p>
+          <TransferForm accounts={options} today={today} />
         </section>
       ) : null}
       <div className="grid gap-3 sm:grid-cols-2">
@@ -89,8 +103,10 @@ export default async function BankCashPage({ searchParams }: { searchParams: Pro
           { key: "code", header: "Code", cell: (row) => row.code },
           { key: "name", header: "Account", cell: (row) => row.name },
           { key: "kind", header: "Type", cell: (row) => typeLabel[row.kind as keyof typeof typeLabel] ?? row.kind },
-          { key: "bank", header: "Bank / branch", cell: (row) => [row.bankName, row.bankBranch].filter(Boolean).join(" · ") || "—" },
+          { key: "bank", header: "Bank / branch", cell: (row) => row.bank || "—" },
           { key: "number", header: "Number", cell: (row) => row.accountNumber ?? "—" },
+          { key: "in", header: `In ${today}`, cell: (row) => row.received },
+          { key: "out", header: `Out ${today}`, cell: (row) => row.paid },
           { key: "balance", header: "Balance", cell: (row) => row.balance },
           {
             key: "ledger",
@@ -98,8 +114,24 @@ export default async function BankCashPage({ searchParams }: { searchParams: Pro
             cell: (row) => <Link href={`/accounting/statements?accountCode=${row.code}`}>Statement</Link>,
           },
         ]}
-        rows={balances}
+        rows={dash.accounts}
         getRowKey={(row) => row.code}
+      />
+      <p className="text-sm">
+        All accounts hold {dash.totals.balance} · in today {dash.totals.received} · out today {dash.totals.paid}
+      </p>
+      <DataTable
+        caption="Transfers between your accounts"
+        columns={[
+          { key: "number", header: "Transfer", cell: (row) => (row.journalId ? <Link href={`/accounting/journals/${row.journalId}`}>{row.number}</Link> : row.number) },
+          { key: "date", header: "Date", cell: (row) => row.businessDate },
+          { key: "from", header: "From", cell: (row) => row.from },
+          { key: "to", header: "To", cell: (row) => row.to },
+          { key: "amount", header: "Amount", cell: (row) => row.amount },
+          { key: "charge", header: "Charge", cell: (row) => (row.charge === "0.00" ? "" : row.charge) },
+        ]}
+        rows={transfers}
+        getRowKey={(row) => row.id}
       />
     </div>
   );
