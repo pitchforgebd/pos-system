@@ -167,7 +167,8 @@ export async function wingSummary(
       _sum: { amount: true },
     }),
     prisma.supplierPayment.aggregate({
-      where: { organizationId, businessDate, ...branchFilter(branchId, branchIds) },
+      // an advance used against a bill (method ADVANCE) moves no money
+      where: { organizationId, businessDate, method: { not: "ADVANCE" }, ...branchFilter(branchId, branchIds) },
       _sum: { amount: true },
     }),
     prisma.customerAdvance.aggregate({

@@ -8,9 +8,10 @@ import { prisma } from "@/lib/db/client";
 
 // Reading purchases. Writing them is in orders.ts (the life of a purchase) and supplier-payments.ts (paying the vendor).
 
-export { cancelPurchase, orderPurchase, postPurchase, receivePurchase, saveDraftPurchase, updatePurchase } from "@/modules/purchasing/orders";
-export type { PurchaseInput, PurchaseLineInput, ReceiveInput } from "@/modules/purchasing/orders";
-export { postSupplierPayment, settleSupplier } from "@/modules/purchasing/supplier-payments";
+export { cancelPurchase, draftsFromReorder, orderPurchase, placePurchase, postPurchase, previewPurchase, receivePurchase, saveDraftPurchase, updatePurchase } from "@/modules/purchasing/orders";
+export type { PurchaseInput, PurchaseLineInput, PurchaseMode, ReceiveInput } from "@/modules/purchasing/orders";
+export { applySupplierAdvance, postSupplierAdvance, postSupplierPayment, settleSupplier } from "@/modules/purchasing/supplier-payments";
+export type { ApplyAdvanceInput, SupplierAdvanceInput, SupplierPaymentInput } from "@/modules/purchasing/supplier-payments";
 export type { Actor } from "@/modules/purchasing/common";
 
 /** The sorts a purchase list may ask for: by date or by number, newest first by default. */

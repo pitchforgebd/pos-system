@@ -20,7 +20,7 @@ export default async function SupplierReturnsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Supplier returns"
-        description="Posted purchase returns for this branch."
+        description="Purchase returns for this branch."
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Suppliers", href: "/suppliers" }, { label: "Returns" }]}
         actions={
           session.permissions.has("purchase.return") ? (

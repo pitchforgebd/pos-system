@@ -18,7 +18,7 @@ export default async function SupplierPaymentsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Supplier payment"
-        description="Search by name or phone. Cash posts to account 1100 and bank posts to account 1200. The payment cannot exceed the outstanding payable."
+        description="Search by name or phone. Cash posts to account 1100 and bank posts to account 1200. The payment cannot exceed what is owed; to pay from a particular bank or mobile account, with its charge, or for named bills, or to pay ahead, use the vendor's page."
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Suppliers", href: "/suppliers" }, { label: "Payment" }]}
       />
       {session.permissions.has("suppliers.payment") ? (

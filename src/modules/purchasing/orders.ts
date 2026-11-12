@@ -12,6 +12,7 @@ import { occurredDate } from "@/lib/format/date";
 import { writeAudit } from "@/modules/auth/audit";
 import { allocateNumber } from "@/modules/documents/numbers";
 import { addExpiryLots, resolveWarehouse, StockRuleError } from "@/modules/inventory/stock";
+import { reorderList } from "@/modules/inventory/alerts";
 import { amountOf, costOf, failure, percentOf, type Actor } from "@/modules/purchasing/common";
 import { costPurchase, type Costing } from "@/modules/purchasing/costing";
 import { settleSupplier } from "@/modules/purchasing/supplier-payments";
@@ -104,6 +105,21 @@ function prepare(input: Pick<PurchaseInput, "lines" | "headerDiscount" | "transp
     otherCost,
   });
   return { costing, lines, headerDiscount, transportCost, otherCost };
+}
+
+/** What a purchase would cost, worked out the way receiving it will (for the form to show while it is typed). Nothing is saved. */
+export function previewPurchase(input: Pick<PurchaseInput, "lines" | "headerDiscount" | "transportCost" | "otherCost">) {
+  const { costing } = prepare(input);
+  const two = (value: Prisma.Decimal) => decimalString(value, 2);
+  return {
+    subtotal: two(costing.subtotal),
+    discountTotal: two(costing.discountTotal),
+    vatTotal: two(costing.vatTotal),
+    total: two(costing.total),
+    haulage: two(costing.transportCost.plus(costing.otherCost)),
+    landedTotal: two(costing.landedTotal),
+    lines: costing.lines.map((line) => ({ lineTotal: two(line.taxable.plus(line.vat)), landedUnitCost: decimalString(line.landedUnitCost, 4) })),
+  };
 }
 
 /** The vendor, the carrier (if any) and the products must be this organization's, and the products must be ones that hold stock. */
@@ -287,7 +303,7 @@ export async function placePurchase(actor: Actor, input: PurchaseInput & Receive
       if (mode === "ordered") {
         number = await orderRow(tx, actor, id);
       } else if (mode === "received") {
-        const done = await receiveRow(tx, actor, id, { receivedOn: input.receivedOn ?? input.businessDate, paymentAmount: input.paymentAmount, paymentMethod: input.paymentMethod });
+        const done = await receiveRow(tx, actor, id, { receivedOn: input.receivedOn ?? input.businessDate, paymentAmount: input.paymentAmount, paymentMethod: input.paymentMethod, paymentAccountId: input.paymentAccountId });
         number = done.number;
         total = decimalString(done.total, 2);
       }
@@ -409,7 +425,9 @@ export type ReceiveInput = {
   receivedOn?: string;
   /** Paid to the vendor at the same time (a payment of its own). */
   paymentAmount?: string;
-  paymentMethod?: "CASH" | "BANK";
+  paymentMethod?: "CASH" | "BANK" | "MOBILE";
+  /** The cash, bank or mobile account the payment leaves from (the default cash drawer or bank when left out). */
+  paymentAccountId?: string;
 };
 
 /**
@@ -537,7 +555,7 @@ async function receiveRow(tx: Tx, actor: Actor, id: string, input: ReceiveInput)
     data: { status: "RECEIVED", number, receivedOn: occurredDate(receivedOn), warehouseId: warehouse.id, journalId, total: prepared.costing.total, subtotal: prepared.costing.subtotal, discountTotal: prepared.costing.discountTotal, vatTotal: prepared.costing.vatTotal },
   });
   if (payment.gt(0) && input.paymentMethod) {
-    await settleSupplier(tx, { ...actor, supplierId: row.supplierId, businessDate: receivedOn, amount: payment, method: input.paymentMethod, purchaseId: id });
+    await settleSupplier(tx, { ...actor, supplierId: row.supplierId, businessDate: receivedOn, amount: payment, method: input.paymentMethod, accountId: input.paymentAccountId, purchaseId: id });
   }
   if (supplier.creditLimit && (await outstandingPayable(actor.organizationId, supplier.id, tx)).gt(supplier.creditLimit)) {
     throw new StockRuleError("The purchase exceeds the supplier credit limit.");
@@ -558,6 +576,66 @@ export async function receivePurchase(actor: Actor, id: string, input: ReceiveIn
       return { id, number: done.number, status: "RECEIVED" as PurchaseStatus, replayed: false, total: decimalString(done.total, 2) as string | null };
     });
     await audited(actor, "receive", outcome, { total: outcome.total });
+    return { ok: true as const, ...outcome };
+  } catch (error) {
+    const mapped = failure(error);
+    if (mapped) {
+      return mapped;
+    }
+    throw error;
+  }
+}
+
+/**
+ * One click from the reorder list (P03) to purchase drafts: the products that need buying (all of them, or the ones named) are grouped by the
+ * vendor they were last bought from, each group becomes a DRAFT purchase at the last cost with the suggested quantity. Products never bought,
+ * or whose last vendor is no longer active, are left out and counted (somebody has to choose a vendor for them). Nothing is posted.
+ */
+export async function draftsFromReorder(actor: Actor, input: { productIds?: string[] } = {}) {
+  const hash = hashPayload({ kind: "reorder", productIds: input.productIds ?? null });
+  try {
+    const outcome = await idempotentTransaction(async (tx) => {
+      const existing = await readIdempotency(tx, { organizationId: actor.organizationId, key: actor.idempotencyKey, requestHash: hash });
+      if (existing === "mismatch") {
+        throw new StockRuleError("This idempotency key was already used for a different request.", 409);
+      }
+      if (existing) {
+        return { ids: [existing.entityId], skipped: 0, replayed: true };
+      }
+      const wanted = input.productIds ? new Set(input.productIds) : null;
+      const rows = (await reorderList(actor.organizationId, actor.branchId)).filter((row) => Number(row.suggested) > 0 && (!wanted || wanted.has(row.productId)));
+      const active = new Set((await tx.supplier.findMany({ where: { organizationId: actor.organizationId, status: "ACTIVE" }, select: { id: true } })).map((row) => row.id));
+      const groups = new Map<string, typeof rows>();
+      let skipped = 0;
+      for (const row of rows) {
+        if (!row.lastVendorId || !active.has(row.lastVendorId)) {
+          skipped += 1;
+          continue;
+        }
+        groups.set(row.lastVendorId, [...(groups.get(row.lastVendorId) ?? []), row]);
+      }
+      if (groups.size === 0) {
+        throw new RuleError(skipped > 0 ? "None of these products has an active vendor it was bought from: make the purchase by hand." : "Nothing needs to be reordered.");
+      }
+      const today = dhakaToday();
+      const ids: string[] = [];
+      for (const [supplierId, group] of groups) {
+        ids.push(
+          await createDraft(tx, actor, {
+            supplierId,
+            businessDate: today,
+            warehouseId: actor.warehouseId,
+            note: "From the reorder list",
+            lines: group.map((row) => ({ productId: row.productId, quantity: row.suggested, unitCost: row.lastCost || "0" })),
+          }),
+        );
+      }
+      await saveIdempotency(tx, { organizationId: actor.organizationId, userId: actor.userId, key: actor.idempotencyKey, requestHash: hash, entityType: "purchase", entityId: ids[0] });
+      return { ids, skipped, replayed: false };
+    });
+    if (!outcome.replayed) {
+      await audited(actor, "reorder", { id: outcome.ids[0], number: null, status: "DRAFT", replayed: false }, { drafts: outcome.ids.length, skipped: outcome.skipped });
+    }
     return { ok: true as const, ...outcome };
   } catch (error) {
     const mapped = failure(error);

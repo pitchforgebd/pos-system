@@ -23,7 +23,7 @@ export default async function PurchaseReturnsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Supplier return"
-        description="Search a posted purchase line. Cash or bank is used only when the return is larger than the outstanding payable."
+        description="Search a line of a received purchase. The vendor is credited what the line was billed (after discount, with VAT); the stock leaves at its average cost and the difference is Purchase Price Variance. Cash or bank is used only when the return is larger than the outstanding payable."
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Purchases", href: "/purchases" }, { label: "Returns" }]}
       />
       {session.permissions.has("purchase.return") ? (
@@ -41,7 +41,7 @@ export default async function PurchaseReturnsPage() {
         ]}
         rows={returns}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No purchase returns" description="Return a posted purchase line. The quantity cannot exceed what is still eligible." />}
+        empty={<EmptyState title="No purchase returns" description="Return a line of a received purchase. The quantity cannot exceed what is still eligible." />}
       />
     </div>
   );

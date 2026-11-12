@@ -87,6 +87,8 @@ export type ReorderRow = {
   onHand: string;
   reorderLevel: string;
   lastVendor: string;
+  /** Who the last received purchase of it was from (null when it was never bought). */
+  lastVendorId: string | null;
   lastCost: string;
   /** Sold in the last 30 days. */
   sold30: string;
@@ -108,14 +110,14 @@ export async function reorderList(organizationId: string, branchId: string, limi
     return [];
   }
   const ids = rows.map((row) => row.productId);
-  const purchases = await prisma.$queryRaw<Array<{ productId: string; unitCost: Prisma.Decimal; supplierName: string }>>`
-    SELECT pi.productId AS productId, pi.unitCost AS unitCost, s.name AS supplierName
+  const purchases = await prisma.$queryRaw<Array<{ productId: string; unitCost: Prisma.Decimal; supplierName: string; supplierId: string }>>`
+    SELECT pi.productId AS productId, pi.unitCost AS unitCost, s.name AS supplierName, s.id AS supplierId
     FROM purchase_items pi
     JOIN purchases pu ON pu.id = pi.purchaseId
     JOIN suppliers s ON s.id = pu.supplierId
     WHERE pi.organizationId = ${organizationId} AND pu.branchId = ${branchId} AND pu.status = 'RECEIVED' AND pi.productId IN (${Prisma.join(ids)})
     ORDER BY pu.businessDate DESC, pu.createdAt DESC`;
-  const last = new Map<string, { unitCost: Prisma.Decimal; supplierName: string }>();
+  const last = new Map<string, { unitCost: Prisma.Decimal; supplierName: string; supplierId: string }>();
   for (const row of purchases) {
     if (!last.has(row.productId)) {
       last.set(row.productId, row);
@@ -142,6 +144,7 @@ export async function reorderList(organizationId: string, branchId: string, limi
       onHand: decimalString(onHand, 4),
       reorderLevel: decimalString(reorder, 4),
       lastVendor: vendor?.supplierName ?? "",
+      lastVendorId: vendor?.supplierId ?? null,
       lastCost: vendor ? decimalString(vendor.unitCost, 4) : "",
       sold30: decimalString(soldLately, 4),
       avgPerDay: soldLately.div(30).toDecimalPlaces(2).toFixed(2),

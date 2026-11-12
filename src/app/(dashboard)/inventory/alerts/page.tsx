@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { PrintButton } from "@/components/inventory/stock-forms";
+import { ReorderDraftsButton } from "@/components/purchasing/reorder-button";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
@@ -108,6 +109,7 @@ export default async function AlertsPage({
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Reorder list</h2>
         <p className="text-sm text-muted">Suggested is enough for the next 30 days at the recent selling rate, or twice the reorder level, whichever is more, less what is on hand.</p>
+        {session.permissions.has("purchase.create") && reorder.some((row) => row.lastVendorId && Number(row.suggested) > 0) ? <ReorderDraftsButton /> : null}
         <DataTable
           caption="Reorder list"
           columns={[

@@ -9,7 +9,8 @@ import { billPayment } from "../../core/payments/index.ts";
 import { assertBooksReconcile } from "../../core/reconcile/index.ts";
 import { prisma } from "../../lib/db/client.ts";
 import { factories, withTestOrg } from "../../tests/helpers/index.ts";
-import { cancelPurchase, getPurchase, orderPurchase, postPurchase, receivePurchase, saveDraftPurchase, updatePurchase, type PurchaseInput } from "./purchases.ts";
+import { cancelPurchase, draftsFromReorder, getPurchase, orderPurchase, postPurchase, previewPurchase, receivePurchase, saveDraftPurchase, updatePurchase, type PurchaseInput } from "./purchases.ts";
+import { postPurchaseReturn } from "./returns.ts";
 import { postSupplierPayment } from "./purchases.ts";
 
 // P05 tasks 1-4: a purchase is written down (DRAFT), sent to the vendor (ORDERED, nothing posted), received (the stock comes in at its
@@ -232,6 +233,63 @@ test("awkward cents: the landed cost is rounded to four decimals, the books stil
     const lines = await journalLines(t, done.ok ? done.id : "");
     const variance = lines.filter((l) => l.role === "PPV").reduce((sum, l) => sum + Number(l.debit) - Number(l.credit), 0);
     assert.ok(Math.abs(variance) <= 0.03, `rounding variance ${variance}`);
+    await assertBooksReconcile(t.org.id, prisma, { strictInventory: true });
+  });
+});
+
+test("the cost the form shows is the cost receiving will use", async () => {
+  await withTestOrg(async (t) => {
+    const { input } = await golden(t);
+    const shown = previewPurchase(input);
+    assert.deepEqual([shown.subtotal, shown.discountTotal, shown.vatTotal, shown.total, shown.haulage, shown.landedTotal], ["3300.00", "330.00", "148.50", "3118.50", "311.85", "3430.35"]);
+    assert.deepEqual(shown.lines.map((l) => [l.lineTotal, l.landedUnitCost]), [["945.00", "103.9500"], ["756.00", "41.5800"], ["1417.50", "311.8500"]]);
+    assert.throws(() => previewPurchase({ ...input, headerDiscount: "99999.00" }), /discount/i);
+  });
+});
+
+test("returning part of a landed purchase: the vendor is credited the bill price, the stock leaves at its landed average, the haulage share is PPV", async () => {
+  await withTestOrg(async (t) => {
+    const { input, vendor } = await golden(t);
+    const bought = await postPurchase({ ...actor(t), ...input });
+    assert.ok(bought.ok);
+    const id = bought.ok ? bought.id : "";
+    const item = await prisma.purchaseItem.findFirstOrThrow({ where: { purchaseId: id, quantity: 10 } });
+    // 4 of line A: billed 945.00 / 10 = 94.50 each = 378.00; the stock was valued at 103.95 each = 415.80
+    const done = await postPurchaseReturn({ ...actor(t), purchaseId: id, businessDate: "2026-11-05", lines: [{ purchaseItemId: item.id, quantity: "4" }] });
+    assert.equal(done.ok, true, JSON.stringify(done));
+    const lines = (await prisma.journalLine.findMany({ where: { organizationId: t.org.id, journal: { docType: "PURCHASE_RETURN", docId: done.ok ? done.id : "" } }, include: { account: { include: { roles: true } } } }))
+      .map((l) => [l.account.roles.map((r) => r.role).join(","), l.debit.toFixed(2), l.credit.toFixed(2)])
+      .sort();
+    assert.deepEqual(lines, [["AP", "378.00", "0.00"], ["INVENTORY", "0.00", "415.80"], ["PPV", "37.80", "0.00"]]);
+    assert.equal((await partyBalance(prisma, { organizationId: t.org.id, partyType: "VENDOR", partyId: vendor.id })).toFixed(2), "2740.50");
+    await assertBooksReconcile(t.org.id, prisma, { strictInventory: true });
+  });
+});
+
+test("the reorder list makes one draft for each vendor the low products were last bought from; a vendor who is no longer active is left out; the same key makes them once", async () => {
+  await withTestOrg(async (t) => {
+    const f = factories(t);
+    const [seed, salt, oil] = [await f.product({ name: "Seed", reorderLevel: "10" }), await f.product({ name: "Salt", reorderLevel: "10" }), await f.product({ name: "Oil", reorderLevel: "10" })];
+    const [green, gone] = [await f.vendor({ name: "Green Seeds" }), await f.vendor({ name: "Gone Oil" })];
+    for (const [product, vendor, cost, units] of [[seed, green, "9.50", "6"], [salt, green, "2.00", "3"], [oil, gone, "5.00", "2"]] as const) {
+      const bought = await postPurchase({ ...actor(t), supplierId: vendor.id, businessDate: "2026-11-01", lines: [{ productId: product.id, quantity: units, unitCost: cost }] });
+      assert.equal(bought.ok, true, JSON.stringify(bought));
+    }
+    await prisma.supplier.update({ where: { id: gone.id }, data: { status: "INACTIVE" } });
+    const key = randomUUID();
+    const made = await draftsFromReorder(actor(t, key));
+    assert.equal(made.ok, true, JSON.stringify(made));
+    if (!made.ok) {
+      return;
+    }
+    assert.deepEqual([made.ids.length, made.skipped], [1, 1]);
+    const draft = await getPurchase(t.org.id, t.branch.id, made.ids[0]);
+    assert.deepEqual([draft?.status, draft?.supplier.id, draft?.number], ["DRAFT", green.id, null]);
+    // enough for twice the reorder level (20), less what is on hand: 14 seeds at the last price 9.50, 17 salt at 2.00
+    assert.deepEqual(draft?.items.map((i) => [i.name, i.quantity, i.unitCost]).sort(), [["Salt", "17.0000", "2.0000"], ["Seed", "14.0000", "9.5000"]]);
+    const again = await draftsFromReorder(actor(t, key));
+    assert.deepEqual([again.ok, again.ok && again.replayed], [true, true]);
+    assert.equal(await prisma.purchase.count({ where: { organizationId: t.org.id, status: "DRAFT" } }), 1);
     await assertBooksReconcile(t.org.id, prisma, { strictInventory: true });
   });
 });
