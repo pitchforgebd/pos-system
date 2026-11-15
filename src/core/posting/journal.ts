@@ -2,7 +2,7 @@ import { Prisma, type JournalKind, type PartyType } from "@prisma/client";
 
 import { accountsFor } from "@/core/ledger/accounts";
 import { PARTY_ROLES, type AccountRole, type PartyRole } from "@/core/ledger/roles";
-import { dateOnly } from "@/core/time/business-date";
+import { businessDate as today, dateOnly } from "@/core/time/business-date";
 import { assertPostable } from "@/core/time/period";
 
 import { PostingError } from "@/core/posting/errors";
@@ -260,6 +260,10 @@ export async function post(tx: Db, plan: JournalPlan): Promise<string> {
   checkSides(plan.lines);
   // The period rules apply to every posting: not in the future, not in a locked period (invariant I11).
   await assertPostable(tx, { organizationId: plan.organizationId }, dateOnly(plan.businessDate));
+  // A posting dated into a day that is over changes that day and every later one: their daily snapshots are marked and made again (P11 task 5).
+  if (dateOnly(plan.businessDate) < today()) {
+    await tx.dailySnapshot.updateMany({ where: { organizationId: plan.organizationId, businessDate: { gte: plan.businessDate }, stale: false }, data: { stale: true } });
+  }
   const accountIds = await resolveAccounts(tx, plan);
   await checkParties(tx, plan, accountIds);
   await checkInventory(tx, plan, accountIds);

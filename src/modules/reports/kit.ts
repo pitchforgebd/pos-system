@@ -24,7 +24,17 @@ export type Column = { key: string; label: Text; numeric?: boolean };
 export type Row = Record<string, string | number | null>;
 export type Section = { key: string; title: Text; columns: Column[]; rows: Row[]; total?: Row };
 export type Identity = { label: Text; left: string; right: string; ok: boolean; difference: string };
-export type ReportResult = { key: string; title: Text; from: string; to: string; summary: Array<{ label: Text; value: string }>; sections: Section[]; identities: Identity[] };
+export type ReportResult = {
+  key: string;
+  title: Text;
+  from: string;
+  to: string;
+  summary: Array<{ label: Text; value: string }>;
+  sections: Section[];
+  identities: Identity[];
+  /** The key numbers of the report by name: the dashboard cards read these, so a card and its report never differ (I16). */
+  figures?: Record<string, string>;
+};
 
 export const ZERO = new Prisma.Decimal(0);
 export const dec = (value: Prisma.Decimal | string | number | bigint | null | undefined) => new Prisma.Decimal(value === null || value === undefined ? 0 : value.toString());

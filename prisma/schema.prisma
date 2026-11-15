@@ -398,6 +398,7 @@ model Organization {
   depreciationRuns       DepreciationRun[]
   smsCampaigns           SmsCampaign[]
   smsCampaignFilters     SmsCampaignFilter[]
+  dailySnapshots         DailySnapshot[]
   shipmentEvents         ShipmentEvent[]
   courierSettlements     CourierSettlement[]
   courierSettlementItems CourierSettlementItem[]
@@ -531,6 +532,7 @@ model Branch {
   salesOrders         SalesOrder[]
   contraTransfers     ContraTransfer[]
   fixedAssets         FixedAsset[]
+  dailySnapshots      DailySnapshot[]
   courierSettlements  CourierSettlement[]
   receiptlessReturns  ReceiptlessReturn[]
   stockLedgers        StockLedger[]
@@ -3439,4 +3441,31 @@ model SmsCampaignFilter {
 
   @@index([campaignId])
   @@map("sms_campaign_filters")
+}
+
+/// The books of a branch at the end of a day (P11 task 5): cash, bank and mobile, stock value, what customers owe, what vendors are owed, what couriers
+/// owe. Made once the day is over (or at the first sign-in after it); a posting dated back into a day marks that day and every later one stale, and
+/// they are made again. Reports compute from the ledger; a snapshot is a quick read of one day and a check that the ledger has not moved under it.
+model DailySnapshot {
+  id             String   @id @default(uuid()) @db.Char(36)
+  organizationId String   @db.Char(36)
+  branchId       String   @db.Char(36)
+  businessDate   DateTime @db.Date
+  cash           Decimal  @db.Decimal(18, 2)
+  bank           Decimal  @db.Decimal(18, 2)
+  stockValue     Decimal  @db.Decimal(18, 2)
+  receivable     Decimal  @db.Decimal(18, 2)
+  payable        Decimal  @db.Decimal(18, 2)
+  courierOwes    Decimal  @db.Decimal(18, 2)
+  /// A posting was dated into this day (or an earlier one) after the snapshot was made: it has to be made again.
+  stale          Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  branch       Branch       @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, branchId, businessDate])
+  @@index([organizationId, stale])
+  @@map("daily_snapshots")
 }

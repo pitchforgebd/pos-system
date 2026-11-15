@@ -178,6 +178,7 @@ export const referenceNavigation: ReferenceEntry[] = [
       { label: "Account Statement", href: "/accounting/statements" },
       { label: "Reports", href: "/reports" },
       { label: "Day Reports", href: "/reports/day" },
+      { label: "Reconciliation", href: "/reports/reconcile" },
     ],
   },
   { kind: "link", label: "Dealer Wings", href: "/customers/dealers" },

@@ -1,9 +1,15 @@
 import type { Metadata } from "next";
-import { businessDate } from "@/core/time/business-date";
+import { businessDate, isIsoDate } from "@/core/time/business-date";
 
 import Link from "next/link";
 
+import { cookies } from "next/headers";
+import { after } from "next/server";
+
 import { DashboardView } from "@/components/dashboard/dashboard-view";
+import { TodayBoard } from "@/components/reports/today-board";
+import { dashboardFor } from "@/modules/reports/dashboard";
+import { ensureSnapshots } from "@/modules/reports/snapshots";
 import { depreciationReminder } from "@/modules/assets/assets";
 import { companyWorth } from "@/modules/assets/worth";
 import { getSession } from "@/modules/auth/current-session";
@@ -55,10 +61,24 @@ export default async function DashboardPage({
 }) {
   const params = await searchParams;
   const view = previewView(params.view);
-  const day = /^\d{4}-\d{2}-\d{2}$/.test(params.date ?? "") ? params.date! : today();
+  const day = params.date && isIsoDate(params.date) ? params.date : today();
   const session = view === "ready" ? await getSession() : null;
   const scope = params.scope === "all" || !session?.branchId ? "all" : "branch";
-  const summary =
+  const lang = (await cookies()).get("meridian_lang")?.value === "bn" ? "bn" : "en";
+  // Today's cards come from the reports themselves (I16): the same figure is on the card and in its report.
+  const canReports = Boolean(session && view === "ready" && session.permissions.has("reports.view"));
+  const board =
+    canReports && session
+      ? await dashboardFor({ organizationId: session.organizationId, branchIds: scope === "all" || !session.branchId ? [...session.branchIds] : [session.branchId], canProfit: session.permissions.has("reports.profit") }, day)
+      : null;
+  // The first sign-in after midnight makes the days that are over snapshots (the cron job does the same): after the answer has gone, never in its way.
+  if (session && view === "ready" && canReports) {
+    const organizationId = session.organizationId;
+    after(async () => {
+      await ensureSnapshots(organizationId).catch(() => undefined);
+    });
+  }
+  const legacy =
     session && view === "ready"
       ? await wingSummary(
           session.organizationId,
@@ -67,6 +87,22 @@ export default async function DashboardPage({
           day,
         )
       : emptySummary;
+  const card = (key: string) => board?.cards.find((row) => row.key === key)?.value;
+  const summary = board
+    ? {
+        ...legacy,
+        totalSales: card("sales") ?? legacy.totalSales,
+        instantPaid: card("paid") ?? legacy.instantPaid,
+        totalDueSale: card("newDue") ?? legacy.totalDueSale,
+        dueReceived: card("dueCollected") ?? legacy.dueReceived,
+        totalExpense: card("expenses") ?? legacy.totalExpense,
+        ...(card("profit") ? { netProfit: card("profit") as string } : {}),
+        stockAlertQty: card("lowStock") ?? legacy.stockAlertQty,
+        products: { ...legacy.products, cashInHand: card("cash") ?? legacy.products.cashInHand, cashAtBank: card("bank") ?? legacy.products.cashAtBank, ...(card("stockValue") ? { stockValue: card("stockValue") as string } : {}) },
+        sell: { ...legacy.sell, customersDue: card("customersOwe") ?? legacy.sell.customersDue, salesDue: card("customersOwe") ?? legacy.sell.salesDue },
+        suppliers: { ...legacy.suppliers, suppliersDue: card("vendorsOwed") ?? legacy.suppliers.suppliersDue },
+      }
+    : legacy;
 
   // The company's worth and the month-end depreciation reminder (P09), for those who see the books.
   const books = session && view === "ready" && session.permissions.has("accounting.view");
@@ -74,6 +110,7 @@ export default async function DashboardPage({
 
   return (
     <>
+      {board ? <TodayBoard board={board} lang={lang} /> : null}
       {worth || reminder ? (
         <div className="mb-4 grid gap-3 sm:grid-cols-2">
           {worth ? (

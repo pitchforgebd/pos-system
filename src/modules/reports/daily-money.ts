@@ -142,8 +142,18 @@ async function flowReport(ctx: ReportCtx, side: "IN" | "OUT"): Promise<ReportRes
   const totals = await accountTotals(ctx, ctx.from, ctx.to);
   const gl = accounts.filter(isMoney).reduce((sum, account) => sum.plus(side === "IN" ? (totals.get(account.id)?.debit ?? ZERO) : (totals.get(account.id)?.credit ?? ZERO)), ZERO);
   const total = sumOf(lines, amount);
+  // Money taken after the sale: every receipt of the window less the tenders taken at the sales themselves (wallet moves no money, so it is left out of both).
+  const range = { gte: new Date(`${ctx.from}T00:00:00.000Z`), lte: new Date(`${ctx.to}T00:00:00.000Z`) };
+  const [receipts, tenders] = side === "IN"
+    ? await Promise.all([
+        prisma.customerPayment.aggregate({ where: { organizationId: ctx.organizationId, method: { not: "WALLET" }, businessDate: range, ...docBranches(ctx) }, _sum: { amount: true } }),
+        prisma.salePayment.aggregate({ where: { organizationId: ctx.organizationId, method: { not: "WALLET" }, sale: { status: "POSTED", businessDate: range, ...docBranches(ctx) } }, _sum: { amount: true } }),
+      ])
+    : [null, null];
+  const dueCollected = receipts && tenders ? dec(receipts._sum.amount).minus(dec(tenders._sum.amount)) : ZERO;
   const rowColumns = [col("date", "Date", "তারিখ"), col("time", "Time", "সময়"), col("kind", "Kind", "ধরন"), col("number", "Number", "নম্বর"), col("what", "What", "বিবরণ"), col("account", side === "IN" ? "Into" : "From", side === "IN" ? "কোথায়" : "কোথা থেকে"), col("amount", "Amount", "পরিমাণ", true), col("charge", "Charge", "চার্জ", true), col("by", "By", "কে")];
   return {
+    figures: { total: money(total), withoutTransfers: money(sumOf(others, amount)), customerReceipts: money(sumOf(lines.filter((line) => line.docType === "CUSTOMER_PAYMENT"), amount)), dueCollected: money(dueCollected), vendorPayments: money(sumOf(lines.filter((line) => line.docType === "SUPPLIER_PAYMENT"), amount)) },
     key: side === "IN" ? "receive" : "payment",
     title: side === "IN" ? t("Money received", "টাকা এসেছে (Receive)") : t("Money paid out", "টাকা বাইরে গেছে (Payment)"),
     from: ctx.from,
@@ -181,6 +191,7 @@ export async function bankReport(ctx: ReportCtx): Promise<ReportResult> {
   const name = new Map(accounts.map((account) => [account.id, account.name]));
   return {
     key: "bank",
+    figures: { closing: money(sumOf(per, (row) => row.closing)) },
     title: t("Bank and mobile balances", "ব্যাংক ও মোবাইল ব্যালান্স"),
     from: ctx.from,
     to: ctx.to,
@@ -256,6 +267,7 @@ export async function cashReport(ctx: ReportCtx): Promise<ReportResult> {
   const total = Object.fromEntries(keys.map((key) => [key, money(sumOf(rows, (row) => row[key]))]));
   return {
     key: "cash",
+    figures: { closing: money(sumOf(rows, (row) => row.closing)), tillSales: money(sumOf(rows, (row) => row.sales)) },
     title: t("Cash balance", "ক্যাশ ব্যালান্স"),
     from: ctx.from,
     to: ctx.to,

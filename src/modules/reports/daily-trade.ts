@@ -101,6 +101,7 @@ export async function salesDayReport(ctx: ReportCtx): Promise<ReportResult> {
   ];
   return {
     key: "sales",
+    figures: { invoices: String(rows.length), sales: money(total), returns: money(returned), net: money(total.minus(returned)), paidSameDay: money(sumOf(rows, (row) => row.paidSameDay)), stillOwed: money(sumOf(rows, (row) => row.owed)) },
     title: t("Sales", "বিক্রি (Sales)"),
     from: ctx.from,
     to: ctx.to,
@@ -254,6 +255,7 @@ export async function dueReport(ctx: ReportCtx): Promise<ReportResult> {
     rows.map((row) => ({ name: row.name, opening: money(row.opening), added: money(row.added), paid: money(row.paid), returned: money(row.returned), advance: money(row.advance), other: money(row.other), closing: money(row.closing), since: row.since ?? "", late: row.late ? "Yes" : "" }));
   return {
     key: "due",
+    figures: { customersOwe: money(sumOf(customerRows, (row) => row.closing)), vendorsOwed: money(sumOf(vendorRows, (row) => row.closing)), customersOwing: String(customerRows.filter((row) => row.closing.gt(0)).length) },
     title: t("What is owed", "বাকির হিসাব (Due)"),
     from: ctx.from,
     to: ctx.to,
@@ -304,6 +306,7 @@ export async function conditionReport(ctx: ReportCtx): Promise<ReportResult> {
   const balance = await roleBalance(ctx, "COURIER_AR", ctx.to);
   return {
     key: "condition",
+    figures: { owed: money(sumOf(rows, (row) => row.closing)) },
     title: t("Couriers' cash on delivery", "কন্ডিশন (কুরিয়ারের পাওনা)"),
     from: ctx.from,
     to: ctx.to,
@@ -355,6 +358,7 @@ export async function profitReport(ctx: ReportCtx): Promise<ReportResult> {
   const line = (en: string, bn: string, value: Prisma.Decimal, strong = false) => ({ line: strong ? `= ${en} / ${bn}` : `${en} / ${bn}`, amount: money(value) });
   return {
     key: "profit",
+    figures: { gross: money(gross), net: money(net) },
     title: t("Profit and loss", "লাভ-ক্ষতি"),
     from: ctx.from,
     to: ctx.to,
@@ -421,6 +425,7 @@ export async function expenseDayReport(ctx: ReportCtx): Promise<ReportResult> {
   const typeLabel: Record<string, string> = { MONTHLY_FIXED: "Fixed monthly / মাসিক স্থির", VARIABLE: "Variable / পরিবর্তনশীল", MISC: "Miscellaneous / বিবিধ", OTHER: "Other (charges, transport, depreciation ...) / অন্যান্য" };
   return {
     key: "expenses",
+    figures: { total: money(total) },
     title: t("Expenses", "খরচ"),
     from: ctx.from,
     to: ctx.to,
@@ -504,6 +509,7 @@ export async function stockDayReport(ctx: ReportCtx): Promise<ReportResult> {
   const totalValue = sumOf(rows, (row) => row.value);
   return {
     key: "stock",
+    figures: { value: money(totalValue), lowOrOut: String(rows.filter((row) => alertStatus(row.closing, row.info?.reorderLevel ?? ZERO) !== "NORMAL").length) },
     title: t("Stock", "স্টক"),
     from: ctx.from,
     to: ctx.to,
