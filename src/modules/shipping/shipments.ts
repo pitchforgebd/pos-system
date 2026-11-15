@@ -9,7 +9,7 @@ import { documentSorts, listQuery, pageInfo, type ListQuery, type Paged } from "
 import { decimalString, money, parseMoney, zero } from "@/core/money";
 import { invoicePayment } from "@/core/payments";
 import type { PostLine } from "@/core/posting/journal";
-import { dateOnly, isIsoDate } from "@/core/time/business-date";
+import { businessDate, dateOnly, isIsoDate } from "@/core/time/business-date";
 import { runTx } from "@/core/tx/run";
 import { occurredDate } from "@/lib/format/date";
 import { prisma } from "@/lib/db/client";
@@ -280,7 +280,7 @@ export function moveShipment(actor: Actor, id: string, to: "PICKED" | "IN_TRANSI
     if (input.on && !isIsoDate(input.on)) {
       throw new RuleError("Dates use YYYY-MM-DD.");
     }
-    await tx.shipment.update({ where: { id }, data: { status: to, ...(to === "DELIVERED" ? { deliveredOn: occurredDate(input.on ?? dateOnly(new Date())) } : {}) } });
+    await tx.shipment.update({ where: { id }, data: { status: to, ...(to === "DELIVERED" ? { deliveredOn: occurredDate(input.on ?? businessDate()) } : {}) } });
     await eventOf(tx, actor, id, to, input.note);
     if (to === "DELIVERED" && current.orderId) {
       // the order is delivered with its parcel

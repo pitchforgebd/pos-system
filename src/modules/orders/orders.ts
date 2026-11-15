@@ -5,7 +5,7 @@ import { RuleError } from "@/core/errors/rule-error";
 import { hashPayload, idempotentTransaction, keyWasUsed, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { documentSorts, listQuery, pageInfo, type ListQuery, type Paged } from "@/core/list";
 import { decimalString, parseMoney, zero } from "@/core/money";
-import { dateOnly, isIsoDate } from "@/core/time/business-date";
+import { businessDate, dateOnly, isIsoDate } from "@/core/time/business-date";
 import { occurredDate } from "@/lib/format/date";
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
@@ -242,7 +242,7 @@ export function confirmOrder(actor: Actor, id: string) {
     if (current.status !== "DRAFT") {
       throw new RuleError("Only a draft order can be confirmed.", 409);
     }
-    if (current.validUntil && current.validUntil.getTime() < occurredDate(dateOnly(new Date())).getTime()) {
+    if (current.validUntil && current.validUntil.getTime() < occurredDate(businessDate()).getTime()) {
       throw new RuleError("This quotation has expired.");
     }
     const warehouse = await resolveWarehouse(actor.organizationId, actor.branchId, current.warehouseId ?? actor.warehouseId);
@@ -349,7 +349,7 @@ export function deliverOrder(actor: Actor, id: string) {
       throw new RuleError("This order goes by courier: mark its parcel delivered on the shipment.", 409);
     }
     if (shipment && shipment.status !== "DELIVERED") {
-      await tx.shipment.update({ where: { id: shipment.id }, data: { status: "DELIVERED", deliveredOn: occurredDate(dateOnly(new Date())) } });
+      await tx.shipment.update({ where: { id: shipment.id }, data: { status: "DELIVERED", deliveredOn: occurredDate(businessDate()) } });
       await tx.shipmentEvent.create({ data: { organizationId: actor.organizationId, shipmentId: shipment.id, status: "DELIVERED", userId: actor.userId, note: "With the order" } });
     }
     await tx.salesOrder.update({ where: { id }, data: { status: "DELIVERED" } });
