@@ -21,7 +21,7 @@ test("phase 16 rejects cross-site, cross-branch, injection, and secret leakage",
   const { GET: health } = await import("../../app/api/health/route.ts");
   const { POST: loginRoute } = await import("../../app/api/v1/auth/login/route.ts");
   const { clientIp, jsonError, rejectCrossSite } = await import("../../lib/api/http.ts");
-  const { securityHeaders } = await import("../../lib/security/headers.ts");
+  const { contentSecurityPolicy, newNonce, securityHeaders } = await import("../../lib/security/headers.ts");
   const { safeImportName } = await import("../imports/files.ts");
   const { postBalancedJournal, PostingError } = await import("../accounting/post.ts");
   const { hashPassword } = await import("./password.ts");
@@ -32,13 +32,17 @@ test("phase 16 rejects cross-site, cross-branch, injection, and secret leakage",
   const headers = securityHeaders("https://shop.example");
   const header = (key: string) => headers.find((item) => item.key === key)?.value ?? "";
   assert.match(header("X-Content-Type-Options"), /nosniff/);
-  assert.match(header("Content-Security-Policy"), /frame-ancestors 'none'/);
-  const previousNodeEnv = process.env.NODE_ENV;
-  process.env.NODE_ENV = "production";
-  assert.doesNotMatch(securityHeaders("https://shop.example").find((item) => item.key === "Content-Security-Policy")?.value ?? "", /unsafe-eval/);
-  process.env.NODE_ENV = "development";
-  assert.match(securityHeaders("http://127.0.0.1:3000").find((item) => item.key === "Content-Security-Policy")?.value ?? "", /script-src 'self' 'unsafe-inline' 'unsafe-eval'/);
-  process.env.NODE_ENV = previousNodeEnv;
+  // the Content-Security-Policy is made for each request, with a nonce (S11)
+  assert.equal(headers.some((item) => item.key === "Content-Security-Policy"), false);
+  const nonce = newNonce();
+  assert.notEqual(nonce, newNonce(), "a new nonce for every request");
+  const policy = contentSecurityPolicy(nonce, false);
+  assert.match(policy, /frame-ancestors 'none'/);
+  assert.ok(policy.includes(`script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`));
+  const scriptRule = policy.split("; ").find((part) => part.startsWith("script-src")) ?? "";
+  assert.doesNotMatch(scriptRule, /unsafe-inline|unsafe-eval/, "no inline script, no eval in production");
+  assert.match(policy, /object-src 'none'/);
+  assert.match(contentSecurityPolicy(nonce, true), /script-src 'self' 'nonce-[^']+' 'strict-dynamic' 'unsafe-eval'/);
   assert.match(header("Referrer-Policy"), /strict-origin/);
   assert.match(header("Permissions-Policy"), /camera=\(\)/);
   assert.equal(header("Strict-Transport-Security").includes("max-age"), true);
