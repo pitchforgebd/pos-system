@@ -11,7 +11,7 @@ import { BooksReconcileError, assertBooksReconcile } from "../../core/reconcile/
 import { businessDate as today } from "../../core/time/business-date.ts";
 import { prisma } from "../../lib/db/client.ts";
 import { factories, withTestOrg } from "../../tests/helpers/index.ts";
-import { addMonths, addOpeningAsset, assetRegister, buyAsset, depreciationFor, disposeAsset, getAsset, previewDepreciation, runDepreciation } from "./assets.ts";
+import { addMonths, addOpeningAsset, assetRegister, buyAsset, depreciationFor, depreciationReminder, disposeAsset, getAsset, previewDepreciation, runDepreciation } from "./assets.ts";
 import { companyWorth } from "./worth.ts";
 
 // P09 (#36-#38, D8): an asset is bought or entered as opening; each month one journal writes off the straight line, the last month takes the
@@ -170,5 +170,20 @@ test("I19: an asset whose lines no longer add up to its cost fails the books che
     await assert.rejects(assertBooksReconcile(t.org.id, prisma), (error: unknown) => error instanceof BooksReconcileError && error.findings.some((finding) => finding.invariant === "I19"));
     await prisma.fixedAsset.update({ where: { id: van.id }, data: { cost: new Prisma.Decimal("5000.00") } });
     await assertBooksReconcile(t.org.id, prisma);
+  });
+});
+
+test("the dashboard reminder: last month's depreciation while it is not posted, nothing once it is", async () => {
+  await withTestOrg(async (t) => {
+    assert.equal(await depreciationReminder(t.org.id), null, "no asset, no reminder");
+    await buy(t, { cost: "24000.00", months: 24, monthsAgo: 2 });
+    const lastMonth = addMonths(thisMonth(), -1);
+    const waiting = await depreciationReminder(t.org.id);
+    assert.equal(waiting?.month, lastMonth);
+    assert.equal((await runDepreciation({ ...actor(t), month: addMonths(thisMonth(), -2) })).ok, true);
+    assert.deepEqual([(await depreciationReminder(t.org.id))?.month, (await depreciationReminder(t.org.id))?.total], [lastMonth, "1000.00"], "the month before does not clear last month");
+    assert.equal((await runDepreciation({ ...actor(t), month: lastMonth })).ok, true);
+    const now = await depreciationReminder(t.org.id);
+    assert.ok(now === null || now.month === thisMonth(), "last month is done (this month only on its last day)");
   });
 });

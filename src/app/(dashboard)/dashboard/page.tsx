@@ -80,17 +80,13 @@ export default async function DashboardPage({
             <Link href="/accounting/worth" className="rounded-xl bg-[#0f8f78] px-4 py-3 text-white">
               <span className="text-xs font-semibold tracking-wide">COMPANY WORTH</span>
               <span className="mt-1 block text-2xl font-semibold">{worth.net}</span>
-              <span className="text-xs">
-                Owns {worth.assets} · owes {worth.liabilities}
-              </span>
+              <span className="text-xs">{`Owns ${worth.assets} · owes ${worth.liabilities}`}</span>
             </Link>
           ) : null}
           {reminder ? (
             <Link href={`/accounting/depreciation?month=${reminder.month}`} className="rounded-xl border border-warning/40 bg-warning-subtle px-4 py-3 text-sm">
-              <span className="font-semibold">Depreciation for {reminder.month} is not posted</span>
-              <span className="mt-1 block">
-                {reminder.assets} asset{reminder.assets === 1 ? "" : "s"}, {reminder.total}. Post it now.
-              </span>
+              <span className="font-semibold">{`Depreciation for ${reminder.month} is not posted`}</span>
+              <span className="mt-1 block">{`${reminder.assets} asset${reminder.assets === 1 ? "" : "s"}, ${reminder.total}. Post it now.`}</span>
             </Link>
           ) : null}
         </div>
