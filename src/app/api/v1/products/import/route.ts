@@ -8,7 +8,7 @@ import { idempotencyKey } from "@/modules/inventory/actor";
 
 const bodySchema = z.object({
   fileName: z.string().trim().max(255).optional(),
-  csv: z.string(),
+  csv: z.string().max(5_000_000),
 });
 
 export const GET = defineRoute({

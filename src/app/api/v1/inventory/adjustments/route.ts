@@ -8,7 +8,7 @@ import { postAdjustment } from "@/modules/inventory/documents";
 const bodySchema = z.object({
   productId: z.string().uuid(),
   variantId: z.string().uuid().optional(),
-  quantity: z.string(),
+  quantity: z.string().trim().max(32),
   direction: z.enum(["IN", "OUT"]),
   reason: z.string().trim().min(1).max(255),
   warehouseId: z.string().uuid().optional(),

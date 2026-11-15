@@ -7,7 +7,7 @@ import { listExpiry, writeOffExpiry } from "@/modules/inventory/documents";
 
 const bodySchema = z.object({
   batchId: z.string().uuid(),
-  quantity: z.string(),
+  quantity: z.string().trim().max(32),
   warehouseId: z.string().uuid().optional(),
 });
 

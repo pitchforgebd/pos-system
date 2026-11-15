@@ -9,8 +9,8 @@ import { postOpeningStock } from "@/modules/inventory/documents";
 const lineSchema = z.object({
   productId: z.string().uuid(),
   variantId: z.string().uuid().optional(),
-  quantity: z.string(),
-  unitCost: z.string().optional(),
+  quantity: z.string().trim().max(32),
+  unitCost: z.string().trim().max(32).optional(),
   lot: z.string().trim().max(64).optional(),
   manufacturedOn: isoDate.optional(),
   expiresOn: isoDate.optional(),

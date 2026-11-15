@@ -9,7 +9,7 @@ const patchSchema = z.object({
   phone: z.string().trim().max(32).nullable().optional(),
   email: z.string().trim().email().nullable().optional(),
   address: z.string().trim().max(255).nullable().optional(),
-  creditLimit: z.string().nullable().optional(),
+  creditLimit: z.string().trim().max(32).nullable().optional(),
   paymentTerms: z.string().trim().max(64).nullable().optional(),
   contactPerson: z.string().trim().max(191).nullable().optional(),
   altPhone: z.string().trim().max(32).nullable().optional(),

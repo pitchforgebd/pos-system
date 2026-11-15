@@ -7,7 +7,7 @@ import { getProductDetail, savePriceSteps } from "@/modules/catalog/detail";
 const bodySchema = z.object({
   variantId: z.string().uuid().nullable().optional(),
   prices: z
-    .array(z.object({ level: z.string().trim().min(1).max(64), minQty: z.string(), price: z.string() }))
+    .array(z.object({ level: z.string().trim().min(1).max(64), minQty: z.string().trim().max(32), price: z.string().trim().max(32) }))
     .max(200),
 });
 

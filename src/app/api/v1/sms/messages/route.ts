@@ -9,9 +9,9 @@ import { smsVariables } from "@/modules/sms/templates";
 const variableSchema = z.object(Object.fromEntries(smsVariables.map((name) => [name, z.string().max(191).optional()]))).strict();
 
 const bodySchema = z.object({
-  recipient: z.string(),
+  recipient: z.string().trim().min(1).max(191),
   templateId: z.string().uuid().nullable().optional(),
-  body: z.string().nullable().optional(),
+  body: z.string().max(2000).nullable().optional(),
   variables: variableSchema.optional(),
 });
 

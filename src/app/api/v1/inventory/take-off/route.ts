@@ -15,7 +15,7 @@ const bodySchema = z.object({
   expenseAccountId: z.string().uuid().optional(),
   warehouseId: z.string().uuid().optional(),
   lines: z
-    .array(z.object({ productId: z.string().uuid(), variantId: z.string().uuid().optional(), quantity: z.string(), lot: z.string().trim().max(64).optional() }))
+    .array(z.object({ productId: z.string().uuid(), variantId: z.string().uuid().optional(), quantity: z.string().trim().max(32), lot: z.string().trim().max(64).optional() }))
     .min(1)
     .max(100),
 });

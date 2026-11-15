@@ -10,7 +10,7 @@ const bodySchema = z.object({
   businessDate: isoDate,
   voucherType: z.enum(["PAYMENT", "RECEIPT"]),
   accountCode: z.string().trim().min(1).max(16),
-  amount: z.string(),
+  amount: z.string().trim().max(32),
   method: z.enum(["CASH", "BANK"]),
   bankCode: z.string().trim().max(16).optional(),
 });

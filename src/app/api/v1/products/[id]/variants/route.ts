@@ -6,7 +6,7 @@ import { addVariant } from "@/modules/catalog/products";
 
 const bodySchema = z.object({
   sku: z.string().trim().min(1).max(64),
-  price: z.string().optional(),
+  price: z.string().trim().max(32).optional(),
   barcode: z.string().trim().min(1).max(64).optional(),
   values: z.array(z.object({ headId: z.string().uuid(), valueId: z.string().uuid() })).max(20).optional(),
 });

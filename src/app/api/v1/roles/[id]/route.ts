@@ -6,7 +6,7 @@ import { permissionCodes } from "@/lib/permissions/codes";
 import { setRolePermissions } from "@/modules/access/roles";
 
 const patchSchema = z.object({
-  permissions: z.array(z.string()),
+  permissions: z.array(z.string().trim().max(64)).max(200),
 });
 
 export const PATCH = defineRoute<undefined, { id: string }>({

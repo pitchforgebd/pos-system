@@ -9,7 +9,7 @@ import { idempotencyKey, stockActor } from "@/modules/inventory/actor";
 const bodySchema = z.object({
   customerId: z.string().uuid(),
   businessDate: isoDate,
-  amount: z.string(),
+  amount: z.string().trim().max(32),
   method: z.enum(["CASH", "BANK"]),
 });
 

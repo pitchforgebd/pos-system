@@ -8,7 +8,7 @@ import { redeemLoyalty } from "@/modules/reference/extras";
 
 const bodySchema = z.object({
   customerId: z.string().uuid(),
-  points: z.string(),
+  points: z.string().trim().max(32),
   businessDate: isoDate,
 });
 

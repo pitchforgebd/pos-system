@@ -12,7 +12,7 @@ const bodySchema = z.object({
   accountNumber: z.string().trim().max(64).optional(),
   bankName: z.string().trim().max(191).optional(),
   bankBranch: z.string().trim().max(191).optional(),
-  openingAmount: z.string().optional(),
+  openingAmount: z.string().trim().max(32).optional(),
 });
 
 export const POST = defineRoute({

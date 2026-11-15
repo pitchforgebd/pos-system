@@ -5,9 +5,9 @@ import { clientIp, jsonError, jsonOk } from "@/lib/api/http";
 import { createBranch, listCompanyBranches } from "@/modules/access/branches";
 
 const bodySchema = z.object({
-  name: z.string(),
-  phone: z.string().nullable().optional(),
-  address: z.string().nullable().optional(),
+  name: z.string().trim().min(1).max(191),
+  phone: z.string().trim().max(64).nullable().optional(),
+  address: z.string().trim().max(255).nullable().optional(),
 });
 
 export const GET = defineRoute({

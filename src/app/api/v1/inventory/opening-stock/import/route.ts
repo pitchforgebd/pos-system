@@ -8,8 +8,8 @@ import { idempotencyKey, stockActor } from "@/modules/inventory/actor";
 
 const bodySchema = z.object({
   fileName: z.string().trim().max(255).optional(),
-  csv: z.string(),
-  businessDate: z.string(),
+  csv: z.string().max(5_000_000),
+  businessDate: z.string().trim().max(10),
   warehouseId: z.string().uuid().optional(),
 });
 

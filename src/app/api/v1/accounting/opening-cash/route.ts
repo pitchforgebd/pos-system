@@ -5,7 +5,7 @@ import { jsonError, jsonOk } from "@/lib/api/http";
 import { postOpeningCash } from "@/modules/accounting/books";
 import { idempotencyKey, stockActor } from "@/modules/inventory/actor";
 
-const bodySchema = z.object({ amount: z.string() });
+const bodySchema = z.object({ amount: z.string().trim().max(32) });
 
 // The cash in the drawer when the books start, entered once per branch (Dr Cash in Hand / Cr Opening Balance Equity).
 export const POST = defineRoute({

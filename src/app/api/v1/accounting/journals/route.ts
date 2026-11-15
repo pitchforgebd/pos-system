@@ -9,7 +9,7 @@ import { listJournals, postJournal } from "@/modules/accounting/books";
 const bodySchema = z.object({
   businessDate: isoDate,
   description: z.string().trim().max(255).default(""),
-  lines: z.array(z.object({ accountCode: z.string().trim().min(1).max(16), debit: z.string(), credit: z.string() })).min(2).max(20),
+  lines: z.array(z.object({ accountCode: z.string().trim().min(1).max(16), debit: z.string().trim().max(32), credit: z.string().trim().max(32) })).min(2).max(20),
 });
 
 export const GET = defineRoute({

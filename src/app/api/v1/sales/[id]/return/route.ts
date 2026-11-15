@@ -11,7 +11,7 @@ const bodySchema = z.object({
   /** Where the money goes: the way the customer paid when left out. */
   refundMethod: z.enum(["CASH", "BANK", "MOBILE", "ADVANCE", "AR_ONLY"]).optional(),
   refundAccountId: z.string().uuid().optional(),
-  lines: z.array(z.object({ saleItemId: z.string().uuid(), quantity: z.string() })).min(1).max(100),
+  lines: z.array(z.object({ saleItemId: z.string().uuid(), quantity: z.string().trim().max(32) })).min(1).max(100),
 });
 
 export const POST = defineRoute<undefined, { id: string }>({

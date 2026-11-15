@@ -6,8 +6,8 @@ import { createLoyaltyTier, listLoyaltyTiers } from "@/modules/customers/loyalty
 
 const bodySchema = z.object({
   name: z.string().trim().min(1).max(191),
-  minimumSpend: z.string(),
-  discountPercent: z.string(),
+  minimumSpend: z.string().trim().max(32),
+  discountPercent: z.string().trim().max(32),
   benefits: z.string().trim().max(255).nullable().optional(),
 });
 

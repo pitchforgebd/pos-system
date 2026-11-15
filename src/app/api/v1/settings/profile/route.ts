@@ -5,14 +5,14 @@ import { clientIp, jsonError, jsonOk } from "@/lib/api/http";
 import { getOrganizationProfile, saveOrganizationProfile } from "@/modules/settings/profile";
 
 const bodySchema = z.object({
-  name: z.string(),
-  phone: z.string().nullable().optional(),
-  address: z.string().nullable().optional(),
-  bin: z.string().nullable().optional(),
-  tin: z.string().nullable().optional(),
-  logoUrl: z.string().nullable().optional(),
-  pointsPerHundred: z.string().nullable().optional(),
-  takaPerPoint: z.string().nullable().optional(),
+  name: z.string().trim().min(1).max(191),
+  phone: z.string().trim().max(64).nullable().optional(),
+  address: z.string().trim().max(255).nullable().optional(),
+  bin: z.string().trim().max(64).nullable().optional(),
+  tin: z.string().trim().max(64).nullable().optional(),
+  logoUrl: z.string().trim().max(255).nullable().optional(),
+  pointsPerHundred: z.string().trim().max(32).nullable().optional(),
+  takaPerPoint: z.string().trim().max(32).nullable().optional(),
 });
 
 export const GET = defineRoute({

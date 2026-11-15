@@ -4,7 +4,7 @@ import { defineRoute } from "@/core/http/define-route";
 import { jsonError, jsonOk } from "@/lib/api/http";
 import { previewProductCsv } from "@/modules/imports/product-import";
 
-const bodySchema = z.object({ csv: z.string() });
+const bodySchema = z.object({ csv: z.string().max(5_000_000) });
 
 export const POST = defineRoute({
   permission: "products.import",

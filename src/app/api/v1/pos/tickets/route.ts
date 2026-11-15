@@ -12,7 +12,7 @@ const bodySchema = z.object({
       z.object({
         productId: z.string().uuid(),
         variantId: z.string().uuid().optional(),
-        quantity: z.string(),
+        quantity: z.string().trim().max(32),
       }),
     )
     .min(1)

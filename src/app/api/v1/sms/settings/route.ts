@@ -5,9 +5,9 @@ import { clientIp, jsonError, jsonOk } from "@/lib/api/http";
 import { getSmsSettings, saveSmsSettings } from "@/modules/sms/sms";
 
 const bodySchema = z.object({
-  sender: z.string(),
-  provider: z.string().nullable().optional(),
-  unitPrice: z.string().nullable().optional(),
+  sender: z.string().trim().min(1).max(191),
+  provider: z.string().trim().max(64).nullable().optional(),
+  unitPrice: z.string().trim().max(32).nullable().optional(),
 });
 
 export const GET = defineRoute({

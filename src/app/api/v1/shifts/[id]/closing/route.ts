@@ -9,7 +9,7 @@ const bodySchema = z
   .object({
     actualCash: z.string().max(24).optional(),
     /** The notes and coins counted, by value, for example two notes of one thousand and one of five hundred. */
-    denominations: z.record(z.string(), z.number().int().min(0).max(1_000_000)).optional(),
+    denominations: z.record(z.string().max(16), z.number().int().min(0).max(1_000_000)).optional(),
   })
   .refine((value) => value.actualCash !== undefined || value.denominations !== undefined);
 

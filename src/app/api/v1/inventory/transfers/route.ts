@@ -10,7 +10,7 @@ const bodySchema = z.object({
   toBranchId: z.string().uuid(),
   fromWarehouseId: z.string().uuid(),
   toWarehouseId: z.string().uuid(),
-  lines: z.array(z.object({ productId: z.string().uuid(), variantId: z.string().uuid().optional(), quantity: z.string() })).min(1).max(100),
+  lines: z.array(z.object({ productId: z.string().uuid(), variantId: z.string().uuid().optional(), quantity: z.string().trim().max(32) })).min(1).max(100),
 });
 
 export const POST = defineRoute({

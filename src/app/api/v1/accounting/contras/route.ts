@@ -9,7 +9,7 @@ import { postContra } from "@/modules/accounting/books";
 const bodySchema = z.object({
   businessDate: isoDate,
   direction: z.enum(["CASH_TO_BANK", "BANK_TO_CASH"]),
-  amount: z.string(),
+  amount: z.string().trim().max(32),
 });
 
 export const POST = defineRoute({

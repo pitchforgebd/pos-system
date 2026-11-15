@@ -9,7 +9,7 @@ import { postPurchaseReturn } from "@/modules/purchasing/returns";
 const bodySchema = z.object({
   businessDate: isoDate,
   refundMethod: z.enum(["CASH", "BANK"]).optional(),
-  lines: z.array(z.object({ purchaseItemId: z.string().uuid(), quantity: z.string() })).min(1).max(100),
+  lines: z.array(z.object({ purchaseItemId: z.string().uuid(), quantity: z.string().trim().max(32) })).min(1).max(100),
 });
 
 export const POST = defineRoute<undefined, { id: string }>({

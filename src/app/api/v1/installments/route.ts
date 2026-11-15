@@ -8,9 +8,9 @@ import { createInstallment, listInstallments } from "@/modules/customers/install
 const bodySchema = z.object({
   customerId: z.string().uuid(),
   invoiceId: z.string().uuid(),
-  amount: z.string(),
+  amount: z.string().trim().max(32),
   dueOn: isoDate,
-  interestPercent: z.string().optional(),
+  interestPercent: z.string().trim().max(32).optional(),
 });
 
 export const GET = defineRoute({

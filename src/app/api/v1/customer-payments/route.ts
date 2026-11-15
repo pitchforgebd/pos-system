@@ -9,12 +9,12 @@ import { idempotencyKey, stockActor } from "@/modules/inventory/actor";
 const bodySchema = z.object({
   customerId: z.string().uuid(),
   businessDate: isoDate,
-  amount: z.string(),
+  amount: z.string().trim().max(32),
   method: z.enum(["CASH", "BANK", "MOBILE"]),
   accountId: z.string().uuid().optional(),
   charge: z.string().max(24).optional(),
   /** The invoices this receipt is for; the rest settles the oldest debt. */
-  allocations: z.array(z.object({ invoiceId: z.string().uuid(), amount: z.string() })).max(100).optional(),
+  allocations: z.array(z.object({ invoiceId: z.string().uuid(), amount: z.string().trim().max(32) })).max(100).optional(),
 });
 
 export const GET = defineRoute({
