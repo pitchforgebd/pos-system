@@ -4,10 +4,13 @@ import { PartyAmountForm } from "@/components/customers/party-search";
 import { PageHeader } from "@/components/ui/page-header";
 import { getSession } from "@/modules/auth/current-session";
 import { listSuppliers } from "@/modules/purchasing/suppliers";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Supplier payment" };
+export const generateMetadata = phraseTitled("Supplier payment");
 
 export default async function SupplierPaymentsPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session?.branchId) {
     redirect("/login");
@@ -17,13 +20,13 @@ export default async function SupplierPaymentsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Supplier payment"
-        description="Search by name or phone. Cash posts to account 1100 and bank posts to account 1200. The payment cannot exceed what is owed; to pay from a particular bank or mobile account, with its charge, or for named bills, or to pay ahead, use the vendor's page."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Suppliers", href: "/suppliers" }, { label: "Payment" }]}
+        title={ph("Supplier payment")}
+        description={ph("Search by name or phone. Cash posts to account 1100 and bank posts to account 1200. The payment cannot exceed what is owed; to pay from a particular bank or mobile account, with its charge, or for named bills, or to pay ahead, use the vendor's page.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Suppliers", href: "/suppliers" }, { label: ph("Payment") }]}
       />
       {session.permissions.has("suppliers.payment") ? (
         <PartyAmountForm
-          title="Take payment"
+          title={ph("Take payment")}
           url="/api/v1/suppliers/:id/payments"
           mode="due"
           balanceLabel="Payable"

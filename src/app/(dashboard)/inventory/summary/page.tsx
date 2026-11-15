@@ -5,10 +5,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
 import { listStock, stockSummary } from "@/modules/inventory/stock";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Product Summary" };
+export const generateMetadata = phraseTitled("Product Summary");
 
 export default async function SummaryPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session?.branchId) {
     redirect("/login");
@@ -21,9 +24,9 @@ export default async function SummaryPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Product Summary"
-        description="Purchase and sale values are the current quantity times the product price. This is not a costing method."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Product Summary" }]}
+        title={ph("Product Summary")}
+        description={ph("Purchase and sale values are the current quantity times the product price. This is not a costing method.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: ph("Product Summary") }]}
       />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[
@@ -33,23 +36,23 @@ export default async function SummaryPage() {
           ["Sale value", summary.saleValue],
         ].map(([label, amount]) => (
           <article key={label} className="rounded-xl bg-[#2457c5] p-4 text-white">
-            <p className="text-xs font-semibold tracking-wide">{label}</p>
+            <p className="text-xs font-semibold tracking-wide">{ph(label)}</p>
             <p className="mt-3 text-2xl font-semibold">{amount}</p>
           </article>
         ))}
       </div>
       <DataTable
-        caption="Product summary"
+        caption={ph("Product summary")}
         columns={[
-          { key: "sku", header: "SKU", cell: (row) => row.sku },
-          { key: "name", header: "Product", cell: (row) => row.name },
-          { key: "quantity", header: "Current stock", cell: (row) => row.quantity },
-          { key: "value", header: "Stock value (avg cost)", cell: (row) => row.stockValue },
-          { key: "sale", header: "Total S. value", cell: (row) => row.saleValue },
+          { key: "sku", header: ph("SKU"), cell: (row) => row.sku },
+          { key: "name", header: ph("Product"), cell: (row) => row.name },
+          { key: "quantity", header: ph("Current stock"), cell: (row) => row.quantity },
+          { key: "value", header: ph("Stock value (avg cost)"), cell: (row) => row.stockValue },
+          { key: "sale", header: ph("Total S. value"), cell: (row) => row.saleValue },
         ]}
         rows={rows}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No stock" description="The summary is zero until a balance exists." />}
+        empty={<EmptyState title={ph("No stock")} description={ph("The summary is zero until a balance exists.")} />}
       />
     </div>
   );

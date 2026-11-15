@@ -8,6 +8,7 @@ import { Select } from "@/components/ui/select";
 import { useSubmit } from "@/lib/client/use-submit";
 import { useI18n } from "@/lib/i18n/provider";
 
+
 // The customer and vendor forms (P10 tasks 2-3): a Bangladeshi phone (a number another customer already has is a warning, not a refusal), where
 // they are (division -> district, required -> upazila, D15), and for a customer the type (its price level), credit, payment days, tags and SMS.
 
@@ -27,6 +28,7 @@ const number = (data: FormData, name: string) => {
 
 /** Division, then district (required), then upazila (optional). */
 export function PlacePicker({ places, districtId, upazilaId }: { places: Places; districtId?: number | null; upazilaId?: number | null }) {
+  const { ph } = useI18n();
   const start = places.districts.find((row) => row.id === districtId);
   const [division, setDivision] = useState<number | "">(start?.divisionId ?? "");
   const [district, setDistrict] = useState<number | "">(start?.id ?? "");
@@ -36,7 +38,7 @@ export function PlacePicker({ places, districtId, upazilaId }: { places: Places;
   return (
     <div className="grid gap-3 sm:grid-cols-3">
       <label className="grid gap-1 text-sm">
-        Division
+        {ph("Division")}
         <Select
           value={division === "" ? "" : String(division)}
           onChange={(event) => {
@@ -44,9 +46,9 @@ export function PlacePicker({ places, districtId, upazilaId }: { places: Places;
             setDistrict("");
             setUpazila("");
           }}
-          aria-label="Division"
+          aria-label={ph("Division")}
         >
-          <option value="">All divisions</option>
+          <option value="">{ph("All divisions")}</option>
           {places.divisions.map((row) => (
             <option key={row.id} value={row.id}>
               {both(row)}
@@ -55,7 +57,7 @@ export function PlacePicker({ places, districtId, upazilaId }: { places: Places;
         </Select>
       </label>
       <label className="grid gap-1 text-sm">
-        District
+        {ph("District")}
         <Select
           name="districtId"
           required
@@ -68,10 +70,10 @@ export function PlacePicker({ places, districtId, upazilaId }: { places: Places;
               setDivision(places.districts.find((row) => row.id === value)?.divisionId ?? "");
             }
           }}
-          aria-label="District"
+          aria-label={ph("District")}
         >
           <option value="" disabled>
-            Choose the district
+            {ph("Choose the district")}
           </option>
           {districts.map((row) => (
             <option key={row.id} value={row.id}>
@@ -81,9 +83,9 @@ export function PlacePicker({ places, districtId, upazilaId }: { places: Places;
         </Select>
       </label>
       <label className="grid gap-1 text-sm">
-        Upazila
-        <Select name="upazilaId" value={upazila === "" ? "" : String(upazila)} onChange={(event) => setUpazila(event.target.value === "" ? "" : Number(event.target.value))} aria-label="Upazila" disabled={district === ""}>
-          <option value="">Not given</option>
+        {ph("Upazila")}
+        <Select name="upazilaId" value={upazila === "" ? "" : String(upazila)} onChange={(event) => setUpazila(event.target.value === "" ? "" : Number(event.target.value))} aria-label={ph("Upazila")} disabled={district === ""}>
+          <option value="">{ph("Not given")}</option>
           {upazilas.map((row) => (
             <option key={row.id} value={row.id}>
               {both(row)}
@@ -97,6 +99,7 @@ export function PlacePicker({ places, districtId, upazilaId }: { places: Places;
 
 /** A phone field that says, as soon as the number is typed, who else already has it. */
 function PhoneField({ kind, name, label, defaultValue, exceptId, required = false }: { kind: "customers" | "suppliers"; name: string; label: string; defaultValue?: string | null; exceptId?: string; required?: boolean }) {
+  const { ph } = useI18n();
   const [value, setValue] = useState(defaultValue ?? "");
   const [found, setFound] = useState<{ phone: string; names: string[] }>({ phone: "", names: [] });
   const typed = value.replace(/[\s()-]/g, "");
@@ -120,8 +123,8 @@ function PhoneField({ kind, name, label, defaultValue, exceptId, required = fals
   return (
     <label className="grid gap-1 text-sm">
       {label}
-      <Input name={name} value={value} onChange={(event) => setValue(event.target.value)} required={required} inputMode="tel" placeholder="01XXXXXXXXX" aria-label={label} />
-      {others.length > 0 ? <span className="text-xs text-warning">Already used by {others.join(", ")}. You can still save.</span> : null}
+      <Input name={name} value={value} onChange={(event) => setValue(event.target.value)} required={required} inputMode="tel" placeholder={ph("01XXXXXXXXX")} aria-label={label} />
+      {others.length > 0 ? <span className="text-xs text-warning">{ph("Already used by")} {others.join(", ")}{ph(". You can still save.")}</span> : null}
     </label>
   );
 }
@@ -150,6 +153,7 @@ export type CustomerInitial = {
 
 /** Adds a customer (no initial) or changes one. */
 export function CustomerForm({ types, places, initial }: { types: Option[]; places: Places; initial?: CustomerInitial }) {
+  const { ph } = useI18n();
   const { submit, pending, message } = useSubmit();
   return (
     <form
@@ -183,26 +187,26 @@ export function CustomerForm({ types, places, initial }: { types: Option[]; plac
     >
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="grid gap-1 text-sm">
-          Name
+          {ph("Name")}
           <Input name="name" required maxLength={191} defaultValue={initial?.name} />
         </label>
         <label className="grid gap-1 text-sm">
-          Business name
+          {ph("Business name")}
           <Input name="businessName" maxLength={191} defaultValue={initial?.businessName ?? ""} />
         </label>
-        <PhoneField kind="customers" name="phone" label="Phone" defaultValue={initial?.phone} exceptId={initial?.id} />
-        <PhoneField kind="customers" name="altPhone" label="Other phone" defaultValue={initial?.altPhone} exceptId={initial?.id} />
+        <PhoneField kind="customers" name="phone" label={ph("Phone")} defaultValue={initial?.phone} exceptId={initial?.id} />
+        <PhoneField kind="customers" name="altPhone" label={ph("Other phone")} defaultValue={initial?.altPhone} exceptId={initial?.id} />
       </div>
       <PlacePicker places={places} districtId={initial?.districtId} upazilaId={initial?.upazilaId} />
       <label className="grid gap-1 text-sm">
-        Address
-        <Input name="address" maxLength={255} defaultValue={initial?.address ?? ""} placeholder="Village / road, house" />
+        {ph("Address")}
+        <Input name="address" maxLength={255} defaultValue={initial?.address ?? ""} placeholder={ph("Village / road, house")} />
       </label>
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="grid gap-1 text-sm">
-          Type (its price level)
+          {ph("Type (its price level)")}
           <Select name="customerTypeId" defaultValue={initial?.customerTypeId ?? ""}>
-            <option value="">No type (the default prices)</option>
+            <option value="">{ph("No type (the default prices)")}</option>
             {types.map((type) => (
               <option key={type.id} value={type.id}>
                 {type.label}
@@ -211,55 +215,55 @@ export function CustomerForm({ types, places, initial }: { types: Option[]; plac
           </Select>
         </label>
         <label className="grid gap-1 text-sm">
-          Credit limit
-          <Input name="creditLimit" inputMode="decimal" defaultValue={initial?.creditLimit ?? ""} placeholder="No limit" />
+          {ph("Credit limit")}
+          <Input name="creditLimit" inputMode="decimal" defaultValue={initial?.creditLimit ?? ""} placeholder={ph("No limit")} />
         </label>
         <label className="grid gap-1 text-sm">
-          Days to pay
+          {ph("Days to pay")}
           <Input name="paymentDays" type="number" min={0} max={365} defaultValue={initial?.paymentDays ?? ""} placeholder="0" />
         </label>
         <label className="grid gap-1 text-sm">
-          Email
+          {ph("Email")}
           <Input name="email" type="email" defaultValue={initial?.email ?? ""} />
         </label>
         <label className="grid gap-1 text-sm">
-          National ID
+          {ph("National ID")}
           <Input name="nid" inputMode="numeric" maxLength={17} defaultValue={initial?.nid ?? ""} />
         </label>
         <label className="grid gap-1 text-sm">
-          Payment terms (note)
+          {ph("Payment terms (note)")}
           <Input name="paymentTerms" maxLength={64} defaultValue={initial?.paymentTerms ?? ""} />
         </label>
       </div>
       <label className="grid gap-1 text-sm">
-        Tags (comma separated)
-        <Input name="tags" maxLength={255} defaultValue={initial?.tags ?? ""} placeholder="dealer, rice, regular" />
+        {ph("Tags (comma separated)")}
+        <Input name="tags" maxLength={255} defaultValue={initial?.tags ?? ""} placeholder={ph("dealer, rice, regular")} />
       </label>
       <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" name="smsOptOut" defaultChecked={initial?.smsOptOut ?? false} /> Does not want offer or reminder SMS
+        <input type="checkbox" name="smsOptOut" defaultChecked={initial?.smsOptOut ?? false} /> {ph("Does not want offer or reminder SMS")}
       </label>
       {initial ? (
         <div className="flex flex-wrap items-end gap-3">
           <label className="grid gap-1 text-sm">
-            Status
+            {ph("Status")}
             <Select name="status" defaultValue={initial.status}>
-              <option value="ACTIVE">Active</option>
-              <option value="INACTIVE">Inactive</option>
+              <option value="ACTIVE">{ph("Active")}</option>
+              <option value="INACTIVE">{ph("Inactive")}</option>
             </Select>
           </label>
           <p className="text-sm text-muted">
-            Code {initial.code}. Opening balance {initial.openingBalance} is not edited here.
+            {ph("Code")} {initial.code}{ph(". Opening balance")} {initial.openingBalance} {ph("is not edited here.")}
           </p>
         </div>
       ) : (
         <label className="grid max-w-xs gap-1 text-sm">
-          What they owed before (opening balance)
+          {ph("What they owed before (opening balance)")}
           <Input name="openingBalance" inputMode="decimal" defaultValue="0.00" />
         </label>
       )}
       {message ? <p className="text-sm text-error">{message}</p> : null}
       <Button type="submit" loading={pending}>
-        {initial ? "Save customer" : "Add customer"}
+        {initial ? ph("Save customer") : ph("Add customer")}
       </Button>
     </form>
   );
@@ -285,6 +289,7 @@ export type VendorInitial = {
 
 /** Adds a vendor (no initial) or changes one. */
 export function VendorForm({ places, initial }: { places: Places; initial?: VendorInitial }) {
+  const { ph } = useI18n();
   const { submit, pending, message } = useSubmit();
   return (
     <form
@@ -315,63 +320,63 @@ export function VendorForm({ places, initial }: { places: Places; initial?: Vend
     >
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="grid gap-1 text-sm">
-          Name
+          {ph("Name")}
           <Input name="name" required maxLength={191} defaultValue={initial?.name} />
         </label>
         <label className="grid gap-1 text-sm">
-          Contact person
+          {ph("Contact person")}
           <Input name="contactPerson" maxLength={191} defaultValue={initial?.contactPerson ?? ""} />
         </label>
-        <PhoneField kind="suppliers" name="phone" label="Phone" defaultValue={initial?.phone} exceptId={initial?.id} />
-        <PhoneField kind="suppliers" name="altPhone" label="Other phone" defaultValue={initial?.altPhone} exceptId={initial?.id} />
+        <PhoneField kind="suppliers" name="phone" label={ph("Phone")} defaultValue={initial?.phone} exceptId={initial?.id} />
+        <PhoneField kind="suppliers" name="altPhone" label={ph("Other phone")} defaultValue={initial?.altPhone} exceptId={initial?.id} />
       </div>
       <PlacePicker places={places} districtId={initial?.districtId} upazilaId={initial?.upazilaId} />
       <label className="grid gap-1 text-sm">
-        Address
+        {ph("Address")}
         <Input name="address" maxLength={255} defaultValue={initial?.address ?? ""} />
       </label>
       <label className="grid gap-1 text-sm">
-        Bank details (bank, branch, account)
+        {ph("Bank details (bank, branch, account)")}
         <Input name="bankDetails" maxLength={255} defaultValue={initial?.bankDetails ?? ""} />
       </label>
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="grid gap-1 text-sm">
-          Email
+          {ph("Email")}
           <Input name="email" type="email" defaultValue={initial?.email ?? ""} />
         </label>
         <label className="grid gap-1 text-sm">
-          Credit limit
-          <Input name="creditLimit" inputMode="decimal" defaultValue={initial?.creditLimit ?? ""} placeholder="No limit" />
+          {ph("Credit limit")}
+          <Input name="creditLimit" inputMode="decimal" defaultValue={initial?.creditLimit ?? ""} placeholder={ph("No limit")} />
         </label>
         <label className="grid gap-1 text-sm">
-          Days to pay
+          {ph("Days to pay")}
           <Input name="paymentDays" type="number" min={0} max={365} defaultValue={initial?.paymentDays ?? ""} />
         </label>
       </div>
       <label className="grid gap-1 text-sm">
-        Payment terms (note)
+        {ph("Payment terms (note)")}
         <Input name="paymentTerms" maxLength={64} defaultValue={initial?.paymentTerms ?? ""} />
       </label>
       {initial ? (
         <div className="flex flex-wrap items-end gap-3">
           <label className="grid gap-1 text-sm">
-            Status
+            {ph("Status")}
             <Select name="status" defaultValue={initial.status}>
-              <option value="ACTIVE">Active</option>
-              <option value="INACTIVE">Inactive</option>
+              <option value="ACTIVE">{ph("Active")}</option>
+              <option value="INACTIVE">{ph("Inactive")}</option>
             </Select>
           </label>
-          <p className="text-sm text-muted">Code {initial.code}.</p>
+          <p className="text-sm text-muted">{ph("Code")} {initial.code}.</p>
         </div>
       ) : (
         <label className="grid max-w-xs gap-1 text-sm">
-          What the shop owed them before (opening payable)
+          {ph("What the shop owed them before (opening payable)")}
           <Input name="openingPayable" inputMode="decimal" defaultValue="0.00" />
         </label>
       )}
       {message ? <p className="text-sm text-error">{message}</p> : null}
       <Button type="submit" loading={pending}>
-        {initial ? "Save vendor" : "Add vendor"}
+        {initial ? ph("Save vendor") : ph("Add vendor")}
       </Button>
     </form>
   );

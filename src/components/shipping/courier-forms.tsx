@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSubmit } from "@/lib/client/use-submit";
+import { useI18n } from "@/lib/i18n/provider";
 
 // A courier: its phone, the condition percentage it keeps of the cash it collects, and what it charges to deliver, inside Dhaka and outside.
 // What is here is the default; each shipment may change it.
@@ -12,6 +13,7 @@ import { useSubmit } from "@/lib/client/use-submit";
 export type CourierValues = { id?: string; name: string; phone: string; status: "ACTIVE" | "INACTIVE"; defaultConditionPercent: string; defaultDeliveryCharge: string; outsideDeliveryCharge: string };
 
 export function CourierForm({ initial }: { initial?: CourierValues }) {
+  const { ph } = useI18n();
   const { submit, pending, message, reset } = useSubmit();
   const [values, setValues] = useState<CourierValues>(initial ?? { name: "", phone: "", status: "ACTIVE", defaultConditionPercent: "1", defaultDeliveryCharge: "60", outsideDeliveryCharge: "110" });
   const set = (name: keyof CourierValues, value: string) => setValues((current) => ({ ...current, [name]: value }));
@@ -28,35 +30,35 @@ export function CourierForm({ initial }: { initial?: CourierValues }) {
       }}
     >
       <label className="grid gap-1 text-sm md:col-span-2">
-        Name
+        {ph("Name")}
         <Input value={values.name} onChange={(event) => set("name", event.target.value)} required maxLength={191} />
       </label>
       <label className="grid gap-1 text-sm">
-        Phone
+        {ph("Phone")}
         <Input value={values.phone} onChange={(event) => set("phone", event.target.value)} maxLength={32} />
       </label>
       <label className="grid gap-1 text-sm">
-        Condition %
+        {ph("Condition %")}
         <Input inputMode="decimal" value={values.defaultConditionPercent} onChange={(event) => set("defaultConditionPercent", event.target.value)} />
       </label>
       <label className="grid gap-1 text-sm">
-        Delivery, Dhaka
+        {ph("Delivery, Dhaka")}
         <Input inputMode="decimal" value={values.defaultDeliveryCharge} onChange={(event) => set("defaultDeliveryCharge", event.target.value)} />
       </label>
       <label className="grid gap-1 text-sm">
-        Delivery, outside
+        {ph("Delivery, outside")}
         <Input inputMode="decimal" value={values.outsideDeliveryCharge} onChange={(event) => set("outsideDeliveryCharge", event.target.value)} />
       </label>
       {initial ? (
         <label className="flex items-center gap-2 text-sm md:col-span-3">
           <input type="checkbox" checked={values.status === "ACTIVE"} onChange={(event) => setValues((current) => ({ ...current, status: event.target.checked ? "ACTIVE" : "INACTIVE" }))} />
-          In use
+          {ph("In use")}
         </label>
       ) : null}
       {message ? <p className="text-sm text-error md:col-span-6" role="alert">{message}</p> : null}
       <div className="md:col-span-6">
         <Button type="submit" size="sm" loading={pending}>
-          {initial ? "Save" : "Add courier"}
+          {initial ? ph("Save") : ph("Add courier")}
         </Button>
       </div>
     </form>

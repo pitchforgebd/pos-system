@@ -9,10 +9,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
 import { listMessages, smsDashboard } from "@/modules/sms/sms";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "SMS" };
+export const generateMetadata = phraseTitled("SMS");
 
 export default async function SmsPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -25,14 +28,14 @@ export default async function SmsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="SMS"
-        description="Every message goes through the outbox: it is sent right after it is written, and a failure is tried again three times. An SMS never holds up or undoes a sale or a payment."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "SMS" }]}
+        title={ph("SMS")}
+        description={ph("Every message goes through the outbox: it is sent right after it is written, and a failure is tried again three times. An SMS never holds up or undoes a sale or a payment.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: ph("SMS") }]}
         actions={
           <>
-            <Button href="/sms/send">Send SMS</Button>
+            <Button href="/sms/send">{ph("Send SMS")}</Button>
             <Button href="/sms/campaigns" variant="secondary">
-              Offer campaigns
+              {ph("Offer campaigns")}
             </Button>
           </>
         }
@@ -40,20 +43,20 @@ export default async function SmsPage() {
       <SmsMetrics figures={figures} />
       {figures.queued > 0 ? <SendWaitingForm waiting={figures.queued} configured={figures.provider !== null} /> : null}
       <DataTable
-        caption="Recent messages"
+        caption={ph("Recent messages")}
         columns={[
-          { key: "date", header: "Date", cell: (row) => row.createdAt.slice(0, 10) },
-          { key: "to", header: "To", cell: (row) => row.recipient },
-          { key: "parts", header: "SMS", cell: (row) => row.parts },
-          { key: "status", header: "Status", cell: (row) => row.status },
-          { key: "result", header: "Note", cell: (row) => (row.status === "SENT" ? "" : row.result) },
+          { key: "date", header: ph("Date"), cell: (row) => row.createdAt.slice(0, 10) },
+          { key: "to", header: ph("To"), cell: (row) => row.recipient },
+          { key: "parts", header: ph("SMS"), cell: (row) => row.parts },
+          { key: "status", header: ph("Status"), cell: (row) => row.status },
+          { key: "result", header: ph("Note"), cell: (row) => (row.status === "SENT" ? "" : row.result) },
         ]}
         rows={messages.slice(0, 20)}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No messages" description="Messages appear here as soon as they are written to the outbox." />}
+        empty={<EmptyState title={ph("No messages")} description={ph("Messages appear here as soon as they are written to the outbox.")} />}
       />
       <p className="text-sm">
-        <Link href="/sms/history">History</Link>
+        <Link href="/sms/history">{ph("History")}</Link>
       </p>
     </div>
   );

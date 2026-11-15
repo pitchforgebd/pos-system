@@ -6,10 +6,13 @@ import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { getSession } from "@/modules/auth/current-session";
 import { listAccounts, listGroups } from "@/modules/accounting/books";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Chart of accounts" };
+export const generateMetadata = phraseTitled("Chart of accounts");
 
 export default async function AccountsPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -25,27 +28,27 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Chart of accounts"
-        description="Accounts used by posted journals. An inactive account cannot be used on a new entry."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Accounting", href: "/accounting" }, { label: "Accounts" }]}
+        title={ph("Chart of accounts")}
+        description={ph("Accounts used by posted journals. An inactive account cannot be used on a new entry.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Accounting", href: "/accounting" }, { label: ph("Accounts") }]}
       />
       {session.permissions.has("accounting.create") ? <AccountForm groups={groups} /> : null}
       <form className="flex flex-wrap items-end gap-2" action="/accounting/accounts">
         <label className="grid min-w-56 flex-1 gap-1 text-sm">
-          Search
-          <input name="q" defaultValue={params.q ?? ""} placeholder="Code, name, or group" className="h-10 rounded-md border border-border px-3" />
+          {ph("Search")}
+          <input name="q" defaultValue={params.q ?? ""} placeholder={ph("Code, name, or group")} className="h-10 rounded-md border border-border px-3" />
         </label>
         <Button type="submit" variant="secondary">
-          Search
+          {ph("Search")}
         </Button>
       </form>
       <DataTable
-        caption="Accounts"
+        caption={ph("Accounts")}
         columns={[
-          { key: "code", header: "Code", cell: (row) => row.code },
-          { key: "name", header: "Account", cell: (row) => row.name },
-          { key: "group", header: "Group", cell: (row) => row.groupName },
-          { key: "status", header: "Status", cell: (row) => row.status },
+          { key: "code", header: ph("Code"), cell: (row) => row.code },
+          { key: "name", header: ph("Account"), cell: (row) => row.name },
+          { key: "group", header: ph("Group"), cell: (row) => row.groupName },
+          { key: "status", header: ph("Status"), cell: (row) => row.status },
         ]}
         rows={rows}
         getRowKey={(row) => row.id}

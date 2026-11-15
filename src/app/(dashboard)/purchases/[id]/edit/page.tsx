@@ -8,10 +8,13 @@ import { moneyAccountOptions, warehouseOptions } from "@/modules/purchasing/look
 import { getPurchase } from "@/modules/purchasing/purchases";
 import { listSuppliers } from "@/modules/purchasing/suppliers";
 import { prisma } from "@/lib/db/client";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Change purchase" };
+export const generateMetadata = phraseTitled("Change purchase");
 
 export default async function EditPurchasePage({ params }: { params: Promise<{ id: string }> }) {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session?.branchId || !session.permissions.has("purchase.edit")) {
     redirect("/purchases");
@@ -65,8 +68,8 @@ export default async function EditPurchasePage({ params }: { params: Promise<{ i
     <div className="space-y-6">
       <PageHeader
         title={`Change ${purchase.number ?? "draft purchase"}`}
-        description="Nothing has been posted for this purchase yet, so its lines and figures can still change."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Purchases", href: "/purchases" }, { label: purchase.number ?? "Draft", href: `/purchases/${id}` }, { label: "Change" }]}
+        description={ph("Nothing has been posted for this purchase yet, so its lines and figures can still change.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Purchases", href: "/purchases" }, { label: purchase.number ?? "Draft", href: `/purchases/${id}` }, { label: ph("Change") }]}
       />
       <PurchaseForm
         today={businessDate()}

@@ -8,10 +8,13 @@ import { getSession } from "@/modules/auth/current-session";
 import { listWarrantyProducts } from "@/modules/catalog/flags";
 import { listCustomers } from "@/modules/customers/customers";
 import { listClaims } from "@/modules/reference/extras";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Warranty Claims" };
+export const generateMetadata = phraseTitled("Warranty Claims");
 
 export default async function WarrantyClaimsPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -25,9 +28,9 @@ export default async function WarrantyClaimsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Warranty Claims"
-        description="A claim stores the product, the customer, an optional IMEI, and a note. Closing it does not move stock or money."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Products", href: "/products" }, { label: "Warranty", href: "/products/warranty" }, { label: "Claims" }]}
+        title={ph("Warranty Claims")}
+        description={ph("A claim stores the product, the customer, an optional IMEI, and a note. Closing it does not move stock or money.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Products", href: "/products" }, { label: "Warranty", href: "/products/warranty" }, { label: ph("Claims") }]}
       />
       {session.permissions.has("products.edit") ? (
         <ClaimForm
@@ -36,22 +39,22 @@ export default async function WarrantyClaimsPage() {
         />
       ) : null}
       <DataTable
-        caption="Claims"
+        caption={ph("Claims")}
         columns={[
-          { key: "product", header: "Product", cell: (row) => row.productName },
-          { key: "customer", header: "Customer", cell: (row) => row.customerName },
-          { key: "serial", header: "IMEI", cell: (row) => row.serial },
-          { key: "note", header: "Note", cell: (row) => row.note },
-          { key: "status", header: "Status", cell: (row) => row.status },
+          { key: "product", header: ph("Product"), cell: (row) => row.productName },
+          { key: "customer", header: ph("Customer"), cell: (row) => row.customerName },
+          { key: "serial", header: ph("IMEI"), cell: (row) => row.serial },
+          { key: "note", header: ph("Note"), cell: (row) => row.note },
+          { key: "status", header: ph("Status"), cell: (row) => row.status },
           {
             key: "close",
-            header: "Claim",
+            header: ph("Claim"),
             cell: (row) => (session.permissions.has("products.edit") && row.status === "OPEN" ? <CloseClaim id={row.id} /> : null),
           },
         ]}
         rows={claims}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No claims" description="File a claim against a product marked warranty available." />}
+        empty={<EmptyState title={ph("No claims")} description={ph("File a claim against a product marked warranty available.")} />}
       />
     </div>
   );

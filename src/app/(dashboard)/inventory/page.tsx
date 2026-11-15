@@ -6,8 +6,10 @@ import { getSession } from "@/modules/auth/current-session";
 import { expiryWarnings, lowStockCount } from "@/modules/inventory/alerts";
 import { listTakeOffs } from "@/modules/inventory/documents";
 import { stockSummary } from "@/modules/inventory/stock";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Inventory" };
+export const generateMetadata = phraseTitled("Inventory");
 
 const ACTIONS: Array<[string, string, string]> = [
   ["/inventory/stock", "Stock", "What is on hand, by product and warehouse"],
@@ -24,6 +26,7 @@ const ACTIONS: Array<[string, string, string]> = [
 ];
 
 export default async function InventoryHubPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session?.branchId) {
     redirect("/login");
@@ -45,9 +48,9 @@ export default async function InventoryHubPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Inventory"
-        description="Stock is the books: every stock document posts its journal, valued at the average cost."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Inventory" }]}
+        title={ph("Inventory")}
+        description={ph("Stock is the books: every stock document posts its journal, valued at the average cost.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: ph("Inventory") }]}
       />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map(([label, value, href]) => (
@@ -68,9 +71,9 @@ export default async function InventoryHubPage() {
         ))}
       </ul>
       <section className="space-y-2">
-        <h2 className="text-lg font-semibold">Latest take-offs</h2>
+        <h2 className="text-lg font-semibold">{ph("Latest take-offs")}</h2>
         {takeOffs.length === 0 ? (
-          <p className="text-sm text-muted">No take-offs yet.</p>
+          <p className="text-sm text-muted">{ph("No take-offs yet.")}</p>
         ) : (
           <ul className="space-y-1 text-sm">
             {takeOffs.map((row) => (

@@ -5,10 +5,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
 import { listSuppliers } from "@/modules/purchasing/suppliers";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Supplier ledger" };
+export const generateMetadata = phraseTitled("Supplier ledger");
 
 export default async function SupplierLedgerPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -18,19 +21,19 @@ export default async function SupplierLedgerPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Supplier ledger"
-        description="Open a supplier to see the credits and debits. Outstanding is credits minus debits."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Suppliers", href: "/suppliers" }, { label: "Ledger" }]}
+        title={ph("Supplier ledger")}
+        description={ph("Open a supplier to see the credits and debits. Outstanding is credits minus debits.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Suppliers", href: "/suppliers" }, { label: ph("Ledger") }]}
       />
       <DataTable
-        caption="Supplier balances"
+        caption={ph("Supplier balances")}
         columns={[
-          { key: "name", header: "Supplier", cell: (row) => row.name },
-          { key: "outstanding", header: "Outstanding", cell: (row) => row.outstanding },
+          { key: "name", header: ph("Supplier"), cell: (row) => row.name },
+          { key: "outstanding", header: ph("Outstanding"), cell: (row) => row.outstanding },
         ]}
         rows={suppliers}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No suppliers" description="Add a supplier to start a ledger." />}
+        empty={<EmptyState title={ph("No suppliers")} description={ph("Add a supplier to start a ledger.")} />}
       />
     </div>
   );

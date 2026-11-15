@@ -5,10 +5,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { prisma } from "@/lib/db/client";
 import { getSession } from "@/modules/auth/current-session";
 import { listPriceLevels } from "@/modules/pricing/admin";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Price levels" };
+export const generateMetadata = phraseTitled("Price levels");
 
 export default async function PriceLevelsPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -21,9 +24,9 @@ export default async function PriceLevelsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Price levels"
-        description="Retail, Wholesale and Dealer, and any you add. A product has a price for each level, and for each quantity step (Wholesale 10+ bags, 50+ bags). The default level answers when a level has no price. A customer type buys at its level."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Settings", href: "/settings" }, { label: "Price levels" }]}
+        title={ph("Price levels")}
+        description={ph("Retail, Wholesale and Dealer, and any you add. A product has a price for each level, and for each quantity step (Wholesale 10+ bags, 50+ bags). The default level answers when a level has no price. A customer type buys at its level.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Settings", href: "/settings" }, { label: ph("Price levels") }]}
       />
       <AddLevelForm />
       <ul className="space-y-2">
@@ -32,9 +35,9 @@ export default async function PriceLevelsPage() {
         ))}
       </ul>
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Customer types</h2>
-        <p className="text-sm text-muted">The level a customer of each type buys at when the sale does not name one.</p>
-        {types.length === 0 ? <p className="text-sm text-muted">No customer types yet.</p> : types.map((type) => <TypeLevelSelect key={type.id} type={type} levels={levels} />)}
+        <h2 className="text-lg font-semibold">{ph("Customer types")}</h2>
+        <p className="text-sm text-muted">{ph("The level a customer of each type buys at when the sale does not name one.")}</p>
+        {types.length === 0 ? <p className="text-sm text-muted">{ph("No customer types yet.")}</p> : types.map((type) => <TypeLevelSelect key={type.id} type={type} levels={levels} />)}
       </section>
     </div>
   );

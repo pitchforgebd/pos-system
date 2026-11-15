@@ -1,4 +1,6 @@
-export function SmsMetrics({
+import { getPhrase } from "@/lib/i18n/server";
+
+export async function SmsMetrics({
   figures,
 }: {
   figures: {
@@ -13,6 +15,7 @@ export function SmsMetrics({
     provider?: string | null;
   };
 }) {
+  const ph = await getPhrase();
   const rows = [
     ["Sent today", String(figures.sentToday)],
     ["Sent this month", String(figures.sentMonth)],
@@ -27,8 +30,8 @@ export function SmsMetrics({
     <dl className="grid gap-3 sm:grid-cols-2">
       {rows.map(([label, value]) => (
         <div key={label} className="rounded-md border border-border px-3 py-2">
-          <dt className="text-sm text-muted">{label}</dt>
-          <dd className="text-sm">{value}</dd>
+          <dt className="text-sm text-muted">{ph(label)}</dt>
+          <dd className="text-sm">{ph(value)}</dd>
         </div>
       ))}
     </dl>

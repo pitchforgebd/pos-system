@@ -4,10 +4,13 @@ import { RoleAdmin } from "@/components/access/role-admin";
 import { PageHeader } from "@/components/ui/page-header";
 import { listPermissionCatalog, listRoles } from "@/modules/access/roles";
 import { getSession } from "@/modules/auth/current-session";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Roles" };
+export const generateMetadata = phraseTitled("Roles");
 
 export default async function RolesPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -17,9 +20,9 @@ export default async function RolesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Roles"
-        description="Admin manages roles. Branch creation stays with Super Admin."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Roles" }]}
+        title={ph("Roles")}
+        description={ph("Admin manages roles. Branch creation stays with Super Admin.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: ph("Roles") }]}
       />
       <RoleAdmin
         roles={roles}

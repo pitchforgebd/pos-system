@@ -6,10 +6,13 @@ import { businessDate } from "@/core/time/business-date";
 import { getSession } from "@/modules/auth/current-session";
 import { moneyAccountOptions, warehouseOptions } from "@/modules/purchasing/lookups";
 import { listSuppliers } from "@/modules/purchasing/suppliers";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "New purchase" };
+export const generateMetadata = phraseTitled("New purchase");
 
 export default async function NewPurchasePage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session?.branchId || !session.permissions.has("purchase.create")) {
     redirect("/purchases");
@@ -23,9 +26,9 @@ export default async function NewPurchasePage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="New purchase"
-        description="Add the lines, the discount and VAT, and what the haulage cost. The server works out each line's landed cost; save it as a draft, order it, or receive it now."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Purchases", href: "/purchases" }, { label: "New" }]}
+        title={ph("New purchase")}
+        description={ph("Add the lines, the discount and VAT, and what the haulage cost. The server works out each line's landed cost; save it as a draft, order it, or receive it now.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Purchases", href: "/purchases" }, { label: ph("New") }]}
       />
       <PurchaseForm
         today={businessDate()}

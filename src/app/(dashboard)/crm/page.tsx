@@ -6,10 +6,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
 import { listAssignableUsers, listCrmActivities, listCrmContacts, listCrmSegments } from "@/modules/customers/crm";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "CRM" };
+export const generateMetadata = phraseTitled("CRM");
 
 export default async function CrmPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -24,9 +27,9 @@ export default async function CrmPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="CRM"
-        description="Contacts, segments, follow-ups, and assignments. Marketing status has no field, so it is not stored."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "CRM" }]}
+        title={ph("CRM")}
+        description={ph("Contacts, segments, follow-ups, and assignments. Marketing status has no field, so it is not stored.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: ph("CRM") }]}
       />
       {session.permissions.has("crm.manage") ? (
         <CrmForms
@@ -36,27 +39,27 @@ export default async function CrmPage() {
         />
       ) : null}
       <DataTable
-        caption="Contacts"
+        caption={ph("Contacts")}
         columns={[
-          { key: "name", header: "Contact", cell: (row) => row.name },
-          { key: "phone", header: "Phone", cell: (row) => row.phone ?? "" },
-          { key: "segment", header: "Segment", cell: (row) => row.segmentName ?? "" },
-          { key: "status", header: "Status", cell: (row) => row.status },
+          { key: "name", header: ph("Contact"), cell: (row) => row.name },
+          { key: "phone", header: ph("Phone"), cell: (row) => row.phone ?? "" },
+          { key: "segment", header: ph("Segment"), cell: (row) => row.segmentName ?? "" },
+          { key: "status", header: ph("Status"), cell: (row) => row.status },
         ]}
         rows={contacts}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No contacts" description="Add a contact to record a follow-up." />}
+        empty={<EmptyState title={ph("No contacts")} description={ph("Add a contact to record a follow-up.")} />}
       />
       <DataTable
-        caption="Follow-ups"
+        caption={ph("Follow-ups")}
         columns={[
-          { key: "date", header: "Date", cell: (row) => row.businessDate },
-          { key: "contact", header: "Contact", cell: (row) => row.contactName },
-          { key: "note", header: "Note", cell: (row) => row.note },
+          { key: "date", header: ph("Date"), cell: (row) => row.businessDate },
+          { key: "contact", header: ph("Contact"), cell: (row) => row.contactName },
+          { key: "note", header: ph("Note"), cell: (row) => row.note },
         ]}
         rows={activities}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No follow-ups" description="A follow-up is a dated note on a contact." />}
+        empty={<EmptyState title={ph("No follow-ups")} description={ph("A follow-up is a dated note on a contact.")} />}
       />
     </div>
   );

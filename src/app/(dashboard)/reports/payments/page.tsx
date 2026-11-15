@@ -7,10 +7,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
 import { paymentMethodReport } from "@/modules/reports/reports";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Payment-method report" };
+export const generateMetadata = phraseTitled("Payment-method report");
 
 export default async function PaymentMethodPage({ searchParams }: { searchParams: Promise<{ from?: string; to?: string }> }) {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session?.branchId) {
     redirect("/login");
@@ -21,22 +24,22 @@ export default async function PaymentMethodPage({ searchParams }: { searchParams
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Payment-method report"
-        description="Amounts are cash, bank, and card taken on posted sales. Wallet is not a tender."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Reports", href: "/reports" }, { label: "Payment method" }]}
-        actions={<Button href="/reports" variant="secondary">Back to reports</Button>}
+        title={ph("Payment-method report")}
+        description={ph("Amounts are cash, bank, and card taken on posted sales. Wallet is not a tender.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Reports", href: "/reports" }, { label: ph("Payment method") }]}
+        actions={<Button href="/reports" variant="secondary">{ph("Back to reports")}</Button>}
       />
       <DateFilter from={query.from} to={query.to} />
       <DataTable
-        caption="Methods"
+        caption={ph("Methods")}
         columns={[
-          { key: "method", header: "Method", cell: (row) => row.method },
-          { key: "count", header: "Payments", cell: (row) => String(row.count) },
-          { key: "amount", header: "Amount", cell: (row) => row.amount },
+          { key: "method", header: ph("Method"), cell: (row) => row.method },
+          { key: "count", header: ph("Payments"), cell: (row) => String(row.count) },
+          { key: "amount", header: ph("Amount"), cell: (row) => row.amount },
         ]}
         rows={report.rows}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No sale payments" description="Cash taken on a posted sale appears here." />}
+        empty={<EmptyState title={ph("No sale payments")} description={ph("Cash taken on a posted sale appears here.")} />}
       />
     </div>
   );

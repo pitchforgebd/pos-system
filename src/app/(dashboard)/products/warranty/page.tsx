@@ -6,10 +6,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
 import { listWarrantyProducts } from "@/modules/catalog/flags";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Warranty" };
+export const generateMetadata = phraseTitled("Warranty");
 
 export default async function WarrantyPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -19,22 +22,22 @@ export default async function WarrantyPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="File New Claim"
-        description="Warranty available is a flag on the product. File the claim on Warranty Claims."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Products", href: "/products" }, { label: "Warranty" }]}
+        title={ph("File New Claim")}
+        description={ph("Warranty available is a flag on the product. File the claim on Warranty Claims.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Products", href: "/products" }, { label: ph("Warranty") }]}
       />
       <p className="text-sm">
-        <Link href="/products/warranty/claims">Warranty Claims</Link>
+        <Link href="/products/warranty/claims">{ph("Warranty Claims")}</Link>
       </p>
       <DataTable
-        caption="Warranty products"
+        caption={ph("Warranty products")}
         columns={[
-          { key: "sku", header: "SKU", cell: (row) => row.sku },
-          { key: "name", header: "Product", cell: (row) => row.name },
+          { key: "sku", header: ph("SKU"), cell: (row) => row.sku },
+          { key: "name", header: ph("Product"), cell: (row) => row.name },
         ]}
         rows={rows}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No warranty products" description="Products marked warranty available appear here. File a claim from Warranty Claims." />}
+        empty={<EmptyState title={ph("No warranty products")} description={ph("Products marked warranty available appear here. File a claim from Warranty Claims.")} />}
       />
     </div>
   );

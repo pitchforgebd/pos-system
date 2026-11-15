@@ -8,12 +8,15 @@ import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
 import { findVendors } from "@/modules/parties/directory";
 import { geography } from "@/modules/parties/profile";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Suppliers" };
+export const generateMetadata = phraseTitled("Suppliers");
 
 type Params = { q?: string; district?: string; due?: string; size?: string; page?: string };
 
 export default async function SuppliersPage({ searchParams }: { searchParams: Promise<Params> }) {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -39,15 +42,15 @@ export default async function SuppliersPage({ searchParams }: { searchParams: Pr
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Suppliers"
-        description="Search by name, phone, code or contact person; filter by district and whether the shop owes them. What is owed comes from the books."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Suppliers" }]}
+        title={ph("Suppliers")}
+        description={ph("Search by name, phone, code or contact person; filter by district and whether the shop owes them. What is owed comes from the books.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: ph("Suppliers") }]}
         actions={
           <>
-            {session.permissions.has("suppliers.create") ? <Button href="/suppliers/new">Add supplier</Button> : null}
+            {session.permissions.has("suppliers.create") ? <Button href="/suppliers/new">{ph("Add supplier")}</Button> : null}
             {session.permissions.has("suppliers.payment") ? (
               <Button href="/suppliers/payments" variant="secondary">
-                Payment
+                {ph("Payment")}
               </Button>
             ) : null}
           </>
@@ -55,13 +58,13 @@ export default async function SuppliersPage({ searchParams }: { searchParams: Pr
       />
       <form className="grid gap-2 sm:grid-cols-[1fr_12rem_10rem_6rem_auto] sm:items-end" action="/suppliers">
         <label className="grid gap-1 text-sm">
-          Search
-          <input name="q" defaultValue={q} placeholder="Name, phone, code or contact" className="h-10 rounded-md border border-border px-3" />
+          {ph("Search")}
+          <input name="q" defaultValue={q} placeholder={ph("Name, phone, code or contact")} className="h-10 rounded-md border border-border px-3" />
         </label>
         <label className="grid gap-1 text-sm">
-          District
+          {ph("District")}
           <select name="district" defaultValue={districtId ? String(districtId) : ""} className="h-10 rounded-md border border-border bg-surface px-2">
-            <option value="">All districts</option>
+            <option value="">{ph("All districts")}</option>
             {geo.districts.map((district) => (
               <option key={district.id} value={district.id}>
                 {district.name} ({district.bnName})
@@ -70,15 +73,15 @@ export default async function SuppliersPage({ searchParams }: { searchParams: Pr
           </select>
         </label>
         <label className="grid gap-1 text-sm">
-          The shop owes
+          {ph("The shop owes")}
           <select name="due" defaultValue={due ?? ""} className="h-10 rounded-md border border-border bg-surface px-2">
-            <option value="">Any</option>
-            <option value="YES">Something</option>
-            <option value="NO">Nothing</option>
+            <option value="">{ph("Any")}</option>
+            <option value="YES">{ph("Something")}</option>
+            <option value="NO">{ph("Nothing")}</option>
           </select>
         </label>
         <label className="grid gap-1 text-sm">
-          Show
+          {ph("Show")}
           <select name="size" defaultValue={String(found.pageSize)} className="h-10 rounded-md border border-border bg-surface px-2">
             <option value="25">25</option>
             <option value="50">50</option>
@@ -87,31 +90,31 @@ export default async function SuppliersPage({ searchParams }: { searchParams: Pr
           </select>
         </label>
         <Button type="submit" variant="secondary">
-          Search
+          {ph("Search")}
         </Button>
       </form>
       <p className="text-sm text-muted">
-        Showing {start}–{start === 0 ? 0 : start + found.rows.length - 1} of {found.total}
+        {ph("Showing")} {start}–{start === 0 ? 0 : start + found.rows.length - 1} {ph("of")} {found.total}
       </p>
       <DataTable
-        caption="Suppliers"
+        caption={ph("Suppliers")}
         columns={[
-          { key: "code", header: "Code", cell: (row) => row.code },
-          { key: "name", header: "Name", cell: (row) => <Link href={`/suppliers/${row.id}`}>{row.name}</Link> },
-          { key: "contact", header: "Contact", cell: (row) => row.contactPerson ?? "" },
-          { key: "phone", header: "Phone", cell: (row) => row.phone ?? "" },
-          { key: "district", header: "District", cell: (row) => row.district ?? "" },
-          { key: "owed", header: "The shop owes", cell: (row) => row.owed },
-          { key: "status", header: "Status", cell: (row) => (row.status === "ACTIVE" ? "" : "Inactive") },
+          { key: "code", header: ph("Code"), cell: (row) => row.code },
+          { key: "name", header: ph("Name"), cell: (row) => <Link href={`/suppliers/${row.id}`}>{row.name}</Link> },
+          { key: "contact", header: ph("Contact"), cell: (row) => row.contactPerson ?? "" },
+          { key: "phone", header: ph("Phone"), cell: (row) => row.phone ?? "" },
+          { key: "district", header: ph("District"), cell: (row) => row.district ?? "" },
+          { key: "owed", header: ph("The shop owes"), cell: (row) => row.owed },
+          { key: "status", header: ph("Status"), cell: (row) => (row.status === "ACTIVE" ? "" : "Inactive") },
         ]}
         rows={found.rows}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No suppliers" description="No supplier matches, or none has been added yet." />}
+        empty={<EmptyState title={ph("No suppliers")} description={ph("No supplier matches, or none has been added yet.")} />}
       />
       <div className="flex items-center justify-end gap-2 text-sm">
         {found.page > 1 ? (
           <Link href={href(found.page - 1)} className="rounded-md border border-border px-3 py-1.5">
-            Previous
+            {ph("Previous")}
           </Link>
         ) : null}
         <span className="text-muted">
@@ -119,7 +122,7 @@ export default async function SuppliersPage({ searchParams }: { searchParams: Pr
         </span>
         {found.page < found.pageCount ? (
           <Link href={href(found.page + 1)} className="rounded-md border border-border px-3 py-1.5">
-            Next
+            {ph("Next")}
           </Link>
         ) : null}
       </div>

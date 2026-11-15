@@ -1,3 +1,4 @@
+import { getPhrase } from "@/lib/i18n/server";
 import { cn } from "@/lib/utils";
 
 const tones = {
@@ -8,16 +9,17 @@ const tones = {
   info: "border-info/20 bg-info-subtle text-info",
 } as const;
 
-export function StatusBadge({
+export async function StatusBadge({
   tone = "neutral",
   children,
 }: {
   tone?: keyof typeof tones;
   children: React.ReactNode;
 }) {
+  const ph = await getPhrase();
   return (
     <span className={cn("inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium", tones[tone])}>
-      {children}
+      {typeof children === "string" ? ph(children) : children}
     </span>
   );
 }

@@ -6,10 +6,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
 import { latestProductImport } from "@/modules/imports/product-import";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Import products" };
+export const generateMetadata = phraseTitled("Import products");
 
 export default async function ProductImportPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -19,25 +22,25 @@ export default async function ProductImportPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Import products"
-        description="Preview the CSV, then confirm. A failed row does not undo an earlier row. An existing SKU is skipped."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Products", href: "/products" }, { label: "Import" }]}
+        title={ph("Import products")}
+        description={ph("Preview the CSV, then confirm. A failed row does not undo an earlier row. An existing SKU is skipped.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Products", href: "/products" }, { label: ph("Import") }]}
       />
-      {session.permissions.has("products.import") ? <ProductImportForm canExport={session.permissions.has("products.export")} /> : <p className="text-sm text-muted">Import permission is required.</p>}
+      {session.permissions.has("products.import") ? <ProductImportForm canExport={session.permissions.has("products.export")} /> : <p className="text-sm text-muted">{ph("Import permission is required.")}</p>}
       <DataTable
-        caption="Latest import"
+        caption={ph("Latest import")}
         columns={[
-          { key: "row", header: "Row", cell: (row) => String(row.rowNumber) },
-          { key: "status", header: "Result", cell: (row) => row.status },
-          { key: "message", header: "Message", cell: (row) => row.message },
+          { key: "row", header: ph("Row"), cell: (row) => String(row.rowNumber) },
+          { key: "status", header: ph("Result"), cell: (row) => row.status },
+          { key: "message", header: ph("Message"), cell: (row) => row.message },
         ]}
         rows={latest?.rows ?? []}
         getRowKey={(row) => String(row.rowNumber)}
-        empty={<EmptyState title="No import yet" description="Confirm a CSV to record the summary." />}
+        empty={<EmptyState title={ph("No import yet")} description={ph("Confirm a CSV to record the summary.")} />}
       />
       {latest ? (
         <p className="text-sm text-muted">
-          Total {latest.total}. Success {latest.success}. Failed {latest.failed}. Skipped {latest.skipped}.
+          {ph("Total")} {latest.total}{ph(". Success")} {latest.success}{ph(". Failed")} {latest.failed}{ph(". Skipped")} {latest.skipped}.
         </p>
       ) : null}
     </div>

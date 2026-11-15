@@ -10,13 +10,16 @@ import { getSession } from "@/modules/auth/current-session";
 import { listCustomerTypes } from "@/modules/customers/customers";
 import { getCustomerProfile } from "@/modules/customers/profile";
 import { geography } from "@/modules/parties/profile";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Customer" };
+export const generateMetadata = phraseTitled("Customer");
 
 const TONE = { PAID: "success", PARTIAL: "warning", UNPAID: "error" } as const;
 const SMS_TONE: Record<string, "success" | "warning" | "error" | "neutral"> = { SENT: "success", QUEUED: "warning", SENDING: "warning", FAILED: "error" };
 
 export default async function CustomerDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ edit?: string }> }) {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -38,32 +41,32 @@ export default async function CustomerDetailPage({ params, searchParams }: { par
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Customers", href: "/customers" }, { label: customer.name }]}
         actions={
           <>
-            {customer.status === "ACTIVE" ? <StatusBadge tone="success">Active</StatusBadge> : <StatusBadge>Inactive</StatusBadge>}
-            {customer.smsOptOut ? <StatusBadge>No offer SMS</StatusBadge> : null}
+            {customer.status === "ACTIVE" ? <StatusBadge tone="success">{ph("Active")}</StatusBadge> : <StatusBadge>{ph("Inactive")}</StatusBadge>}
+            {customer.smsOptOut ? <StatusBadge>{ph("No offer SMS")}</StatusBadge> : null}
             <Link href={`/customers/${customer.id}/statement`} className="text-sm font-medium text-primary">
-              Statement
+              {ph("Statement")}
             </Link>
             {session.permissions.has("customers.edit") && !customer.isSystem && !editing ? (
               <Link href={`/customers/${customer.id}?edit=1`} className="text-sm font-medium text-primary">
-                Edit
+                {ph("Edit")}
               </Link>
             ) : null}
           </>
         }
       />
       <dl className="grid gap-3 text-sm sm:grid-cols-3 lg:grid-cols-6">
-        <Figure label="Owes" value={customer.summary.due} />
-        <Figure label="Held for them" value={customer.summary.advance} />
-        <Figure label="Bought in all" value={customer.summary.bought} />
-        <Figure label="Invoices" value={String(customer.summary.invoices)} />
-        <Figure label="Last bought" value={customer.summary.lastPurchase ?? "Never"} />
-        <Figure label="Credit limit" value={customer.creditLimit ?? "None"} />
+        <Figure label={ph("Owes")} value={customer.summary.due} />
+        <Figure label={ph("Held for them")} value={customer.summary.advance} />
+        <Figure label={ph("Bought in all")} value={customer.summary.bought} />
+        <Figure label={ph("Invoices")} value={String(customer.summary.invoices)} />
+        <Figure label={ph("Last bought")} value={customer.summary.lastPurchase ?? "Never"} />
+        <Figure label={ph("Credit limit")} value={customer.creditLimit ?? "None"} />
       </dl>
       {customer.tags ? <p className="text-sm text-muted">{`Tags: ${customer.tags}`}</p> : null}
 
       {editing && places ? (
-        <section className="space-y-3" aria-label="Edit customer">
-          <h2 className="text-lg font-semibold">Edit</h2>
+        <section className="space-y-3" aria-label={ph("Edit customer")}>
+          <h2 className="text-lg font-semibold">{ph("Edit")}</h2>
           <CustomerForm
             types={types.filter((type) => type.status === "ACTIVE" || type.id === customer.customerTypeId).map((type) => ({ id: type.id, label: type.name }))}
             places={places}
@@ -73,27 +76,27 @@ export default async function CustomerDetailPage({ params, searchParams }: { par
       ) : null}
 
       <DataTable
-        caption="Invoices"
+        caption={ph("Invoices")}
         columns={[
-          { key: "number", header: "Invoice", cell: (row) => <Link href={`/sales/${row.id}`}>{row.number ?? "Invoice"}</Link> },
-          { key: "date", header: "Date", cell: (row) => row.businessDate },
-          { key: "branch", header: "Branch", cell: (row) => row.branch },
-          { key: "total", header: "Total", cell: (row) => row.total },
-          { key: "owed", header: "Still owed", cell: (row) => row.owed },
-          { key: "status", header: "Payment", cell: (row) => <StatusBadge tone={TONE[row.status]}>{row.status}</StatusBadge> },
+          { key: "number", header: ph("Invoice"), cell: (row) => <Link href={`/sales/${row.id}`}>{row.number ?? ph("Invoice")}</Link> },
+          { key: "date", header: ph("Date"), cell: (row) => row.businessDate },
+          { key: "branch", header: ph("Branch"), cell: (row) => row.branch },
+          { key: "total", header: ph("Total"), cell: (row) => row.total },
+          { key: "owed", header: ph("Still owed"), cell: (row) => row.owed },
+          { key: "status", header: ph("Payment"), cell: (row) => <StatusBadge tone={TONE[row.status]}>{row.status}</StatusBadge> },
         ]}
         rows={customer.invoices}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No invoices" description="Sales to this customer appear here." />}
+        empty={<EmptyState title={ph("No invoices")} description={ph("Sales to this customer appear here.")} />}
       />
       {customer.returns.length > 0 ? (
         <DataTable
-          caption="Returns"
+          caption={ph("Returns")}
           columns={[
-            { key: "number", header: "Return", cell: (row) => row.number ?? "Return" },
-            { key: "date", header: "Date", cell: (row) => row.businessDate },
-            { key: "sale", header: "Of invoice", cell: (row) => <Link href={`/sales/${row.saleId}`}>Open</Link> },
-            { key: "total", header: "Total", cell: (row) => row.total },
+            { key: "number", header: ph("Return"), cell: (row) => row.number ?? "Return" },
+            { key: "date", header: ph("Date"), cell: (row) => row.businessDate },
+            { key: "sale", header: ph("Of invoice"), cell: (row) => <Link href={`/sales/${row.saleId}`}>{ph("Open")}</Link> },
+            { key: "total", header: ph("Total"), cell: (row) => row.total },
           ]}
           rows={customer.returns}
           getRowKey={(row) => row.id}
@@ -101,40 +104,40 @@ export default async function CustomerDetailPage({ params, searchParams }: { par
       ) : null}
       {customer.orders.length > 0 ? (
         <DataTable
-          caption="Orders and quotations"
+          caption={ph("Orders and quotations")}
           columns={[
-            { key: "number", header: "Order", cell: (row) => <Link href={`/orders/${row.id}`}>{row.number ?? (row.quotation ? "Quotation" : "Draft")}</Link> },
-            { key: "date", header: "Date", cell: (row) => row.businessDate },
-            { key: "status", header: "Status", cell: (row) => (row.quotation ? "Quotation" : row.status) },
-            { key: "total", header: "Total", cell: (row) => row.total },
+            { key: "number", header: ph("Order"), cell: (row) => <Link href={`/orders/${row.id}`}>{row.number ?? (row.quotation ? ph("Quotation") : ph("Draft"))}</Link> },
+            { key: "date", header: ph("Date"), cell: (row) => row.businessDate },
+            { key: "status", header: ph("Status"), cell: (row) => (row.quotation ? "Quotation" : row.status) },
+            { key: "total", header: ph("Total"), cell: (row) => row.total },
           ]}
           rows={customer.orders}
           getRowKey={(row) => row.id}
         />
       ) : null}
       <DataTable
-        caption="SMS sent"
+        caption={ph("SMS sent")}
         columns={[
-          { key: "at", header: "When", cell: (row) => row.at.slice(0, 16).replace("T", " ") },
-          { key: "campaign", header: "Campaign", cell: (row) => row.campaign ?? "" },
-          { key: "body", header: "Message", cell: (row) => row.body },
-          { key: "status", header: "Status", cell: (row) => <StatusBadge tone={SMS_TONE[row.status] ?? "neutral"}>{row.status}</StatusBadge> },
+          { key: "at", header: ph("When"), cell: (row) => row.at.slice(0, 16).replace("T", " ") },
+          { key: "campaign", header: ph("Campaign"), cell: (row) => row.campaign ?? "" },
+          { key: "body", header: ph("Message"), cell: (row) => row.body },
+          { key: "status", header: ph("Status"), cell: (row) => <StatusBadge tone={SMS_TONE[row.status] ?? "neutral"}>{row.status}</StatusBadge> },
         ]}
         rows={customer.messages}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No SMS" description="Messages sent to this customer appear here." />}
+        empty={<EmptyState title={ph("No SMS")} description={ph("Messages sent to this customer appear here.")} />}
       />
       <DataTable
-        caption="Ledger (latest)"
+        caption={ph("Ledger (latest)")}
         columns={[
-          { key: "date", header: "Date", cell: (row) => row.businessDate },
-          { key: "type", header: "Entry", cell: (row) => row.entryType },
-          { key: "debit", header: "Debit", cell: (row) => row.debit },
-          { key: "credit", header: "Credit", cell: (row) => row.credit },
+          { key: "date", header: ph("Date"), cell: (row) => row.businessDate },
+          { key: "type", header: ph("Entry"), cell: (row) => row.entryType },
+          { key: "debit", header: ph("Debit"), cell: (row) => row.debit },
+          { key: "credit", header: ph("Credit"), cell: (row) => row.credit },
         ]}
         rows={customer.ledger}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No ledger lines" description="A sale, a payment, a return or an advance writes a line." />}
+        empty={<EmptyState title={ph("No ledger lines")} description={ph("A sale, a payment, a return or an advance writes a line.")} />}
       />
     </div>
   );

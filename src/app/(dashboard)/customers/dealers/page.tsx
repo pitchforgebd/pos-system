@@ -7,10 +7,13 @@ import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
 import { listCustomers } from "@/modules/customers/customers";
 import { listDealers } from "@/modules/reference/extras";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Dealer Wings" };
+export const generateMetadata = phraseTitled("Dealer Wings");
 
 export default async function DealersPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -24,9 +27,9 @@ export default async function DealersPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Dealer Wings"
-        description="A dealer is a customer with the Dealer type. Marking a customer does not open a separate account."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Customers", href: "/customers" }, { label: "Dealers" }]}
+        title={ph("Dealer Wings")}
+        description={ph("A dealer is a customer with the Dealer type. Marking a customer does not open a separate account.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Customers", href: "/customers" }, { label: ph("Dealers") }]}
       />
       {session.permissions.has("customers.edit") ? (
         <DealerForm
@@ -36,14 +39,14 @@ export default async function DealersPage() {
         />
       ) : null}
       <DataTable
-        caption="Dealers"
+        caption={ph("Dealers")}
         columns={[
-          { key: "name", header: "Dealer", cell: (row) => row.name },
-          { key: "phone", header: "Phone", cell: (row) => row.phone ?? "" },
+          { key: "name", header: ph("Dealer"), cell: (row) => row.name },
+          { key: "phone", header: ph("Phone"), cell: (row) => row.phone ?? "" },
         ]}
         rows={dealers}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No dealers" description="Mark an existing customer as a dealer." />}
+        empty={<EmptyState title={ph("No dealers")} description={ph("Mark an existing customer as a dealer.")} />}
       />
     </div>
   );

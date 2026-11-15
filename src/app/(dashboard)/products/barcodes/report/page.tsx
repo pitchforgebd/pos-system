@@ -6,10 +6,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
 import { listBarcodePrints } from "@/modules/catalog/barcodes";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Barcode print report" };
+export const generateMetadata = phraseTitled("Barcode print report");
 
 export default async function BarcodeReportPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -19,25 +22,25 @@ export default async function BarcodeReportPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Barcode print report"
-        description="Each prepared label is listed. Copies are a layout count and do not change stock."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Products", href: "/products" }, { label: "Barcode report" }]}
-        actions={<Button href="/products/barcodes">Print labels</Button>}
+        title={ph("Barcode print report")}
+        description={ph("Each prepared label is listed. Copies are a layout count and do not change stock.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Products", href: "/products" }, { label: ph("Barcode report") }]}
+        actions={<Button href="/products/barcodes">{ph("Print labels")}</Button>}
       />
       <DataTable
-        caption="Prints"
+        caption={ph("Prints")}
         columns={[
-          { key: "date", header: "Date", cell: (row) => row.businessDate },
-          { key: "barcode", header: "Barcode", cell: (row) => row.barcode },
-          { key: "product", header: "Product", cell: (row) => row.product },
-          { key: "level", header: "Price level", cell: (row) => row.level },
-          { key: "format", header: "Layout", cell: (row) => (row.format === "LABEL_38X25" ? "38 × 25 mm" : row.format === "A4" ? "A4 sheet" : row.format) },
-          { key: "copies", header: "Copies", cell: (row) => row.copies },
-          { key: "user", header: "Printed by", cell: (row) => row.user },
+          { key: "date", header: ph("Date"), cell: (row) => row.businessDate },
+          { key: "barcode", header: ph("Barcode"), cell: (row) => row.barcode },
+          { key: "product", header: ph("Product"), cell: (row) => row.product },
+          { key: "level", header: ph("Price level"), cell: (row) => row.level },
+          { key: "format", header: ph("Layout"), cell: (row) => (row.format === "LABEL_38X25" ? "38 × 25 mm" : row.format === "A4" ? "A4 sheet" : row.format) },
+          { key: "copies", header: ph("Copies"), cell: (row) => row.copies },
+          { key: "user", header: ph("Printed by"), cell: (row) => row.user },
         ]}
         rows={rows}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No labels prepared" description="Prepare a label to record it here." />}
+        empty={<EmptyState title={ph("No labels prepared")} description={ph("Prepare a label to record it here.")} />}
       />
     </div>
   );

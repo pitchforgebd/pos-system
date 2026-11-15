@@ -8,10 +8,13 @@ import { getSession } from "@/modules/auth/current-session";
 import { businessDate } from "@/core/time/business-date";
 import { moneyAccountOptions } from "@/modules/purchasing/lookups";
 import { listCustomerPayments } from "@/modules/customers/dues";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Take Payment" };
+export const generateMetadata = phraseTitled("Take Payment");
 
 export default async function CustomerPaymentsPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session?.branchId) {
     redirect("/login");
@@ -21,25 +24,25 @@ export default async function CustomerPaymentsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Take Payment"
-        description="Find the customer, see what they owe invoice by invoice, choose the invoices the money is for (or let it settle the oldest first), the account it came into and the bank or mobile charge."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Take Customer Due" }]}
+        title={ph("Take Payment")}
+        description={ph("Find the customer, see what they owe invoice by invoice, choose the invoices the money is for (or let it settle the oldest first), the account it came into and the bank or mobile charge.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: ph("Take Customer Due") }]}
       />
       {session.permissions.has("customers.payment") ? (
         <CollectForm today={businessDate()} accounts={accounts.map((account) => ({ id: account.id, label: `${account.code} · ${account.name}`, kind: account.kind }))} />
       ) : null}
       <DataTable
-        caption="Payment vouchers"
+        caption={ph("Payment vouchers")}
         columns={[
-          { key: "number", header: "Receipt", cell: (row) => row.number },
-          { key: "date", header: "Date", cell: (row) => row.businessDate },
-          { key: "customer", header: "Customer", cell: (row) => row.customerName },
-          { key: "method", header: "Method", cell: (row) => row.method },
-          { key: "amount", header: "Amount", cell: (row) => row.amount },
+          { key: "number", header: ph("Receipt"), cell: (row) => row.number },
+          { key: "date", header: ph("Date"), cell: (row) => row.businessDate },
+          { key: "customer", header: ph("Customer"), cell: (row) => row.customerName },
+          { key: "method", header: ph("Method"), cell: (row) => row.method },
+          { key: "amount", header: ph("Amount"), cell: (row) => row.amount },
         ]}
         rows={payments}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No payment vouchers" description="A receipt appears after a due is collected." />}
+        empty={<EmptyState title={ph("No payment vouchers")} description={ph("A receipt appears after a due is collected.")} />}
       />
     </div>
   );

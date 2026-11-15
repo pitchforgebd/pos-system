@@ -8,8 +8,10 @@ import { EmptyState } from "@/components/ui/states";
 import { listBrands, listCategories } from "@/modules/catalog/references";
 import { getSession } from "@/modules/auth/current-session";
 import { listExpiry } from "@/modules/inventory/documents";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Expired Products List" };
+export const generateMetadata = phraseTitled("Expired Products List");
 
 function recordId(value: string | undefined) {
   return value && /^[0-9a-f-]{36}$/i.test(value) ? value : undefined;
@@ -28,6 +30,7 @@ export default async function ExpiryPage({
 }: {
   searchParams: Promise<{ lot?: string; generic?: string; brandId?: string; categoryId?: string; status?: string }>;
 }) {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session?.branchId) {
     redirect("/login");
@@ -53,23 +56,23 @@ export default async function ExpiryPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Expired Products List"
-        description="Expired means the date is before today in UTC. Generic is the category name. Days left is counted from that same date."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Expired Products List" }]}
+        title={ph("Expired Products List")}
+        description={ph("Expired means the date is before today in UTC. Generic is the category name. Days left is counted from that same date.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: ph("Expired Products List") }]}
       />
       <form className="flex flex-wrap items-end gap-2" action="/inventory/expiry">
         <label className="grid gap-1 text-sm">
-          Lot
+          {ph("Lot")}
           <input name="lot" defaultValue={params.lot ?? ""} className="h-10 rounded-md border border-border px-3" />
         </label>
         <label className="grid gap-1 text-sm">
-          Generic
+          {ph("Generic")}
           <input name="generic" defaultValue={params.generic ?? ""} className="h-10 rounded-md border border-border px-3" />
         </label>
         <label className="grid gap-1 text-sm">
-          Brand
+          {ph("Brand")}
           <select name="brandId" defaultValue={brandId ?? ""} className="h-10 rounded-md border border-border bg-surface px-2">
-            <option value="">All brands</option>
+            <option value="">{ph("All brands")}</option>
             {brands.map((brand) => (
               <option key={brand.id} value={brand.id}>
                 {brand.name}
@@ -78,9 +81,9 @@ export default async function ExpiryPage({
           </select>
         </label>
         <label className="grid gap-1 text-sm">
-          Category
+          {ph("Category")}
           <select name="categoryId" defaultValue={categoryId ?? ""} className="h-10 rounded-md border border-border bg-surface px-2">
-            <option value="">All categories</option>
+            <option value="">{ph("All categories")}</option>
             {categories.map((category) => (
               <option key={category.id} value={category.id}>
                 {category.name}
@@ -89,35 +92,35 @@ export default async function ExpiryPage({
           </select>
         </label>
         <label className="grid gap-1 text-sm">
-          Status
+          {ph("Status")}
           <select name="status" defaultValue={status} className="h-10 rounded-md border border-border bg-surface px-2">
-            <option value="">All</option>
-            <option value="EXPIRED">Already expired</option>
-            <option value="IN_DATE">In date</option>
+            <option value="">{ph("All")}</option>
+            <option value="EXPIRED">{ph("Already expired")}</option>
+            <option value="IN_DATE">{ph("In date")}</option>
           </select>
         </label>
         <Button type="submit" variant="secondary">
-          Search
+          {ph("Search")}
         </Button>
         <PrintButton />
       </form>
       <div className="print-sheet">
       <DataTable
-        caption="Expiry lots"
+        caption={ph("Expiry lots")}
         columns={[
-          { key: "sku", header: "SKU", cell: (row) => row.sku },
-          { key: "name", header: "Product", cell: (row) => row.name },
-          { key: "generic", header: "Generic", cell: (row) => row.category },
-          { key: "lot", header: "Lot", cell: (row) => row.lot },
-          { key: "made", header: "Manufacture", cell: (row) => row.manufacturedOn ?? "" },
-          { key: "expires", header: "Expiry", cell: (row) => row.expiresOn },
-          { key: "days", header: "Days left", cell: (row) => daysLeft(row.expiresOn) },
-          { key: "quantity", header: "Quantity", cell: (row) => row.quantity },
-          { key: "status", header: "Status", cell: (row) => (row.status === "EXPIRED" ? "Already expired" : "In date") },
+          { key: "sku", header: ph("SKU"), cell: (row) => row.sku },
+          { key: "name", header: ph("Product"), cell: (row) => row.name },
+          { key: "generic", header: ph("Generic"), cell: (row) => row.category },
+          { key: "lot", header: ph("Lot"), cell: (row) => row.lot },
+          { key: "made", header: ph("Manufacture"), cell: (row) => row.manufacturedOn ?? "" },
+          { key: "expires", header: ph("Expiry"), cell: (row) => row.expiresOn },
+          { key: "days", header: ph("Days left"), cell: (row) => daysLeft(row.expiresOn) },
+          { key: "quantity", header: ph("Quantity"), cell: (row) => row.quantity },
+          { key: "status", header: ph("Status"), cell: (row) => (row.status === "EXPIRED" ? "Already expired" : "In date") },
         ]}
         rows={rows}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No lots" description="Expiry lots are created when opening stock is posted for a product that tracks expiry." />}
+        empty={<EmptyState title={ph("No lots")} description={ph("Expiry lots are created when opening stock is posted for a product that tracks expiry.")} />}
       />
       </div>
       {session.permissions.has("inventory.expiry") ? (

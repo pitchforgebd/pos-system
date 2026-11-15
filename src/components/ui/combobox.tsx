@@ -2,6 +2,7 @@
 
 import { useId, useMemo, useState } from "react";
 
+import { useI18n } from "@/lib/i18n/provider";
 import { controlClass } from "@/lib/ui/classes";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +23,7 @@ export function Combobox({
   invalid?: boolean;
   describedById?: string;
 }) {
+  const { ph } = useI18n();
   const listId = useId();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -47,7 +49,7 @@ export function Combobox({
         aria-invalid={invalid || undefined}
         aria-describedby={describedById}
         className={cn(controlClass)}
-        placeholder={placeholder}
+        placeholder={ph(placeholder)}
         value={open ? query : (selected?.label ?? "")}
         onChange={(event) => {
           setQuery(event.target.value);
@@ -91,7 +93,7 @@ export function Combobox({
           className="absolute z-20 mt-1 max-h-48 w-full overflow-auto rounded-md border border-border bg-surface py-1 shadow-[0_8px_24px_rgba(15,39,68,0.12)]"
         >
           {filtered.length === 0 ? (
-            <li className="px-3 py-2 text-sm text-muted">No matches</li>
+            <li className="px-3 py-2 text-sm text-muted">{ph("No matches")}</li>
           ) : (
             filtered.map((option, index) => (
               <li key={option.value} role="option" aria-selected={option.value === value}>

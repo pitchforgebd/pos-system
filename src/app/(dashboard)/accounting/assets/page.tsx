@@ -9,12 +9,15 @@ import { businessDate } from "@/core/time/business-date";
 import { getSession } from "@/modules/auth/current-session";
 import { CATEGORIES, assetRegister, vendorOptions } from "@/modules/assets/assets";
 import { moneyPickerOptions } from "@/modules/treasury/dashboard";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Fixed Assets" };
+export const generateMetadata = phraseTitled("Fixed Assets");
 
 const label = (value: string) => CATEGORIES.find((category) => category.value === value)?.label ?? value;
 
 export default async function AssetsPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session?.branchId) {
     redirect("/login");
@@ -25,60 +28,60 @@ export default async function AssetsPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Fixed assets"
-        description="The shop's vehicles, furniture, computers and equipment: what each cost, what has been written off and what it is worth now, all from the books."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Accounting", href: "/accounting" }, { label: "Fixed assets" }]}
+        title={ph("Fixed assets")}
+        description={ph("The shop's vehicles, furniture, computers and equipment: what each cost, what has been written off and what it is worth now, all from the books.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Accounting", href: "/accounting" }, { label: ph("Fixed assets") }]}
         actions={
           <>
             <Link href="/accounting/depreciation" className="text-sm font-medium text-primary">
-              Monthly depreciation
+              {ph("Monthly depreciation")}
             </Link>
             <Link href="/accounting/worth" className="text-sm font-medium text-primary">
-              Company worth
+              {ph("Company worth")}
             </Link>
           </>
         }
       />
-      <section className="grid gap-3 sm:grid-cols-4" aria-label="Totals">
-        <Figure label="Assets in use" value={String(register.totals.count)} />
-        <Figure label="Cost" value={register.totals.cost} />
-        <Figure label="Written off" value={register.totals.accumulated} />
-        <Figure label="Worth now" value={register.totals.bookValue} />
+      <section className="grid gap-3 sm:grid-cols-4" aria-label={ph("Totals")}>
+        <Figure label={ph("Assets in use")} value={String(register.totals.count)} />
+        <Figure label={ph("Cost")} value={register.totals.cost} />
+        <Figure label={ph("Written off")} value={register.totals.accumulated} />
+        <Figure label={ph("Worth now")} value={register.totals.bookValue} />
       </section>
       {register.byCategory.length > 0 ? (
         <DataTable
-          caption="By category"
+          caption={ph("By category")}
           columns={[
-            { key: "category", header: "Category", cell: (row) => row.label },
-            { key: "count", header: "Assets", cell: (row) => row.count },
-            { key: "cost", header: "Cost", cell: (row) => row.cost },
-            { key: "accumulated", header: "Written off", cell: (row) => row.accumulated },
-            { key: "bookValue", header: "Worth now", cell: (row) => row.bookValue },
+            { key: "category", header: ph("Category"), cell: (row) => row.label },
+            { key: "count", header: ph("Assets"), cell: (row) => row.count },
+            { key: "cost", header: ph("Cost"), cell: (row) => row.cost },
+            { key: "accumulated", header: ph("Written off"), cell: (row) => row.accumulated },
+            { key: "bookValue", header: ph("Worth now"), cell: (row) => row.bookValue },
           ]}
           rows={register.byCategory}
           getRowKey={(row) => row.category}
         />
       ) : null}
       <DataTable
-        caption="Register"
+        caption={ph("Register")}
         columns={[
-          { key: "code", header: "Code", cell: (row) => <Link href={`/accounting/assets/${row.id}`}>{row.code}</Link> },
-          { key: "name", header: "Asset", cell: (row) => row.name },
-          { key: "category", header: "Category", cell: (row) => label(row.category) },
-          { key: "where", header: "Where", cell: (row) => [row.branch, row.location].filter(Boolean).join(" · ") },
-          { key: "bought", header: "Bought", cell: (row) => row.purchaseDate },
-          { key: "cost", header: "Cost", cell: (row) => row.cost },
-          { key: "accumulated", header: "Written off", cell: (row) => row.accumulated },
-          { key: "bookValue", header: "Worth now", cell: (row) => row.bookValue },
-          { key: "status", header: "Status", cell: (row) => (row.status === "ACTIVE" ? "In use" : `Disposed ${row.disposedOn ?? ""}`) },
+          { key: "code", header: ph("Code"), cell: (row) => <Link href={`/accounting/assets/${row.id}`}>{row.code}</Link> },
+          { key: "name", header: ph("Asset"), cell: (row) => row.name },
+          { key: "category", header: ph("Category"), cell: (row) => label(row.category) },
+          { key: "where", header: ph("Where"), cell: (row) => [row.branch, row.location].filter(Boolean).join(" · ") },
+          { key: "bought", header: ph("Bought"), cell: (row) => row.purchaseDate },
+          { key: "cost", header: ph("Cost"), cell: (row) => row.cost },
+          { key: "accumulated", header: ph("Written off"), cell: (row) => row.accumulated },
+          { key: "bookValue", header: ph("Worth now"), cell: (row) => row.bookValue },
+          { key: "status", header: ph("Status"), cell: (row) => (row.status === "ACTIVE" ? "In use" : `Disposed ${row.disposedOn ?? ""}`) },
         ]}
         rows={register.rows}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No fixed assets" description="Add the shop's vehicles, furniture, computers and equipment." />}
+        empty={<EmptyState title={ph("No fixed assets")} description={ph("Add the shop's vehicles, furniture, computers and equipment.")} />}
       />
       {canPost ? (
-        <section className="space-y-3" aria-label="Add an asset">
-          <h2 className="text-lg font-semibold">Add an asset</h2>
+        <section className="space-y-3" aria-label={ph("Add an asset")}>
+          <h2 className="text-lg font-semibold">{ph("Add an asset")}</h2>
           <AssetForm categories={[...CATEGORIES]} accounts={accounts.map((account) => ({ id: account.id, label: account.label }))} vendors={vendors} today={businessDate()} />
         </section>
       ) : null}

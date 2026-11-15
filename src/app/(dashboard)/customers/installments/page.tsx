@@ -8,10 +8,13 @@ import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
 import { listCustomerInvoices, listCustomers } from "@/modules/customers/customers";
 import { listInstallments } from "@/modules/customers/installments";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Installment Reminders" };
+export const generateMetadata = phraseTitled("Installment Reminders");
 
 export default async function InstallmentsPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session?.branchId) {
     redirect("/login");
@@ -28,9 +31,9 @@ export default async function InstallmentsPage({ searchParams }: { searchParams:
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Installment Reminders"
-        description="A reminder tracks an amount and a due date. Enter an interest percent to show the interest. Closing the reminder does not collect money."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Customers", href: "/customers" }, { label: "Installments" }]}
+        title={ph("Installment Reminders")}
+        description={ph("A reminder tracks an amount and a due date. Enter an interest percent to show the interest. Closing the reminder does not collect money.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Customers", href: "/customers" }, { label: ph("Installments") }]}
       />
       {session.permissions.has("customers.edit") ? (
         <InstallmentForm
@@ -42,34 +45,34 @@ export default async function InstallmentsPage({ searchParams }: { searchParams:
       ) : null}
       <div className="flex gap-2 text-sm">
         <Link href="/customers/installments" className={view === "all" ? "font-semibold" : "text-muted"}>
-          All
+          {ph("All")}
         </Link>
         <Link href="/customers/installments?view=open" className={view === "open" ? "font-semibold" : "text-muted"}>
-          Open
+          {ph("Open")}
         </Link>
         <Link href="/customers/installments?view=overdue" className={view === "overdue" ? "font-semibold" : "text-muted"}>
-          Overdue
+          {ph("Overdue")}
         </Link>
       </div>
       <DataTable
-        caption="Reminders"
+        caption={ph("Reminders")}
         columns={[
-          { key: "invoice", header: "Invoice", cell: (row) => row.invoiceNumber },
-          { key: "customer", header: "Customer", cell: (row) => row.customerName },
-          { key: "due", header: "Due date", cell: (row) => row.dueOn },
-          { key: "amount", header: "Amount", cell: (row) => row.amount },
-          { key: "interest", header: "Interest %", cell: (row) => row.interestPercent },
-          { key: "interestAmount", header: "Interest", cell: (row) => row.interestAmount },
-          { key: "status", header: "Status", cell: (row) => row.displayStatus },
+          { key: "invoice", header: ph("Invoice"), cell: (row) => row.invoiceNumber },
+          { key: "customer", header: ph("Customer"), cell: (row) => row.customerName },
+          { key: "due", header: ph("Due date"), cell: (row) => row.dueOn },
+          { key: "amount", header: ph("Amount"), cell: (row) => row.amount },
+          { key: "interest", header: ph("Interest %"), cell: (row) => row.interestPercent },
+          { key: "interestAmount", header: ph("Interest"), cell: (row) => row.interestAmount },
+          { key: "status", header: ph("Status"), cell: (row) => row.displayStatus },
           {
             key: "close",
-            header: "Reminder",
+            header: ph("Reminder"),
             cell: (row) => (session.permissions.has("customers.edit") && row.status === "OPEN" ? <CloseReminder id={row.id} /> : null),
           },
         ]}
         rows={rows}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No reminders" description="Add a reminder against a posted customer invoice." />}
+        empty={<EmptyState title={ph("No reminders")} description={ph("Add a reminder against a posted customer invoice.")} />}
       />
     </div>
   );

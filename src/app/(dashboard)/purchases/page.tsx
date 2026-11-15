@@ -10,13 +10,16 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { listQuery } from "@/core/list";
 import { getSession } from "@/modules/auth/current-session";
 import { listPurchases, purchaseSorts } from "@/modules/purchasing/purchases";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Purchases" };
+export const generateMetadata = phraseTitled("Purchases");
 
 const STATUSES = ["DRAFT", "ORDERED", "RECEIVED", "CANCELLED"] as const;
 const TONE = { DRAFT: "neutral", ORDERED: "info", RECEIVED: "success", CANCELLED: "error" } as const;
 
 export default async function PurchasesPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; page?: string; pageSize?: string; sort?: string }> }) {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session?.branchId) {
     redirect("/login");
@@ -29,20 +32,20 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Pr
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Purchases"
-        description="A purchase is written down, ordered from the vendor, then received: only then does stock and what is owed to the vendor change."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Purchases" }]}
-        actions={session.permissions.has("purchase.create") ? <Button href="/purchases/new">New purchase</Button> : null}
+        title={ph("Purchases")}
+        description={ph("A purchase is written down, ordered from the vendor, then received: only then does stock and what is owed to the vendor change.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: ph("Purchases") }]}
+        actions={session.permissions.has("purchase.create") ? <Button href="/purchases/new">{ph("New purchase")}</Button> : null}
       />
       <form className="flex flex-wrap items-end gap-2" action="/purchases">
         <label className="grid min-w-56 flex-1 gap-1 text-sm">
-          Search
-          <input name="q" defaultValue={params.q ?? ""} placeholder="Number, vendor's invoice or supplier" className="h-10 rounded-md border border-border px-3" />
+          {ph("Search")}
+          <input name="q" defaultValue={params.q ?? ""} placeholder={ph("Number, vendor's invoice or supplier")} className="h-10 rounded-md border border-border px-3" />
         </label>
         <label className="grid gap-1 text-sm">
-          Status
+          {ph("Status")}
           <select name="status" defaultValue={status ?? ""} className="h-10 rounded-md border border-border bg-surface px-2">
-            <option value="">All</option>
+            <option value="">{ph("All")}</option>
             {STATUSES.map((value) => (
               <option key={value} value={value}>
                 {value.charAt(0) + value.slice(1).toLowerCase()}
@@ -51,22 +54,22 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Pr
           </select>
         </label>
         <Button type="submit" variant="secondary">
-          Search
+          {ph("Search")}
         </Button>
       </form>
       <DataTable
-        caption="Purchases"
+        caption={ph("Purchases")}
         columns={[
-          { key: "number", header: "Number", cell: (row) => <Link href={`/purchases/${row.id}`}>{row.number ?? "Draft"}</Link> },
-          { key: "date", header: "Date", cell: (row) => row.businessDate },
-          { key: "supplier", header: "Supplier", cell: (row) => row.supplierName },
-          { key: "invoice", header: "Vendor's invoice", cell: (row) => row.supplierInvoiceNo ?? "" },
-          { key: "total", header: "Total", cell: (row) => row.total },
-          { key: "status", header: "Status", cell: (row) => <StatusBadge tone={TONE[row.status as keyof typeof TONE] ?? "neutral"}>{row.status}</StatusBadge> },
+          { key: "number", header: ph("Number"), cell: (row) => <Link href={`/purchases/${row.id}`}>{row.number ?? ph("Draft")}</Link> },
+          { key: "date", header: ph("Date"), cell: (row) => row.businessDate },
+          { key: "supplier", header: ph("Supplier"), cell: (row) => row.supplierName },
+          { key: "invoice", header: ph("Vendor's invoice"), cell: (row) => row.supplierInvoiceNo ?? "" },
+          { key: "total", header: ph("Total"), cell: (row) => row.total },
+          { key: "status", header: ph("Status"), cell: (row) => <StatusBadge tone={TONE[row.status as keyof typeof TONE] ?? "neutral"}>{row.status}</StatusBadge> },
         ]}
         rows={purchases}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No purchases" description="Write a purchase down or receive goods from a supplier." />}
+        empty={<EmptyState title={ph("No purchases")} description={ph("Write a purchase down or receive goods from a supplier.")} />}
       />
       {page.total > page.pageSize ? (
         <Pagination

@@ -6,10 +6,13 @@ import { getSession } from "@/modules/auth/current-session";
 import { listRegisterCustomers } from "@/modules/customers/customers";
 import { listSuppliers } from "@/modules/purchasing/suppliers";
 import { listTemplates, smsDashboard } from "@/modules/sms/sms";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Send SMS" };
+export const generateMetadata = phraseTitled("Send SMS");
 
 export default async function SendSmsPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -24,9 +27,9 @@ export default async function SendSmsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Send SMS"
-        description="A message is put in the outbox and sent right after; a failure is tried again. Bangla takes more SMS parts than English (70 characters per SMS)."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "SMS", href: "/sms" }, { label: "Send" }]}
+        title={ph("Send SMS")}
+        description={ph("A message is put in the outbox and sent right after; a failure is tried again. Bangla takes more SMS parts than English (70 characters per SMS).")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "SMS", href: "/sms" }, { label: ph("Send") }]}
       />
       <SendForm
         templates={templates.filter((template) => template.status === "ACTIVE").map((template) => ({ id: template.id, label: template.name }))}

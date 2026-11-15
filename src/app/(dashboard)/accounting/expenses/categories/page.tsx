@@ -4,10 +4,13 @@ import { CategoryForm } from "@/components/treasury/forms";
 import { PageHeader } from "@/components/ui/page-header";
 import { getSession } from "@/modules/auth/current-session";
 import { listCategories, listExpenseAccounts } from "@/modules/treasury/expenses";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Expense Categories" };
+export const generateMetadata = phraseTitled("Expense Categories");
 
 export default async function ExpenseCategoriesPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session?.branchId) {
     redirect("/login");
@@ -20,24 +23,24 @@ export default async function ExpenseCategoriesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Expense categories"
-        description="Each category posts to one expense account of the chart. A fixed monthly cost (rent, salary) can be set to come every month from the Expenses page."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Accounting", href: "/accounting" }, { label: "Expenses", href: "/accounting/expenses" }, { label: "Categories" }]}
+        title={ph("Expense categories")}
+        description={ph("Each category posts to one expense account of the chart. A fixed monthly cost (rent, salary) can be set to come every month from the Expenses page.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Accounting", href: "/accounting" }, { label: "Expenses", href: "/accounting/expenses" }, { label: ph("Categories") }]}
       />
       {canEdit ? (
-        <section className="space-y-3" aria-label="Add a category">
-          <h2 className="text-lg font-semibold">Add a category</h2>
+        <section className="space-y-3" aria-label={ph("Add a category")}>
+          <h2 className="text-lg font-semibold">{ph("Add a category")}</h2>
           <CategoryForm accounts={options} />
         </section>
       ) : null}
-      <section className="space-y-2" aria-label="Categories">
+      <section className="space-y-2" aria-label={ph("Categories")}>
         {categories.map((category) =>
           canEdit ? (
             <CategoryForm key={category.id} accounts={options} initial={{ id: category.id, name: category.name, accountId: category.accountId, type: category.type, active: category.status === "ACTIVE" }} />
           ) : (
             <p key={category.id} className="rounded-md border border-border p-3 text-sm">
               {category.name} · {category.accountCode} {category.accountName} · {typeLabel[category.type]}
-              {category.status === "ACTIVE" ? "" : " · inactive"}
+              {category.status === "ACTIVE" ? "" : ph("· inactive")}
             </p>
           ),
         )}

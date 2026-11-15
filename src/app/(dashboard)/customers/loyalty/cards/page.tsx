@@ -7,10 +7,13 @@ import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
 import { listCustomers } from "@/modules/customers/customers";
 import { listLoyaltyCards, listLoyaltyTiers } from "@/modules/customers/loyalty";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Loyalty cards" };
+export const generateMetadata = phraseTitled("Loyalty cards");
 
 export default async function LoyaltyCardsPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -24,9 +27,9 @@ export default async function LoyaltyCardsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Loyalty cards"
-        description="Issue one card with a number, a customer, and an optional tier. Cards are not generated in a batch, and they do not earn or redeem points."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Loyalty", href: "/customers/loyalty" }, { label: "Cards" }]}
+        title={ph("Loyalty cards")}
+        description={ph("Issue one card with a number, a customer, and an optional tier. Cards are not generated in a batch, and they do not earn or redeem points.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Loyalty", href: "/customers/loyalty" }, { label: ph("Cards") }]}
       />
       {session.permissions.has("loyalty.manage") ? (
         <CardForm
@@ -35,18 +38,18 @@ export default async function LoyaltyCardsPage() {
         />
       ) : null}
       <DataTable
-        caption="Cards"
+        caption={ph("Cards")}
         columns={[
-          { key: "number", header: "Card", cell: (row) => row.number },
-          { key: "customer", header: "Customer", cell: (row) => row.customerName },
-          { key: "tier", header: "Tier", cell: (row) => row.tierName ?? "" },
-          { key: "issued", header: "Issued", cell: (row) => row.issuedOn },
-          { key: "expires", header: "Expires", cell: (row) => row.expiresOn ?? "" },
-          { key: "status", header: "Status", cell: (row) => row.status },
+          { key: "number", header: ph("Card"), cell: (row) => row.number },
+          { key: "customer", header: ph("Customer"), cell: (row) => row.customerName },
+          { key: "tier", header: ph("Tier"), cell: (row) => row.tierName ?? "" },
+          { key: "issued", header: ph("Issued"), cell: (row) => row.issuedOn },
+          { key: "expires", header: ph("Expires"), cell: (row) => row.expiresOn ?? "" },
+          { key: "status", header: ph("Status"), cell: (row) => row.status },
         ]}
         rows={cards}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No cards" description="Issue a card when the customer and card number are known." />}
+        empty={<EmptyState title={ph("No cards")} description={ph("Issue a card when the customer and card number are known.")} />}
       />
     </div>
   );

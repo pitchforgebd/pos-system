@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSubmit } from "@/lib/client/use-submit";
+import { useI18n } from "@/lib/i18n/provider";
 
 // A courier's settlement (#27): tick the parcels, see the cash collected, the charges and what should come, say what came and where it went.
 // If what came is not what should have, give the reason (only a user who may approve differences can post it).
@@ -16,6 +17,7 @@ const cents = (value: string) => Math.round((Number.parseFloat(value) || 0) * 10
 const text = (value: number) => (value / 100).toFixed(2);
 
 export function SettleForm({ courierId, parcels, accounts, today, canApproveDifference }: { courierId: string; parcels: Parcel[]; accounts: Account[]; today: string; canApproveDifference: boolean }) {
+  const { ph } = useI18n();
   const { submit, pending, message, reset } = useSubmit();
   const [ticked, setTicked] = useState<Record<string, boolean>>(() => Object.fromEntries(parcels.map((parcel) => [parcel.id, true])));
   const [date, setDate] = useState(today);
@@ -31,7 +33,7 @@ export function SettleForm({ courierId, parcels, accounts, today, canApproveDiff
   const difference = cents(net) - expected;
 
   if (parcels.length === 0) {
-    return <p className="text-sm text-muted">Nothing waits to be settled for this courier: no delivered parcel, and none that came back, is outstanding.</p>;
+    return <p className="text-sm text-muted">{ph("Nothing waits to be settled for this courier: no delivered parcel, and none that came back, is outstanding.")}</p>;
   }
 
   return (
@@ -47,17 +49,17 @@ export function SettleForm({ courierId, parcels, accounts, today, canApproveDiff
     >
       <div className="overflow-x-auto rounded-md border border-border">
         <table className="w-full min-w-[40rem] text-sm">
-          <caption className="sr-only">Parcels waiting to be settled</caption>
+          <caption className="sr-only">{ph("Parcels waiting to be settled")}</caption>
           <thead className="text-left text-muted">
             <tr>
               <th className="p-2" />
-              <th className="p-2">Shipment</th>
-              <th className="p-2">Customer</th>
-              <th className="p-2 text-right">Cash collected</th>
-              <th className="p-2 text-right">Delivery</th>
-              <th className="p-2 text-right">Condition</th>
-              <th className="p-2 text-right">Settles</th>
-              <th className="p-2">Waiting</th>
+              <th className="p-2">{ph("Shipment")}</th>
+              <th className="p-2">{ph("Customer")}</th>
+              <th className="p-2 text-right">{ph("Cash collected")}</th>
+              <th className="p-2 text-right">{ph("Delivery")}</th>
+              <th className="p-2 text-right">{ph("Condition")}</th>
+              <th className="p-2 text-right">{ph("Settles")}</th>
+              <th className="p-2">{ph("Waiting")}</th>
             </tr>
           </thead>
           <tbody>
@@ -67,8 +69,8 @@ export function SettleForm({ courierId, parcels, accounts, today, canApproveDiff
                   <input type="checkbox" aria-label={`Settle ${parcel.number ?? "parcel"}`} checked={Boolean(ticked[parcel.id])} onChange={(event) => setTicked({ ...ticked, [parcel.id]: event.target.checked })} />
                 </td>
                 <td className="p-2">
-                  {parcel.number ?? "Shipment"}
-                  {parcel.status === "RETURNED" ? <span className="ml-2 text-xs text-error">came back</span> : null}
+                  {parcel.number ?? ph("Shipment")}
+                  {parcel.status === "RETURNED" ? <span className="ml-2 text-xs text-error">{ph("came back")}</span> : null}
                   {parcel.trackingCode ? <span className="block text-xs text-muted">{parcel.trackingCode}</span> : null}
                 </td>
                 <td className="p-2">{parcel.customerName}</td>
@@ -83,26 +85,26 @@ export function SettleForm({ courierId, parcels, accounts, today, canApproveDiff
         </table>
       </div>
       <dl className="grid max-w-md grid-cols-2 gap-x-4 gap-y-1 text-sm" aria-live="polite">
-        <dt>Cash collected by the courier</dt>
+        <dt>{ph("Cash collected by the courier")}</dt>
         <dd className="text-right tabular-nums">{text(gross)}</dd>
-        <dt>Delivery charges kept</dt>
+        <dt>{ph("Delivery charges kept")}</dt>
         <dd className="text-right tabular-nums">{text(delivery)}</dd>
-        <dt>Condition charges kept</dt>
+        <dt>{ph("Condition charges kept")}</dt>
         <dd className="text-right tabular-nums">{text(condition)}</dd>
-        <dt className="font-medium">What should come</dt>
+        <dt className="font-medium">{ph("What should come")}</dt>
         <dd className="text-right font-medium tabular-nums">{text(expected)}</dd>
       </dl>
       <div className="grid gap-3 md:grid-cols-4">
         <label className="grid gap-1 text-sm">
-          Date
+          {ph("Date")}
           <Input type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
         </label>
         <label className="grid gap-1 text-sm">
-          What came
+          {ph("What came")}
           <Input inputMode="decimal" value={net} onChange={(event) => setReceived(event.target.value)} required />
         </label>
         <label className="grid gap-1 text-sm">
-          Came into
+          {ph("Came into")}
           <select value={accountId} onChange={(event) => setAccountId(event.target.value)} className="h-10 rounded-md border border-border bg-surface px-2">
             {accounts.map((account) => (
               <option key={account.id} value={account.id}>
@@ -113,16 +115,16 @@ export function SettleForm({ courierId, parcels, accounts, today, canApproveDiff
         </label>
         {difference !== 0 ? (
           <label className="grid gap-1 text-sm">
-            Why it differs ({difference > 0 ? "over" : "short"} {text(Math.abs(difference))})
+            {ph("Why it differs (")}{difference > 0 ? ph("over") : ph("short")} {text(Math.abs(difference))})
             <Input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={255} required />
           </label>
         ) : null}
       </div>
-      {difference !== 0 && !canApproveDifference ? <p className="text-sm text-error">A difference needs the owner&apos;s approval: ask a user who may approve it.</p> : null}
+      {difference !== 0 && !canApproveDifference ? <p className="text-sm text-error">{ph("A difference needs the owner's approval: ask a user who may approve it.")}</p> : null}
       {message ? <p className="text-sm text-error" role="alert">{message}</p> : null}
       <div>
         <Button type="submit" loading={pending} disabled={chosen.length === 0 || (difference !== 0 && !canApproveDifference)}>
-          Record settlement
+          {ph("Record settlement")}
         </Button>
       </div>
     </form>

@@ -7,11 +7,14 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { getSession } from "@/modules/auth/current-session";
 import { DAILY, reportContext } from "@/modules/reports/registry";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Day Reports" };
+export const generateMetadata = phraseTitled("Day Reports");
 
 // "Generate all reports" (P11 task 7, U11): the day's ten reports one after the other, each on its own printed page, in the owner's order.
 export default async function DayReportsPage({ searchParams }: { searchParams: Promise<{ date?: string; branch?: string }> }) {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -26,30 +29,30 @@ export default async function DayReportsPage({ searchParams }: { searchParams: P
   return (
     <div className="space-y-6">
       <PageHeader
-        title={lang === "bn" ? "দিনের সব রিপোর্ট" : "All reports of the day"}
+        title={lang === "bn" ? "দিনের সব রিপোর্ট" : ph("All reports of the day")}
         description={"error" in ctx ? ctx.error : `${ctx.from} · ${results.length} ${lang === "bn" ? "টি রিপোর্ট" : "reports"}${red > 0 ? (lang === "bn" ? ` · ${red}টি মিল হয়নি` : ` · ${red} check(s) do not agree`) : lang === "bn" ? " · সব মিল ✔" : " · every check agrees ✔"}`}
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Reports", href: "/reports" }, { label: lang === "bn" ? "দিনের সব রিপোর্ট" : "Day reports" }]}
-        actions={<PrintButton label={lang === "bn" ? "সব প্রিন্ট" : "Print all"} />}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Reports", href: "/reports" }, { label: lang === "bn" ? "দিনের সব রিপোর্ট" : ph("Day reports") }]}
+        actions={<PrintButton label={lang === "bn" ? "সব প্রিন্ট" : ph("Print all")} />}
       />
       <form className="flex flex-wrap items-end gap-2 print:hidden" action="/reports/day">
         <label className="grid gap-1 text-sm">
-          {lang === "bn" ? "তারিখ" : "Day"}
+          {lang === "bn" ? "তারিখ" : ph("Day")}
           <input name="date" type="date" defaultValue={"error" in ctx ? "" : ctx.from} className="h-10 rounded-md border border-border px-3" />
         </label>
         <label className="grid gap-1 text-sm">
-          {lang === "bn" ? "ব্রাঞ্চ" : "Branch"}
+          {lang === "bn" ? "ব্রাঞ্চ" : ph("Branch")}
           <select name="branch" defaultValue={params.branch ?? ""} className="h-10 rounded-md border border-border bg-surface px-2">
-            <option value="">{lang === "bn" ? "এই ব্রাঞ্চ" : "This branch"}</option>
+            <option value="">{lang === "bn" ? "এই ব্রাঞ্চ" : ph("This branch")}</option>
             {session.branches.map((branch) => (
               <option key={branch.id} value={branch.id}>
                 {branch.name}
               </option>
             ))}
-            {session.permissions.has("reports.all_branches") ? <option value="all">{lang === "bn" ? "সব ব্রাঞ্চ" : "All branches"}</option> : null}
+            {session.permissions.has("reports.all_branches") ? <option value="all">{lang === "bn" ? "সব ব্রাঞ্চ" : ph("All branches")}</option> : null}
           </select>
         </label>
         <Button type="submit" variant="secondary">
-          {lang === "bn" ? "দেখাও" : "Show"}
+          {lang === "bn" ? "দেখাও" : ph("Show")}
         </Button>
       </form>
       {results.map((result, index) => (

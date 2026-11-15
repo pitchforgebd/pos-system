@@ -9,10 +9,13 @@ import { EmptyState } from "@/components/ui/states";
 import { listCapitalRows } from "@/modules/accounting/unposted";
 import { getSession } from "@/modules/auth/current-session";
 import { listAccounts } from "@/modules/accounting/books";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Capital" };
+export const generateMetadata = phraseTitled("Capital");
 
 export default async function CapitalPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -25,26 +28,26 @@ export default async function CapitalPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Capital"
-        description="Capital added debits cash or bank and credits owner capital. A withdrawal debits drawings and credits cash or bank."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Accounting", href: "/accounting" }, { label: "Capital" }]}
+        title={ph("Capital")}
+        description={ph("Capital added debits cash or bank and credits owner capital. A withdrawal debits drawings and credits cash or bank.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Accounting", href: "/accounting" }, { label: ph("Capital") }]}
       />
       {session.permissions.has("accounting.post") && session.branchId ? (
         <CapitalForm moneyAccounts={accounts.filter((account) => account.status === "ACTIVE" && ["CASH", "BANK", "MOBILE"].includes(account.kind)).map((account) => ({ code: account.code, kind: account.kind, label: `${account.code} · ${account.name}` }))} />
       ) : null}
       <ChartAccountTable rows={accounts.filter((account) => account.groupCode === GROUP.EQUITY)} />
       <DataTable
-        caption="Capital documents"
+        caption={ph("Capital documents")}
         columns={[
-          { key: "date", header: "Date", cell: (row) => row.businessDate },
-          { key: "type", header: "Type", cell: (row) => row.capitalType },
-          { key: "owner", header: "Owner", cell: (row) => row.ownerName },
-          { key: "amount", header: "Amount", cell: (row) => row.amount },
-          { key: "posted", header: "Journal", cell: (row) => row.posted },
+          { key: "date", header: ph("Date"), cell: (row) => row.businessDate },
+          { key: "type", header: ph("Type"), cell: (row) => row.capitalType },
+          { key: "owner", header: ph("Owner"), cell: (row) => row.ownerName },
+          { key: "amount", header: ph("Amount"), cell: (row) => row.amount },
+          { key: "posted", header: ph("Journal"), cell: (row) => row.posted },
         ]}
         rows={capitalRows}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No capital document" description="Post capital added or capital withdrawn." />}
+        empty={<EmptyState title={ph("No capital document")} description={ph("Post capital added or capital withdrawn.")} />}
       />
     </div>
   );

@@ -3,10 +3,13 @@ import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { listPermissionCatalog } from "@/modules/access/roles";
 import { getSession } from "@/modules/auth/current-session";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Permissions" };
+export const generateMetadata = phraseTitled("Permissions");
 
 export default async function PermissionsPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -16,16 +19,16 @@ export default async function PermissionsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Permissions"
-        description="These codes are fixed. This screen does not add new ones."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Permissions" }]}
+        title={ph("Permissions")}
+        description={ph("These codes are fixed. This screen does not add new ones.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: ph("Permissions") }]}
       />
       <div className="overflow-x-auto rounded-md border border-border">
         <table className="min-w-full text-sm">
           <thead className="bg-secondary text-left">
             <tr>
-              <th className="px-3 py-2 font-medium">Code</th>
-              <th className="px-3 py-2 font-medium">Module</th>
+              <th className="px-3 py-2 font-medium">{ph("Code")}</th>
+              <th className="px-3 py-2 font-medium">{ph("Module")}</th>
             </tr>
           </thead>
           <tbody>

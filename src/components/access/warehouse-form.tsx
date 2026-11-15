@@ -5,8 +5,10 @@ import { type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSubmit } from "@/lib/client/use-submit";
+import { useI18n } from "@/lib/i18n/provider";
 
 export function WarehouseForm({ branches }: { branches: { id: string; name: string }[] }) {
+  const { ph } = useI18n();
   const { submit, pending, message } = useSubmit();
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -17,17 +19,17 @@ export function WarehouseForm({ branches }: { branches: { id: string; name: stri
 
   return (
     <form className="grid max-w-xl gap-3" onSubmit={onSubmit}>
-      <select name="branchId" required aria-label="Branch" className="h-10 rounded-md border border-border bg-surface px-2">
+      <select name="branchId" required aria-label={ph("Branch")} className="h-10 rounded-md border border-border bg-surface px-2">
         {branches.map((branch) => (
           <option key={branch.id} value={branch.id}>
             {branch.name}
           </option>
         ))}
       </select>
-      <Input name="name" required placeholder="Warehouse name" aria-label="Warehouse name" />
+      <Input name="name" required placeholder={ph("Warehouse name")} aria-label={ph("Warehouse name")} />
       {message ? <p className="text-sm text-error">{message}</p> : null}
       <Button type="submit" loading={pending}>
-        Create warehouse
+        {ph("Create warehouse")}
       </Button>
     </form>
   );

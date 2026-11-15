@@ -6,8 +6,10 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSubmit } from "@/lib/client/use-submit";
+import { useI18n } from "@/lib/i18n/provider";
 
 export function ProductForm() {
+  const { ph } = useI18n();
   const router = useRouter();
   const [photoMessage, setPhotoMessage] = useState("");
   const { submit, pending, message: serverMessage } = useSubmit();
@@ -56,29 +58,29 @@ export function ProductForm() {
         })();
       }}
     >
-      <Input name="sku" required placeholder="SKU" aria-label="SKU" />
-      <Input name="name" required placeholder="Name" aria-label="Name" />
-      <Input name="purchasePrice" required placeholder="Purchase price" aria-label="Purchase price" />
-      <Input name="sellingPrice" required placeholder="Selling price" aria-label="Selling price" />
-      <Input name="wholesalePrice" required placeholder="Wholesale price" aria-label="Wholesale price" />
-      <Input name="minimumPrice" required placeholder="Minimum price" aria-label="Minimum price" />
-      <Input name="reorderLevel" placeholder="Reorder level" aria-label="Reorder level" defaultValue="0" />
-      <Input name="barcode" placeholder="Barcode" aria-label="Barcode" />
+      <Input name="sku" required placeholder={ph("SKU")} aria-label={ph("SKU")} />
+      <Input name="name" required placeholder={ph("Name")} aria-label={ph("Name")} />
+      <Input name="purchasePrice" required placeholder={ph("Purchase price")} aria-label={ph("Purchase price")} />
+      <Input name="sellingPrice" required placeholder={ph("Selling price")} aria-label={ph("Selling price")} />
+      <Input name="wholesalePrice" required placeholder={ph("Wholesale price")} aria-label={ph("Wholesale price")} />
+      <Input name="minimumPrice" required placeholder={ph("Minimum price")} aria-label={ph("Minimum price")} />
+      <Input name="reorderLevel" placeholder={ph("Reorder level")} aria-label={ph("Reorder level")} defaultValue="0" />
+      <Input name="barcode" placeholder={ph("Barcode")} aria-label={ph("Barcode")} />
       <label className="flex items-center gap-2 text-sm">
         <input name="trackStock" type="checkbox" defaultChecked />
-        Track stock
+        {ph("Track stock")}
       </label>
       <label className="flex items-center gap-2 text-sm">
         <input name="trackExpiry" type="checkbox" />
-        Track expiry
+        {ph("Track expiry")}
       </label>
       <label className="grid gap-1 text-sm">
-        Photo
-        <input name="file" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Product photo" />
+        {ph("Photo")}
+        <input name="file" type="file" accept="image/jpeg,image/png,image/webp" aria-label={ph("Product photo")} />
       </label>
       {message ? <p className="text-sm text-error">{message}</p> : null}
       <Button type="submit" loading={pending}>
-        Save product
+        {ph("Save product")}
       </Button>
     </form>
   );

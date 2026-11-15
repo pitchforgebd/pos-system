@@ -7,10 +7,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
 import { purchaseReport } from "@/modules/reports/reports";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Purchase report" };
+export const generateMetadata = phraseTitled("Purchase report");
 
 export default async function PurchaseReportPage({ searchParams }: { searchParams: Promise<{ from?: string; to?: string }> }) {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session?.branchId) {
     redirect("/login");
@@ -21,24 +24,24 @@ export default async function PurchaseReportPage({ searchParams }: { searchParam
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Purchase report"
+        title={ph("Purchase report")}
         description={`Total ${report.total} from ${report.count} posted purchases.`}
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Reports", href: "/reports" }, { label: "Purchases" }]}
-        actions={<Button href="/reports" variant="secondary">Back to reports</Button>}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Reports", href: "/reports" }, { label: ph("Purchases") }]}
+        actions={<Button href="/reports" variant="secondary">{ph("Back to reports")}</Button>}
       />
       <DateFilter from={query.from} to={query.to} />
       <ReportNote count={report.count} shown={report.rows.length} />
       <DataTable
-        caption="Posted purchases"
+        caption={ph("Posted purchases")}
         columns={[
-          { key: "date", header: "Date", cell: (row) => row.businessDate },
-          { key: "number", header: "Purchase", cell: (row) => row.number },
-          { key: "party", header: "Supplier", cell: (row) => row.party },
-          { key: "total", header: "Total", cell: (row) => row.total },
+          { key: "date", header: ph("Date"), cell: (row) => row.businessDate },
+          { key: "number", header: ph("Purchase"), cell: (row) => row.number },
+          { key: "party", header: ph("Supplier"), cell: (row) => row.party },
+          { key: "total", header: ph("Total"), cell: (row) => row.total },
         ]}
         rows={report.rows}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No posted purchases" description="Posted purchases on this branch appear here." />}
+        empty={<EmptyState title={ph("No posted purchases")} description={ph("Posted purchases on this branch appear here.")} />}
       />
     </div>
   );

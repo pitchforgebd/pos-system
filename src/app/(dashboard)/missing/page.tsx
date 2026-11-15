@@ -1,22 +1,23 @@
-import type { Metadata } from "next";
+
 
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/states";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "Not found",
-};
+export const generateMetadata = phraseTitled("Not found");
 
-export default function MissingPage() {
+export default async function MissingPage() {
+  const ph = await getPhrase();
   return (
     <EmptyState
-      title="Page not found"
-      description="That screen is not part of this application."
+      title={ph("Page not found")}
+      description={ph("That screen is not part of this application.")}
       action={
         <Button href="/dashboard" variant="secondary">
-          Back to dashboard
+          {ph("Back to dashboard")}
         </Button>
       }
     />

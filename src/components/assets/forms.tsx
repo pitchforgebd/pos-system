@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { useFormSubmit } from "@/lib/client/use-form-submit";
+import { useI18n } from "@/lib/i18n/provider";
 
 type Option = { id: string; label: string };
 type Category = { value: string; label: string };
@@ -14,6 +15,7 @@ const optional = (data: FormData, name: string) => String(data.get(name) ?? "").
 
 /** Adds an asset: bought now (paid from an account, or owed to a vendor) or one the shop already had (with what was written off before). */
 export function AssetForm({ categories, accounts, vendors, today }: { categories: Category[]; accounts: Option[]; vendors: Option[]; today: string }) {
+  const { ph } = useI18n();
   const [kind, setKind] = useState<"BUY" | "OPENING">("BUY");
   const [paidWith, setPaidWith] = useState<"ACCOUNT" | "CREDIT">("ACCOUNT");
   const form = useFormSubmit<{ id: string }>(
@@ -38,25 +40,25 @@ export function AssetForm({ categories, accounts, vendors, today }: { categories
 
   return (
     <form className="grid max-w-3xl gap-3" onSubmit={form.onSubmit}>
-      <div className="flex flex-wrap gap-4 text-sm" role="radiogroup" aria-label="How the asset comes in">
+      <div className="flex flex-wrap gap-4 text-sm" role="radiogroup" aria-label={ph("How the asset comes in")}>
         <label className="flex items-center gap-2">
-          <input type="radio" name="kind" checked={kind === "BUY"} onChange={() => setKind("BUY")} /> Bought now
+          <input type="radio" name="kind" checked={kind === "BUY"} onChange={() => setKind("BUY")} /> {ph("Bought now")}
         </label>
         <label className="flex items-center gap-2">
-          <input type="radio" name="kind" checked={kind === "OPENING"} onChange={() => setKind("OPENING")} /> Already owned (opening)
+          <input type="radio" name="kind" checked={kind === "OPENING"} onChange={() => setKind("OPENING")} /> {ph("Already owned (opening)")}
         </label>
       </div>
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="grid gap-1 text-sm sm:col-span-2">
-          Name
-          <Input name="name" required maxLength={191} placeholder="Delivery van" />
+          {ph("Name")}
+          <Input name="name" required maxLength={191} placeholder={ph("Delivery van")} />
         </label>
         <label className="grid gap-1 text-sm">
-          Code (optional)
-          <Input name="code" maxLength={32} placeholder="Made for you" />
+          {ph("Code (optional)")}
+          <Input name="code" maxLength={32} placeholder={ph("Made for you")} />
         </label>
         <label className="grid gap-1 text-sm">
-          Category
+          {ph("Category")}
           <Select name="category" defaultValue="OTHER">
             {categories.map((category) => (
               <option key={category.value} value={category.value}>
@@ -66,38 +68,38 @@ export function AssetForm({ categories, accounts, vendors, today }: { categories
           </Select>
         </label>
         <label className="grid gap-1 text-sm">
-          Bought on
+          {ph("Bought on")}
           <Input name="purchaseDate" type="date" required defaultValue={today} max={today} />
         </label>
         <label className="grid gap-1 text-sm">
-          Location
-          <Input name="location" maxLength={191} placeholder="Main shop" />
+          {ph("Location")}
+          <Input name="location" maxLength={191} placeholder={ph("Main shop")} />
         </label>
         <label className="grid gap-1 text-sm">
-          Cost
+          {ph("Cost")}
           <Input name="cost" required inputMode="decimal" placeholder="0.00" />
         </label>
         <label className="grid gap-1 text-sm">
-          Value left at the end
+          {ph("Value left at the end")}
           <Input name="salvageValue" inputMode="decimal" placeholder="0.00" />
         </label>
         <label className="grid gap-1 text-sm">
-          Useful life (months)
+          {ph("Useful life (months)")}
           <Input name="usefulLifeMonths" required type="number" min={1} max={600} defaultValue={60} />
         </label>
       </div>
       {kind === "BUY" ? (
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="grid gap-1 text-sm">
-            Paid
-            <Select value={paidWith} onChange={(event) => setPaidWith(event.target.value as "ACCOUNT" | "CREDIT")} aria-label="Paid">
-              <option value="ACCOUNT">From an account (cash, bank, mobile)</option>
-              <option value="CREDIT">Not yet: owed to a vendor</option>
+            {ph("Paid")}
+            <Select value={paidWith} onChange={(event) => setPaidWith(event.target.value as "ACCOUNT" | "CREDIT")} aria-label={ph("Paid")}>
+              <option value="ACCOUNT">{ph("From an account (cash, bank, mobile)")}</option>
+              <option value="CREDIT">{ph("Not yet: owed to a vendor")}</option>
             </Select>
           </label>
           {paidWith === "ACCOUNT" ? (
             <label className="grid gap-1 text-sm">
-              Paid from
+              {ph("Paid from")}
               <Select name="moneyAccountId" required>
                 {accounts.map((account) => (
                   <option key={account.id} value={account.id}>
@@ -108,10 +110,10 @@ export function AssetForm({ categories, accounts, vendors, today }: { categories
             </label>
           ) : (
             <label className="grid gap-1 text-sm">
-              Owed to
+              {ph("Owed to")}
               <Select name="vendorId" required defaultValue="">
                 <option value="" disabled>
-                  Choose a vendor
+                  {ph("Choose a vendor")}
                 </option>
                 {vendors.map((vendor) => (
                   <option key={vendor.id} value={vendor.id}>
@@ -125,20 +127,20 @@ export function AssetForm({ categories, accounts, vendors, today }: { categories
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="grid gap-1 text-sm">
-            Written off before (accumulated depreciation)
+            {ph("Written off before (accumulated depreciation)")}
             <Input name="accumulated" inputMode="decimal" placeholder="0.00" />
           </label>
           <label className="grid gap-1 text-sm">
-            Opening date
+            {ph("Opening date")}
             <Input name="asOf" type="date" defaultValue={today} max={today} />
           </label>
-          <p className="text-xs text-muted sm:col-span-2">It goes in against Opening Balance Equity. What is left is written off over the months of its life still to come, from the month after the opening date.</p>
+          <p className="text-xs text-muted sm:col-span-2">{ph("It goes in against Opening Balance Equity. What is left is written off over the months of its life still to come, from the month after the opening date.")}</p>
         </div>
       )}
-      <Input name="note" maxLength={255} placeholder="Note" aria-label="Note" />
+      <Input name="note" maxLength={255} placeholder={ph("Note")} aria-label={ph("Note")} />
       {form.message ? <p className="text-sm text-error">{form.message}</p> : null}
       <Button type="submit" loading={form.pending}>
-        Add asset
+        {ph("Add asset")}
       </Button>
     </form>
   );
@@ -146,6 +148,7 @@ export function AssetForm({ categories, accounts, vendors, today }: { categories
 
 /** Sells or writes off an asset: what it brought (nothing for a write-off) and the account it came into. */
 export function DisposeForm({ assetId, accounts, today, bookValue }: { assetId: string; accounts: Option[]; today: string; bookValue: string }) {
+  const { ph } = useI18n();
   const [amount, setAmount] = useState("");
   const gain = amount.trim() === "" || !Number.isFinite(Number(amount)) ? null : (Number(amount) - Number(bookValue)).toFixed(2);
   const form = useFormSubmit(`/api/v1/assets/${assetId}/dispose`, (data) => ({
@@ -158,16 +161,16 @@ export function DisposeForm({ assetId, accounts, today, bookValue }: { assetId: 
     <form className="grid max-w-xl gap-3" onSubmit={form.onSubmit}>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="grid gap-1 text-sm">
-          Date
+          {ph("Date")}
           <Input name="businessDate" type="date" required defaultValue={today} max={today} />
         </label>
         <label className="grid gap-1 text-sm">
-          Sold for (empty to write it off)
-          <Input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" placeholder="0.00" aria-label="Sold for" />
+          {ph("Sold for (empty to write it off)")}
+          <Input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" placeholder="0.00" aria-label={ph("Sold for")} />
         </label>
         {Number(amount) > 0 ? (
           <label className="grid gap-1 text-sm sm:col-span-2">
-            Money came into
+            {ph("Money came into")}
             <Select name="moneyAccountId" required>
               {accounts.map((account) => (
                 <option key={account.id} value={account.id}>
@@ -179,13 +182,13 @@ export function DisposeForm({ assetId, accounts, today, bookValue }: { assetId: 
         ) : null}
       </div>
       <p className="text-sm">
-        Worth now <strong>{bookValue}</strong>
-        {gain !== null ? <> · {Number(gain) >= 0 ? "gain" : "loss"} <strong>{Math.abs(Number(gain)).toFixed(2)}</strong></> : null}
+        {ph("Worth now")} <strong>{bookValue}</strong>
+        {gain !== null ? <> · {Number(gain) >= 0 ? ph("gain") : ph("loss")} <strong>{Math.abs(Number(gain)).toFixed(2)}</strong></> : null}
       </p>
-      <Input name="note" maxLength={255} placeholder="Reason or buyer" aria-label="Note" />
+      <Input name="note" maxLength={255} placeholder={ph("Reason or buyer")} aria-label={ph("Note")} />
       {form.message ? <p className="text-sm text-error">{form.message}</p> : null}
       <Button type="submit" variant="danger" loading={form.pending}>
-        {Number(amount) > 0 ? "Sell asset" : "Write off asset"}
+        {Number(amount) > 0 ? ph("Sell asset") : ph("Write off asset")}
       </Button>
     </form>
   );
@@ -193,11 +196,12 @@ export function DisposeForm({ assetId, accounts, today, bookValue }: { assetId: 
 
 /** Posts the month's depreciation after the preview. */
 export function RunDepreciationForm({ month, total }: { month: string; total: string }) {
+  const { ph } = useI18n();
   const form = useFormSubmit("/api/v1/assets/depreciation", () => ({ month }));
   return (
     <form className="flex flex-wrap items-center gap-3" onSubmit={form.onSubmit}>
       <Button type="submit" loading={form.pending}>
-        Post {total} for {month}
+        {ph("Post")} {total} {ph("for")} {month}
       </Button>
       {form.message ? <p className="text-sm text-error">{form.message}</p> : null}
     </form>

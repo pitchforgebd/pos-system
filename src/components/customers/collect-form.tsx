@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ChargeInput } from "@/components/treasury/charge-input";
 import { Input } from "@/components/ui/input";
 import { useSubmit } from "@/lib/client/use-submit";
+import { useI18n } from "@/lib/i18n/provider";
 
 // Taking a due (P06 task 6, #18): find the customer, see what they still owe invoice by invoice, say which invoices the money is for (or leave
 // it to settle the oldest first), the account it came into, and the charge the bank or mobile service kept (D7, the shop's expense).
@@ -17,6 +18,7 @@ type Account = { id: string; label: string; kind: "CASH" | "BANK" | "MOBILE" };
 const select = "h-10 rounded-md border border-border bg-surface px-2";
 
 export function CollectForm({ accounts, today }: { accounts: Account[]; today: string }) {
+  const { ph } = useI18n();
   const { submit, pending, message, reset } = useSubmit();
   const [query, setQuery] = useState("");
   const [found, setFound] = useState<Customer[]>([]);
@@ -72,19 +74,19 @@ export function CollectForm({ accounts, today }: { accounts: Account[]; today: s
     >
       <section className="grid gap-2">
         <label className="grid gap-1 text-sm">
-          Customer (name or phone)
-          <Input value={customer ? customer.name : query} onChange={(event) => { setCustomer(null); setQuery(event.target.value); }} placeholder="Search customers" autoComplete="off" />
+          {ph("Customer (name or phone)")}
+          <Input value={customer ? customer.name : query} onChange={(event) => { setCustomer(null); setQuery(event.target.value); }} placeholder={ph("Search customers")} autoComplete="off" />
         </label>
-        {customer ? <p className="text-sm text-muted">{customer.phone ?? ""} · owes {customer.outstanding}</p> : null}
+        {customer ? <p className="text-sm text-muted">{customer.phone ?? ""} {ph("· owes")} {customer.outstanding}</p> : null}
         {shown.length > 0 && !customer ? (
-          <ul className="max-h-56 overflow-auto rounded-md border border-border bg-surface text-sm" aria-label="Customers found">
+          <ul className="max-h-56 overflow-auto rounded-md border border-border bg-surface text-sm" aria-label={ph("Customers found")}>
             {shown.map((row) => (
               <li key={row.id}>
                 <button type="button" className="flex w-full justify-between gap-3 px-3 py-2 text-left hover:bg-surface-muted" onClick={() => choose(row)}>
                   <span>
                     {row.name} {row.phone ? `· ${row.phone}` : ""}
                   </span>
-                  <span className="text-muted">owes {row.outstanding}</span>
+                  <span className="text-muted">{ph("owes")} {row.outstanding}</span>
                 </button>
               </li>
             ))}
@@ -96,15 +98,15 @@ export function CollectForm({ accounts, today }: { accounts: Account[]; today: s
         <>
           <div className="grid gap-3 md:grid-cols-4">
             <label className="grid gap-1 text-sm">
-              Date
+              {ph("Date")}
               <Input type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
             </label>
             <label className="grid gap-1 text-sm">
-              Amount received
+              {ph("Amount received")}
               <Input inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} required />
             </label>
             <label className="grid gap-1 text-sm">
-              Came into
+              {ph("Came into")}
               <select value={accountId} onChange={(event) => { setAccountId(event.target.value); setChargeTyped(false); setCharge(""); }} className={select}>
                 {accounts.map((row) => (
                   <option key={row.id} value={row.id}>
@@ -114,30 +116,30 @@ export function CollectForm({ accounts, today }: { accounts: Account[]; today: s
               </select>
             </label>
             {account && account.kind !== "CASH" ? (
-              <ChargeInput accountId={accountId} amount={amount} value={charge} typed={chargeTyped} label="Bank or mobile charge kept" onChange={(value, typed) => { setCharge(value); setChargeTyped(typed); }} />
+              <ChargeInput accountId={accountId} amount={amount} value={charge} typed={chargeTyped} label={ph("Bank or mobile charge kept")} onChange={(value, typed) => { setCharge(value); setChargeTyped(typed); }} />
             ) : null}
           </div>
           {invoices.length > 0 ? (
             <div className="grid gap-1 text-sm">
-              <p className="font-medium">For these invoices (leave empty to settle the oldest first)</p>
+              <p className="font-medium">{ph("For these invoices (leave empty to settle the oldest first)")}</p>
               {invoices.map((invoice) => (
                 <label key={invoice.id} className="flex items-center justify-between gap-3">
                   <span>
-                    {invoice.number ?? "Invoice"} · {invoice.businessDate} · total {invoice.total} · owed {invoice.owed} ({invoice.status})
+                    {invoice.number ?? ph("Invoice")} · {invoice.businessDate} {ph("· total")} {invoice.total} {ph("· owed")} {invoice.owed} ({invoice.status})
                   </span>
                   <input className="h-9 w-28 rounded-md border border-border bg-surface px-2 text-sm" inputMode="decimal" aria-label={`Amount for ${invoice.number ?? "invoice"}`} value={shares[invoice.id] ?? ""} onChange={(event) => setShares({ ...shares, [invoice.id]: event.target.value })} />
                 </label>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-muted">No invoice is open; an opening balance, if any, is settled first.</p>
+            <p className="text-sm text-muted">{ph("No invoice is open; an opening balance, if any, is settled first.")}</p>
           )}
         </>
       ) : null}
       {message ? <p className="text-sm text-error" role="alert">{message}</p> : null}
       <div>
         <Button type="submit" loading={pending} disabled={!customer || accounts.length === 0}>
-          Record receipt
+          {ph("Record receipt")}
         </Button>
       </div>
     </form>

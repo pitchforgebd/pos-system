@@ -4,10 +4,13 @@ import { PrintButton, PrintSheet } from "@/components/print/sheet";
 import { PageHeader } from "@/components/ui/page-header";
 import { getSession } from "@/modules/auth/current-session";
 import { getSupplierPayment } from "@/modules/purchasing/vendor-profile";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Payment receipt" };
+export const generateMetadata = phraseTitled("Payment receipt");
 
 export default async function SupplierPaymentReceiptPage({ params }: { params: Promise<{ id: string }> }) {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -23,25 +26,25 @@ export default async function SupplierPaymentReceiptPage({ params }: { params: P
     <div className="space-y-4">
       <PageHeader
         title={title}
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Suppliers", href: "/suppliers" }, { label: payment.supplier.name, href: `/suppliers/${payment.supplier.id}` }, { label: "Receipt" }]}
-        actions={<PrintButton label="Print receipt" />}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Suppliers", href: "/suppliers" }, { label: payment.supplier.name, href: `/suppliers/${payment.supplier.id}` }, { label: ph("Receipt") }]}
+        actions={<PrintButton label={ph("Print receipt")} />}
       />
       <PrintSheet title={title} note={`Paid to ${payment.supplier.name} on ${payment.businessDate}`}>
         <dl className="grid max-w-sm grid-cols-2 gap-x-4 gap-y-1">
-          <dt>Amount paid to the vendor</dt>
+          <dt>{ph("Amount paid to the vendor")}</dt>
           <dd className="text-right font-semibold tabular-nums">{payment.amount}</dd>
           {payment.charge !== "0.00" ? (
             <>
-              <dt>Bank or mobile charge</dt>
+              <dt>{ph("Bank or mobile charge")}</dt>
               <dd className="text-right tabular-nums">{payment.charge}</dd>
             </>
           ) : null}
-          <dt>{payment.method === "ADVANCE" ? "From" : "Paid from"}</dt>
+          <dt>{payment.method === "ADVANCE" ? ph("From") : ph("Paid from")}</dt>
           <dd className="text-right">{payment.account || payment.method}</dd>
         </dl>
         {payment.bills.length > 0 ? (
           <table className="w-full max-w-sm text-sm">
-            <caption className="text-left font-medium">Settled</caption>
+            <caption className="text-left font-medium">{ph("Settled")}</caption>
             <tbody>
               {payment.bills.map((bill) => (
                 <tr key={bill.id}>

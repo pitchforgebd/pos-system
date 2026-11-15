@@ -6,10 +6,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
 import { listPurchaseReturns } from "@/modules/purchasing/returns";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Supplier returns" };
+export const generateMetadata = phraseTitled("Supplier returns");
 
 export default async function SupplierReturnsPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session?.branchId) {
     redirect("/login");
@@ -19,29 +22,29 @@ export default async function SupplierReturnsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Supplier returns"
-        description="Purchase returns for this branch."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Suppliers", href: "/suppliers" }, { label: "Returns" }]}
+        title={ph("Supplier returns")}
+        description={ph("Purchase returns for this branch.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Suppliers", href: "/suppliers" }, { label: ph("Returns") }]}
         actions={
           session.permissions.has("purchase.return") ? (
             <Button href="/purchases/returns" variant="secondary">
-              New return
+              {ph("New return")}
             </Button>
           ) : null
         }
       />
       <DataTable
-        caption="Supplier returns"
+        caption={ph("Supplier returns")}
         columns={[
-          { key: "number", header: "Return", cell: (row) => row.number },
-          { key: "date", header: "Date", cell: (row) => row.businessDate },
-          { key: "source", header: "Purchase", cell: (row) => row.source },
-          { key: "supplier", header: "Supplier", cell: (row) => row.supplierName },
-          { key: "total", header: "Total", cell: (row) => row.total },
+          { key: "number", header: ph("Return"), cell: (row) => row.number },
+          { key: "date", header: ph("Date"), cell: (row) => row.businessDate },
+          { key: "source", header: ph("Purchase"), cell: (row) => row.source },
+          { key: "supplier", header: ph("Supplier"), cell: (row) => row.supplierName },
+          { key: "total", header: ph("Total"), cell: (row) => row.total },
         ]}
         rows={returns}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No supplier returns" description="A supplier return is posted from the purchase return screen." />}
+        empty={<EmptyState title={ph("No supplier returns")} description={ph("A supplier return is posted from the purchase return screen.")} />}
       />
     </div>
   );

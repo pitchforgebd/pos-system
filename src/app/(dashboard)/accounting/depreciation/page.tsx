@@ -9,10 +9,13 @@ import { EmptyState } from "@/components/ui/states";
 import { businessDate } from "@/core/time/business-date";
 import { getSession } from "@/modules/auth/current-session";
 import { addMonths, listRuns, previewDepreciation } from "@/modules/assets/assets";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Depreciation" };
+export const generateMetadata = phraseTitled("Depreciation");
 
 export default async function DepreciationPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session?.branchId) {
     redirect("/login");
@@ -30,58 +33,58 @@ export default async function DepreciationPage({ searchParams }: { searchParams:
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Monthly depreciation"
-        description="Choose a month, check what each asset writes off, and post it as one journal (Depreciation / Accumulated Depreciation). Straight line; the last month takes the rounding. Each month once, in order."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Accounting", href: "/accounting" }, { label: "Fixed assets", href: "/accounting/assets" }, { label: "Depreciation" }]}
+        title={ph("Monthly depreciation")}
+        description={ph("Choose a month, check what each asset writes off, and post it as one journal (Depreciation / Accumulated Depreciation). Straight line; the last month takes the rounding. Each month once, in order.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Accounting", href: "/accounting" }, { label: "Fixed assets", href: "/accounting/assets" }, { label: ph("Depreciation") }]}
       />
       <form className="flex flex-wrap items-end gap-2" action="/accounting/depreciation">
         <label className="grid gap-1 text-sm">
-          Month
+          {ph("Month")}
           <input name="month" type="month" defaultValue={month} max={thisMonth} className="h-10 rounded-md border border-border px-3" />
         </label>
         <Button type="submit" variant="secondary">
-          Show
+          {ph("Show")}
         </Button>
       </form>
-      <section className="space-y-3" aria-label="Preview">
+      <section className="space-y-3" aria-label={ph("Preview")}>
         <h2 className="text-lg font-semibold">{month}</h2>
         {preview.done ? (
           <p className="text-sm">
-            Done: {preview.done.total} was posted. <Link href={`/accounting/journals/${preview.done.journalId}`}>See the journal</Link>
+            {ph("Done:")} {preview.done.total} {ph("was posted.")} <Link href={`/accounting/journals/${preview.done.journalId}`}>{ph("See the journal")}</Link>
           </p>
         ) : (
           <>
             <DataTable
-              caption="What each asset writes off"
+              caption={ph("What each asset writes off")}
               columns={[
-                { key: "code", header: "Code", cell: (row) => <Link href={`/accounting/assets/${row.id}`}>{row.code}</Link> },
-                { key: "name", header: "Asset", cell: (row) => row.name },
-                { key: "cost", header: "Cost", cell: (row) => row.cost },
-                { key: "accumulated", header: "Written off so far", cell: (row) => row.accumulated },
-                { key: "amount", header: "This month", cell: (row) => row.amount },
-                { key: "after", header: "Worth after", cell: (row) => row.bookValueAfter },
+                { key: "code", header: ph("Code"), cell: (row) => <Link href={`/accounting/assets/${row.id}`}>{row.code}</Link> },
+                { key: "name", header: ph("Asset"), cell: (row) => row.name },
+                { key: "cost", header: ph("Cost"), cell: (row) => row.cost },
+                { key: "accumulated", header: ph("Written off so far"), cell: (row) => row.accumulated },
+                { key: "amount", header: ph("This month"), cell: (row) => row.amount },
+                { key: "after", header: ph("Worth after"), cell: (row) => row.bookValueAfter },
               ]}
               rows={preview.rows.map((row) => ({ ...row, amount: row.amount.toFixed(2) }))}
               getRowKey={(row) => row.id}
-              empty={<EmptyState title="Nothing to write off" description="No asset in use has anything left to depreciate for this month." />}
+              empty={<EmptyState title={ph("Nothing to write off")} description={ph("No asset in use has anything left to depreciate for this month.")} />}
             />
-            <p className="text-sm">Total {preview.total}</p>
-            {future ? <p className="text-sm text-muted">This month has not started yet.</p> : null}
-            {outOfOrder ? <p className="text-sm text-muted">A later month is already posted: months go in order.</p> : null}
+            <p className="text-sm">{ph("Total")} {preview.total}</p>
+            {future ? <p className="text-sm text-muted">{ph("This month has not started yet.")}</p> : null}
+            {outOfOrder ? <p className="text-sm text-muted">{ph("A later month is already posted: months go in order.")}</p> : null}
             {canPost && preview.rows.length > 0 && !future && !outOfOrder ? <RunDepreciationForm month={month} total={preview.total} /> : null}
           </>
         )}
       </section>
       <DataTable
-        caption="Months posted"
+        caption={ph("Months posted")}
         columns={[
-          { key: "month", header: "Month", cell: (row) => row.month },
-          { key: "assets", header: "Assets", cell: (row) => row.assets },
-          { key: "total", header: "Total", cell: (row) => <Link href={`/accounting/journals/${row.journalId}`}>{row.total}</Link> },
+          { key: "month", header: ph("Month"), cell: (row) => row.month },
+          { key: "assets", header: ph("Assets"), cell: (row) => row.assets },
+          { key: "total", header: ph("Total"), cell: (row) => <Link href={`/accounting/journals/${row.journalId}`}>{row.total}</Link> },
         ]}
         rows={runs}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No month posted yet" description="Each month's depreciation shows here once it is posted." />}
+        empty={<EmptyState title={ph("No month posted yet")} description={ph("Each month's depreciation shows here once it is posted.")} />}
       />
     </div>
   );

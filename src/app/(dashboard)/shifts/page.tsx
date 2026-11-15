@@ -9,12 +9,15 @@ import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
 import { activeShiftOf, listShifts, shiftRequired } from "@/modules/shifts/shifts";
 import { moneyPickerOptions } from "@/modules/treasury/dashboard";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Shifts" };
+export const generateMetadata = phraseTitled("Shifts");
 
 const views = ["active", "close", "history"] as const;
 
 export default async function ShiftsPage({ searchParams }: { searchParams: Promise<{ view?: string; q?: string }> }) {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session?.branchId) {
     redirect("/login");
@@ -41,52 +44,52 @@ export default async function ShiftsPage({ searchParams }: { searchParams: Promi
     <div className="space-y-6">
       <PageHeader
         title={title}
-        description="Open a shift with the cash in the drawer, work, then count and close. The drawer should hold the opening cash plus what this shift took in cash, less what it paid out. Two cashiers can work at the same time: each has a drawer of their own."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Shifts" }]}
+        description={ph("Open a shift with the cash in the drawer, work, then count and close. The drawer should hold the opening cash plus what this shift took in cash, less what it paid out. Two cashiers can work at the same time: each has a drawer of their own.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: ph("Shifts") }]}
       />
-      {required && !mine ? <p className="rounded-md border border-border p-3 text-sm">This shop needs an open shift to take or pay cash. Open one to start.</p> : null}
+      {required && !mine ? <p className="rounded-md border border-border p-3 text-sm">{ph("This shop needs an open shift to take or pay cash. Open one to start.")}</p> : null}
       {mine && view === "active" ? (
         <p className="text-sm">
-          You have a shift open. <Link href={`/shifts/${mine.id}`}>Open it</Link> to move cash, count the drawer and close.
+          {ph("You have a shift open.")} <Link href={`/shifts/${mine.id}`}>{ph("Open it")}</Link> {ph("to move cash, count the drawer and close.")}
         </p>
       ) : null}
       {session.permissions.has("shifts.manage") && view === "active" && !mine ? <OpenShiftForm cashAccounts={cashAccounts.filter((account) => account.kind === "CASH").map((account) => ({ id: account.id, label: account.label }))} /> : null}
       <div className="flex flex-wrap gap-3 text-sm">
         <Link href="/shifts?view=active" className={view === "active" ? "font-semibold" : "text-muted"}>
-          My Active Shift
+          {ph("My Active Shift")}
         </Link>
         <Link href="/shifts?view=close" className={view === "close" ? "font-semibold" : "text-muted"}>
-          Close My Shift
+          {ph("Close My Shift")}
         </Link>
         <Link href="/shifts?view=history" className={view === "history" ? "font-semibold" : "text-muted"}>
-          Shift History
+          {ph("Shift History")}
         </Link>
         <Link href="/accounting/statements" className="text-muted">
-          Branch Ledger
+          {ph("Branch Ledger")}
         </Link>
       </div>
       <form className="flex flex-wrap items-end gap-2" action="/shifts">
         <input type="hidden" name="view" value={view} />
         <label className="grid min-w-56 flex-1 gap-1 text-sm">
-          Search
-          <input name="q" defaultValue={params.q ?? ""} placeholder="Cashier" className="h-10 rounded-md border border-border px-3" />
+          {ph("Search")}
+          <input name="q" defaultValue={params.q ?? ""} placeholder={ph("Cashier")} className="h-10 rounded-md border border-border px-3" />
         </label>
         <Button type="submit" variant="secondary">
-          Search
+          {ph("Search")}
         </Button>
       </form>
       <DataTable
-        caption="Shifts"
+        caption={ph("Shifts")}
         columns={[
-          { key: "cashier", header: "Cashier", cell: (row) => <Link href={`/shifts/${row.id}`}>{row.cashierName}</Link> },
-          { key: "status", header: "Status", cell: (row) => row.status },
-          { key: "opening", header: "Opening", cell: (row) => row.openingCash ?? "" },
-          { key: "expected", header: "Expected", cell: (row) => row.expectedCash ?? "" },
-          { key: "difference", header: "Difference", cell: (row) => row.difference ?? "" },
+          { key: "cashier", header: ph("Cashier"), cell: (row) => <Link href={`/shifts/${row.id}`}>{row.cashierName}</Link> },
+          { key: "status", header: ph("Status"), cell: (row) => row.status },
+          { key: "opening", header: ph("Opening"), cell: (row) => row.openingCash ?? "" },
+          { key: "expected", header: ph("Expected"), cell: (row) => row.expectedCash ?? "" },
+          { key: "difference", header: ph("Difference"), cell: (row) => row.difference ?? "" },
         ]}
         rows={shifts}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No shifts" description="Open a shift with the cash already in the drawer." />}
+        empty={<EmptyState title={ph("No shifts")} description={ph("Open a shift with the cash already in the drawer.")} />}
       />
     </div>
   );

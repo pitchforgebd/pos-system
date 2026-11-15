@@ -6,6 +6,7 @@ import { businessDate } from "@/core/time/business-date";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSubmit } from "@/lib/client/use-submit";
+import { useI18n } from "@/lib/i18n/provider";
 
 type Party = { id: string; name: string; phone: string | null; outstanding: string };
 
@@ -31,6 +32,7 @@ export function PartyAmountForm({
   mode: "due" | "advance";
   balanceLabel?: string;
 }) {
+  const { ph } = useI18n();
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState<Party | null>(null);
@@ -66,7 +68,7 @@ export function PartyAmountForm({
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
       <section className="rounded-2xl border border-border bg-surface p-4">
         <label className="grid gap-1 text-sm">
-          Name or phone
+          {ph("Name or phone")}
           <input
             value={query}
             onChange={(event) => {
@@ -87,18 +89,18 @@ export function PartyAmountForm({
                 choose(active);
               }
             }}
-            placeholder="Search name or phone"
-            aria-label="Search name or phone"
+            placeholder={ph("Search name or phone")}
+            aria-label={ph("Search name or phone")}
             className="h-10 rounded-md border border-border px-3"
           />
         </label>
         <p className="mt-2 text-sm text-muted">
-          Showing {shown.length} of {matched.length}. Use the up and down keys, then Enter.
+          {ph("Showing")} {shown.length} {ph("of")} {matched.length}{ph(". Use the up and down keys, then Enter.")}
         </p>
         {shown.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted">{mode === "due" ? `No outstanding ${balanceLabel.toLowerCase()}.` : "No matching name."}</p>
+          <p className="py-8 text-center text-sm text-muted">{mode === "due" ? `No outstanding ${balanceLabel.toLowerCase()}.` : ph("No matching name.")}</p>
         ) : (
-          <ul className="mt-2 divide-y divide-border" role="listbox" aria-label="Customers">
+          <ul className="mt-2 divide-y divide-border" role="listbox" aria-label={ph("Customers")}>
             {shown.map((party) => {
               const current = party.id === active?.id;
               return (
@@ -112,7 +114,7 @@ export function PartyAmountForm({
                   >
                     <span>
                       <span className="block font-medium">{party.name}</span>
-                      <span className="text-xs text-muted">{party.phone ?? "No phone"}</span>
+                      <span className="text-xs text-muted">{party.phone ?? ph("No phone")}</span>
                     </span>
                     <span>{party.outstanding}</span>
                   </button>
@@ -127,7 +129,7 @@ export function PartyAmountForm({
         onSubmit={(event) => {
           event.preventDefault();
           if (!selected) {
-            setLocalMessage("Choose a name from the list.");
+            setLocalMessage(ph("Choose a name from the list."));
             return;
           }
           setLocalMessage("");
@@ -156,14 +158,14 @@ export function PartyAmountForm({
             </span>
           </p>
         ) : (
-          <p className="mt-2 text-sm text-muted">Select a name from the list.</p>
+          <p className="mt-2 text-sm text-muted">{ph("Select a name from the list.")}</p>
         )}
         <div className="mt-3 grid gap-3">
-          <Input type="date" required aria-label="Date" value={postDate} onChange={(event) => setPostDate(event.target.value)} />
-          <Input required aria-label="Amount" placeholder="Amount" value={amount} onChange={(event) => setAmount(event.target.value)} />
-          <select aria-label="Method" value={method} onChange={(event) => setMethod(event.target.value)} className="h-10 rounded-md border border-border bg-surface px-3 text-sm">
-            <option value="CASH">Cash</option>
-            <option value="BANK">Bank</option>
+          <Input type="date" required aria-label={ph("Date")} value={postDate} onChange={(event) => setPostDate(event.target.value)} />
+          <Input required aria-label={ph("Amount")} placeholder={ph("Amount")} value={amount} onChange={(event) => setAmount(event.target.value)} />
+          <select aria-label={ph("Method")} value={method} onChange={(event) => setMethod(event.target.value)} className="h-10 rounded-md border border-border bg-surface px-3 text-sm">
+            <option value="CASH">{ph("Cash")}</option>
+            <option value="BANK">{ph("Bank")}</option>
           </select>
         </div>
         {message ? <p className="mt-3 text-sm text-error">{message}</p> : null}

@@ -111,7 +111,7 @@ export function NavLinks({
         {!nested ? <Icon label={label} /> : <span className="size-1.5 rounded-full bg-current opacity-60" aria-hidden="true" />}
         <span className="truncate">{translateNav(lang, label)}</span>
         {href && badges?.[href] ? (
-          <span className="ml-auto rounded-full bg-red-600 px-1.5 text-[11px] font-semibold text-white" title="Needs attention">
+          <span className="ml-auto rounded-full bg-red-600 px-1.5 text-[11px] font-semibold text-white" title={lang === "bn" ? "মনোযোগ দরকার" : "Needs attention"}>
             {badges[href]}
           </span>
         ) : null}
@@ -128,7 +128,7 @@ export function NavLinks({
   }
 
   return (
-    <nav aria-label="Primary" className="space-y-1 px-2 py-3">
+    <nav aria-label={lang === "bn" ? "প্রধান মেনু" : "Primary"} className="space-y-1 px-2 py-3">
       {referenceNavigation.filter((entry) => entryVisible(entry, granted)).map((entry) => {
         if (entry.kind === "label") {
           return (

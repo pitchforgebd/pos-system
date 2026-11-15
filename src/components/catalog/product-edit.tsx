@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSubmit } from "@/lib/client/use-submit";
+import { useI18n } from "@/lib/i18n/provider";
 
 type Option = { id: string; name: string };
 
@@ -50,6 +51,7 @@ function Select({ name, label, value, options, none }: { name: string; label: st
 
 /** The general information of a product: name, groups, VAT, prices, flags. */
 export function ProductEditForm({ product, brands, categories, units }: { product: EditableProduct; brands: Option[]; categories: Option[]; units: Option[] }) {
+  const { ph } = useI18n();
   const { submit, pending, message } = useSubmit();
   return (
     <form
@@ -85,37 +87,37 @@ export function ProductEditForm({ product, brands, categories, units }: { produc
               warrantyAvailable: flag("warrantyAvailable"),
             },
           },
-          { successMessage: "Saved." },
+          { successMessage: ph("Saved.") },
         );
       }}
     >
       <div className="grid gap-3 sm:grid-cols-2">
-        <Input name="sku" required defaultValue={product.sku} aria-label="SKU" placeholder="SKU" />
-        <Input name="name" required defaultValue={product.name} aria-label="Name" placeholder="Name" />
-        <Input name="genericName" defaultValue={product.genericName ?? ""} aria-label="Generic name" placeholder="Generic name" />
-        <Input name="reorderLevel" defaultValue={product.reorderLevel} aria-label="Reorder level" placeholder="Reorder level" />
-        <Select name="brandId" label="Brand" value={product.brandId} options={brands} none="No brand" />
-        <Select name="categoryId" label="Category" value={product.categoryId} options={categories} none="No category" />
-        <Select name="unitId" label="Unit" value={product.unitId} options={units} none="No unit" />
+        <Input name="sku" required defaultValue={product.sku} aria-label={ph("SKU")} placeholder={ph("SKU")} />
+        <Input name="name" required defaultValue={product.name} aria-label={ph("Name")} placeholder={ph("Name")} />
+        <Input name="genericName" defaultValue={product.genericName ?? ""} aria-label={ph("Generic name")} placeholder={ph("Generic name")} />
+        <Input name="reorderLevel" defaultValue={product.reorderLevel} aria-label={ph("Reorder level")} placeholder={ph("Reorder level")} />
+        <Select name="brandId" label={ph("Brand")} value={product.brandId} options={brands} none="No brand" />
+        <Select name="categoryId" label={ph("Category")} value={product.categoryId} options={categories} none="No category" />
+        <Select name="unitId" label={ph("Unit")} value={product.unitId} options={units} none="No unit" />
         <label className="grid gap-1 text-sm">
-          VAT
+          {ph("VAT")}
           <select name="vatType" defaultValue={product.vatType ?? ""} className="h-10 rounded-md border border-border bg-surface px-2">
-            <option value="">No VAT</option>
-            <option value="INCLUSIVE">Included in the price</option>
-            <option value="EXCLUSIVE">Added to the price</option>
+            <option value="">{ph("No VAT")}</option>
+            <option value="INCLUSIVE">{ph("Included in the price")}</option>
+            <option value="EXCLUSIVE">{ph("Added to the price")}</option>
           </select>
         </label>
-        <Input name="vatValue" defaultValue={product.vatValue ?? ""} aria-label="VAT rate in percent" placeholder="VAT rate, %" />
+        <Input name="vatValue" defaultValue={product.vatValue ?? ""} aria-label={ph("VAT rate in percent")} placeholder={ph("VAT rate, %")} />
       </div>
       <label className="grid gap-1 text-sm">
-        Description
+        {ph("Description")}
         <textarea name="description" defaultValue={product.description ?? ""} rows={3} className="rounded-md border border-border bg-surface px-3 py-2" />
       </label>
       <div className="grid gap-3 sm:grid-cols-2">
-        <Input name="sellingPrice" required defaultValue={product.sellingPrice} aria-label="Retail price" placeholder="Retail price" />
-        <Input name="wholesalePrice" required defaultValue={product.wholesalePrice} aria-label="Wholesale price" placeholder="Wholesale price" />
-        <Input name="minimumPrice" required defaultValue={product.minimumPrice} aria-label="Minimum price" placeholder="Minimum price" />
-        {product.purchasePrice !== undefined ? <Input name="purchasePrice" required defaultValue={product.purchasePrice} aria-label="Last purchase price" placeholder="Last purchase price" /> : null}
+        <Input name="sellingPrice" required defaultValue={product.sellingPrice} aria-label={ph("Retail price")} placeholder={ph("Retail price")} />
+        <Input name="wholesalePrice" required defaultValue={product.wholesalePrice} aria-label={ph("Wholesale price")} placeholder={ph("Wholesale price")} />
+        <Input name="minimumPrice" required defaultValue={product.minimumPrice} aria-label={ph("Minimum price")} placeholder={ph("Minimum price")} />
+        {product.purchasePrice !== undefined ? <Input name="purchasePrice" required defaultValue={product.purchasePrice} aria-label={ph("Last purchase price")} placeholder={ph("Last purchase price")} /> : null}
       </div>
       <div className="flex flex-wrap gap-4 text-sm">
         {(
@@ -135,7 +137,7 @@ export function ProductEditForm({ product, brands, categories, units }: { produc
       </div>
       {message ? <p className="text-sm text-error">{message}</p> : null}
       <Button type="submit" loading={pending}>
-        Save product
+        {ph("Save product")}
       </Button>
     </form>
   );
@@ -145,6 +147,7 @@ type Step = { level: string; minQty: string; price: string };
 
 /** The price list: a level, the quantity a price starts at, the price. The default level is the fallback for everything else. */
 export function PriceStepsForm({ productId, levels, initial }: { productId: string; levels: string[]; initial: Step[] }) {
+  const { ph } = useI18n();
   const { submit, pending, message } = useSubmit();
   const [rows, setRows] = useState<Step[]>(initial.length > 0 ? initial : [{ level: levels[0] ?? "Retail", minQty: "1", price: "" }]);
   const change = (index: number, patch: Partial<Step>) => setRows((current) => current.map((row, i) => (i === index ? { ...row, ...patch } : row)));
@@ -153,15 +156,15 @@ export function PriceStepsForm({ productId, levels, initial }: { productId: stri
       className="grid max-w-2xl gap-3"
       onSubmit={(event) => {
         event.preventDefault();
-        void submit({ url: `/api/v1/products/${productId}/prices`, method: "PUT", body: { prices: rows.map((row) => ({ level: row.level, minQty: row.minQty.trim(), price: row.price.trim() })) } }, { successMessage: "Prices saved." });
+        void submit({ url: `/api/v1/products/${productId}/prices`, method: "PUT", body: { prices: rows.map((row) => ({ level: row.level, minQty: row.minQty.trim(), price: row.price.trim() })) } }, { successMessage: ph("Prices saved.") });
       }}
     >
       <table className="w-full text-left text-sm">
         <thead>
           <tr>
-            <th className="py-1 pr-2">Level</th>
-            <th className="py-1 pr-2">From quantity</th>
-            <th className="py-1 pr-2">Price</th>
+            <th className="py-1 pr-2">{ph("Level")}</th>
+            <th className="py-1 pr-2">{ph("From quantity")}</th>
+            <th className="py-1 pr-2">{ph("Price")}</th>
             <th />
           </tr>
         </thead>
@@ -169,7 +172,7 @@ export function PriceStepsForm({ productId, levels, initial }: { productId: stri
           {rows.map((row, index) => (
             <tr key={index}>
               <td className="py-1 pr-2">
-                <select aria-label="Level" value={row.level} onChange={(event) => change(index, { level: event.target.value })} className="h-10 rounded-md border border-border bg-surface px-2">
+                <select aria-label={ph("Level")} value={row.level} onChange={(event) => change(index, { level: event.target.value })} className="h-10 rounded-md border border-border bg-surface px-2">
                   {levels.map((level) => (
                     <option key={level} value={level}>
                       {level}
@@ -178,14 +181,14 @@ export function PriceStepsForm({ productId, levels, initial }: { productId: stri
                 </select>
               </td>
               <td className="py-1 pr-2">
-                <Input aria-label="From quantity" value={row.minQty} onChange={(event) => change(index, { minQty: event.target.value })} />
+                <Input aria-label={ph("From quantity")} value={row.minQty} onChange={(event) => change(index, { minQty: event.target.value })} />
               </td>
               <td className="py-1 pr-2">
-                <Input aria-label="Price" value={row.price} onChange={(event) => change(index, { price: event.target.value })} />
+                <Input aria-label={ph("Price")} value={row.price} onChange={(event) => change(index, { price: event.target.value })} />
               </td>
               <td className="py-1">
                 <button type="button" className="text-sm underline" onClick={() => setRows((current) => current.filter((_, i) => i !== index))}>
-                  Remove
+                  {ph("Remove")}
                 </button>
               </td>
             </tr>
@@ -194,10 +197,10 @@ export function PriceStepsForm({ productId, levels, initial }: { productId: stri
       </table>
       <div className="flex gap-2">
         <Button type="button" variant="secondary" onClick={() => setRows((current) => [...current, { level: levels[0] ?? "Retail", minQty: "1", price: "" }])}>
-          Add a step
+          {ph("Add a step")}
         </Button>
         <Button type="submit" loading={pending}>
-          Save prices
+          {ph("Save prices")}
         </Button>
       </div>
       {message ? <p className="text-sm text-error">{message}</p> : null}
@@ -207,6 +210,7 @@ export function PriceStepsForm({ productId, levels, initial }: { productId: stri
 
 /** Adds one more barcode to the product (or to one variant of it). */
 export function BarcodeAddForm({ productId }: { productId: string }) {
+  const { ph } = useI18n();
   const { submit, pending, message } = useSubmit();
   return (
     <form
@@ -218,12 +222,12 @@ export function BarcodeAddForm({ productId }: { productId: string }) {
         void submit({ url: `/api/v1/products/${productId}/barcodes`, body: { barcode } }, { onSuccess: () => element.reset() });
       }}
     >
-      <Input name="barcode" required placeholder="Barcode" aria-label="Barcode" />
+      <Input name="barcode" required placeholder={ph("Barcode")} aria-label={ph("Barcode")} />
       <Button type="submit" variant="secondary" loading={pending}>
-        Add barcode
+        {ph("Add barcode")}
       </Button>
-      <Button type="button" variant="secondary" loading={pending} onClick={() => void submit({ url: `/api/v1/products/${productId}/barcodes`, body: { generate: true } }, { successMessage: "Barcode made." })}>
-        Make one (EAN-13)
+      <Button type="button" variant="secondary" loading={pending} onClick={() => void submit({ url: `/api/v1/products/${productId}/barcodes`, body: { generate: true } }, { successMessage: ph("Barcode made.") })}>
+        {ph("Make one (EAN-13)")}
       </Button>
       {message ? <p className="w-full text-sm text-error">{message}</p> : null}
     </form>
@@ -232,6 +236,7 @@ export function BarcodeAddForm({ productId }: { productId: string }) {
 
 /** Adds a variant (a size, a pack) with its own SKU, one value of each variation it uses and, if it differs, its own price. */
 export function VariantAddForm({ productId, heads }: { productId: string; heads: Array<{ id: string; name: string; values: Array<{ id: string; value: string }> }> }) {
+  const { ph } = useI18n();
   const { submit, pending, message } = useSubmit();
   return (
     <form
@@ -248,7 +253,7 @@ export function VariantAddForm({ productId, heads }: { productId: string; heads:
         void submit({ url: `/api/v1/products/${productId}/variants`, body: { sku: String(form.get("sku") ?? "").trim(), ...(price ? { price } : {}), ...(values.length > 0 ? { values } : {}) } }, { onSuccess: () => element.reset() });
       }}
     >
-      <Input name="sku" required placeholder="Variant SKU" aria-label="Variant SKU" />
+      <Input name="sku" required placeholder={ph("Variant SKU")} aria-label={ph("Variant SKU")} />
       {heads.map((head) => (
         <label key={head.id} className="grid gap-1 text-sm">
           {head.name}
@@ -262,9 +267,9 @@ export function VariantAddForm({ productId, heads }: { productId: string; heads:
           </select>
         </label>
       ))}
-      <Input name="price" placeholder="Price (optional)" aria-label="Variant price" />
+      <Input name="price" placeholder={ph("Price (optional)")} aria-label={ph("Variant price")} />
       <Button type="submit" variant="secondary" loading={pending}>
-        Add variant
+        {ph("Add variant")}
       </Button>
       {message ? <p className="w-full text-sm text-error">{message}</p> : null}
     </form>

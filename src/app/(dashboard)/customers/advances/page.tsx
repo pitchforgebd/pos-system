@@ -7,10 +7,13 @@ import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
 import { listCustomerAdvances } from "@/modules/customers/advances";
 import { listCustomers } from "@/modules/customers/customers";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Advance Receive" };
+export const generateMetadata = phraseTitled("Advance Receive");
 
 export default async function CustomerAdvancesPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session?.branchId) {
     redirect("/login");
@@ -23,13 +26,13 @@ export default async function CustomerAdvancesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Advance Receive"
-        description="An advance is its own record. It can be more than the outstanding due, and it is not a wallet payment."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Customer Advance" }]}
+        title={ph("Advance Receive")}
+        description={ph("An advance is its own record. It can be more than the outstanding due, and it is not a wallet payment.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: ph("Customer Advance") }]}
       />
       {session.permissions.has("customers.advance") ? (
         <PartyAmountForm
-          title="Advance Receive"
+          title={ph("Advance Receive")}
           url="/api/v1/customer-advances"
           mode="advance"
           parties={customers
@@ -38,16 +41,16 @@ export default async function CustomerAdvancesPage() {
         />
       ) : null}
       <DataTable
-        caption="Advance report"
+        caption={ph("Advance report")}
         columns={[
-          { key: "date", header: "Date", cell: (row) => row.businessDate },
-          { key: "customer", header: "Customer", cell: (row) => row.customerName },
-          { key: "method", header: "Method", cell: (row) => row.method },
-          { key: "amount", header: "Amount", cell: (row) => row.amount },
+          { key: "date", header: ph("Date"), cell: (row) => row.businessDate },
+          { key: "customer", header: ph("Customer"), cell: (row) => row.customerName },
+          { key: "method", header: ph("Method"), cell: (row) => row.method },
+          { key: "amount", header: ph("Amount"), cell: (row) => row.amount },
         ]}
         rows={advances}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No advances" description="An advance stays separate from due collection." />}
+        empty={<EmptyState title={ph("No advances")} description={ph("An advance stays separate from due collection.")} />}
       />
     </div>
   );

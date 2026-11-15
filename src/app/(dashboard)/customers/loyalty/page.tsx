@@ -8,10 +8,13 @@ import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
 import { listCustomers } from "@/modules/customers/customers";
 import { listLoyaltyTransactions } from "@/modules/customers/loyalty";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Loyalty" };
+export const generateMetadata = phraseTitled("Loyalty");
 
 export default async function LoyaltyPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -24,13 +27,13 @@ export default async function LoyaltyPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Loyalty"
-        description="A sale earns points when shop settings have points per hundred. Redeem uses taka per point from those settings and reduces the customer balance."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Loyalty" }]}
+        title={ph("Loyalty")}
+        description={ph("A sale earns points when shop settings have points per hundred. Redeem uses taka per point from those settings and reduces the customer balance.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: ph("Loyalty") }]}
         actions={
           <div className="flex gap-2">
-            <Button href="/customers/loyalty/tiers" variant="secondary">Tiers</Button>
-            <Button href="/customers/loyalty/cards" variant="secondary">Cards</Button>
+            <Button href="/customers/loyalty/tiers" variant="secondary">{ph("Tiers")}</Button>
+            <Button href="/customers/loyalty/cards" variant="secondary">{ph("Cards")}</Button>
           </div>
         }
       />
@@ -38,16 +41,16 @@ export default async function LoyaltyPage() {
         <RedeemForm customers={customers.filter((customer) => customer.status === "ACTIVE").map((customer) => ({ id: customer.id, label: customer.name }))} />
       ) : null}
       <DataTable
-        caption="Loyalty ledger"
+        caption={ph("Loyalty ledger")}
         columns={[
-          { key: "date", header: "Date", cell: (row) => row.businessDate },
-          { key: "customer", header: "Customer", cell: (row) => row.customerName },
-          { key: "type", header: "Type", cell: (row) => row.entryType },
-          { key: "points", header: "Points", cell: (row) => row.points },
+          { key: "date", header: ph("Date"), cell: (row) => row.businessDate },
+          { key: "customer", header: ph("Customer"), cell: (row) => row.customerName },
+          { key: "type", header: ph("Type"), cell: (row) => row.entryType },
+          { key: "points", header: ph("Points"), cell: (row) => row.points },
         ]}
         rows={transactions}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No loyalty transactions" description="Set points per hundred on shop settings, then sell to a customer." />}
+        empty={<EmptyState title={ph("No loyalty transactions")} description={ph("Set points per hundred on shop settings, then sell to a customer.")} />}
       />
     </div>
   );

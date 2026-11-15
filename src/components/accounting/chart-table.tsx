@@ -2,24 +2,26 @@ import Link from "next/link";
 
 import { DataTable } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/states";
+import { getPhrase } from "@/lib/i18n/server";
 
-export function ChartAccountTable({ rows }: { rows: { id: string; code: string; name: string; groupName: string }[] }) {
+export async function ChartAccountTable({ rows }: { rows: { id: string; code: string; name: string; groupName: string }[] }) {
+  const ph = await getPhrase();
   return (
     <DataTable
-      caption="Accounts"
+      caption={ph("Accounts")}
       columns={[
-        { key: "code", header: "Code", cell: (row) => row.code },
-        { key: "name", header: "Account", cell: (row) => row.name },
-        { key: "group", header: "Group", cell: (row) => row.groupName },
+        { key: "code", header: ph("Code"), cell: (row) => row.code },
+        { key: "name", header: ph("Account"), cell: (row) => row.name },
+        { key: "group", header: ph("Group"), cell: (row) => row.groupName },
         {
           key: "ledger",
-          header: "Ledger",
-          cell: (row) => <Link href={`/accounting/statements?accountCode=${row.code}`}>Statement</Link>,
+          header: ph("Ledger"),
+          cell: (row) => <Link href={`/accounting/statements?accountCode=${row.code}`}>{ph("Statement")}</Link>,
         },
       ]}
       rows={rows}
       getRowKey={(row) => row.id}
-      empty={<EmptyState title="No accounts" description="The chart has no account in this group." />}
+      empty={<EmptyState title={ph("No accounts")} description={ph("The chart has no account in this group.")} />}
     />
   );
 }

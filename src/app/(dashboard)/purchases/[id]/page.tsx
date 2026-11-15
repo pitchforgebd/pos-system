@@ -8,12 +8,15 @@ import { businessDate } from "@/core/time/business-date";
 import { getSession } from "@/modules/auth/current-session";
 import { moneyAccountOptions } from "@/modules/purchasing/lookups";
 import { getPurchase } from "@/modules/purchasing/purchases";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Purchase" };
+export const generateMetadata = phraseTitled("Purchase");
 
 const TONE = { DRAFT: "neutral", ORDERED: "info", RECEIVED: "success", CANCELLED: "error" } as const;
 
 export default async function PurchaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session?.branchId) {
     redirect("/login");
@@ -42,48 +45,48 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
         can={{ create: session.permissions.has("purchase.create"), edit: session.permissions.has("purchase.edit"), return: session.permissions.has("purchase.return") }}
       />
       <DataTable
-        caption="Purchase lines"
+        caption={ph("Purchase lines")}
         columns={[
-          { key: "sku", header: "SKU", cell: (row) => row.sku },
-          { key: "name", header: "Product", cell: (row) => row.name },
-          { key: "quantity", header: "Quantity", cell: (row) => row.quantity },
-          { key: "cost", header: "Unit cost", cell: (row) => row.unitCost },
-          { key: "discount", header: "Discount", cell: (row) => row.discount },
-          { key: "vat", header: "VAT", cell: (row) => (row.vatRate === "0.00" ? "" : `${row.vatRate}% = ${row.vatAmount}`) },
-          { key: "total", header: "Line total", cell: (row) => row.lineTotal },
-          { key: "landed", header: "Landed unit cost", cell: (row) => row.landedUnitCost ?? "" },
+          { key: "sku", header: ph("SKU"), cell: (row) => row.sku },
+          { key: "name", header: ph("Product"), cell: (row) => row.name },
+          { key: "quantity", header: ph("Quantity"), cell: (row) => row.quantity },
+          { key: "cost", header: ph("Unit cost"), cell: (row) => row.unitCost },
+          { key: "discount", header: ph("Discount"), cell: (row) => row.discount },
+          { key: "vat", header: ph("VAT"), cell: (row) => (row.vatRate === "0.00" ? "" : `${row.vatRate}% = ${row.vatAmount}`) },
+          { key: "total", header: ph("Line total"), cell: (row) => row.lineTotal },
+          { key: "landed", header: ph("Landed unit cost"), cell: (row) => row.landedUnitCost ?? "" },
         ]}
         rows={purchase.items}
         getRowKey={(row) => row.id}
       />
       <dl className="grid max-w-md grid-cols-2 gap-x-4 gap-y-1 text-sm">
-        <dt>Goods</dt>
+        <dt>{ph("Goods")}</dt>
         <dd className="text-right tabular-nums">{purchase.subtotal}</dd>
-        <dt>Discounts</dt>
+        <dt>{ph("Discounts")}</dt>
         <dd className="text-right tabular-nums">{purchase.discountTotal}</dd>
-        <dt>VAT</dt>
+        <dt>{ph("VAT")}</dt>
         <dd className="text-right tabular-nums">{purchase.vatTotal}</dd>
-        <dt className="font-medium">Owed to {purchase.supplier.name}</dt>
+        <dt className="font-medium">{ph("Owed to")} {purchase.supplier.name}</dt>
         <dd className="text-right font-medium tabular-nums">{purchase.total}</dd>
-        <dt>Haulage {purchase.transportCost}, other costs {purchase.otherCost}</dt>
+        <dt>{ph("Haulage")} {purchase.transportCost}{ph(", other costs")} {purchase.otherCost}</dt>
         <dd className="text-right tabular-nums">{purchase.chargesTotal}</dd>
-        <dt className="font-medium">Cost altogether</dt>
+        <dt className="font-medium">{ph("Cost altogether")}</dt>
         <dd className="text-right font-medium tabular-nums">{purchase.landedTotal}</dd>
       </dl>
       {purchase.chargesTotal !== "0.00" ? (
         <p className="text-sm text-muted">
-          Haulage {purchase.transportPaidWith === "CREDIT" ? `is owed to ${purchase.transporter?.name ?? "the carrier"}` : `was paid ${purchase.transportPaidWith === "BANK" ? "from the bank" : "in cash"}`}
+          {ph("Haulage")} {purchase.transportPaidWith === "CREDIT" ? `is owed to ${purchase.transporter?.name ?? "the carrier"}` : `was paid ${purchase.transportPaidWith === "BANK" ? "from the bank" : "in cash"}`}
           {purchase.transporter ? ` · carrier ${purchase.transporter.name}` : ""}
           {purchase.vehicleNo ? ` · vehicle ${purchase.vehicleNo}` : ""}.
         </p>
       ) : null}
       {purchase.status === "RECEIVED" ? (
         <p className="text-sm text-muted">
-          Received {purchase.receivedOn} into {purchase.warehouse?.name ?? "the warehouse"}. Payment status {purchase.paymentStatus}: owed {purchase.owed}, paid since the purchase {purchase.paidLater}. Journal{" "}
-          {purchase.journalBalanced ? "is balanced" : "is not balanced"}.
+          {ph("Received")} {purchase.receivedOn} {ph("into")} {purchase.warehouse?.name ?? ph("the warehouse")}{ph(". Payment status")} {purchase.paymentStatus}{ph(": owed")} {purchase.owed}{ph(", paid since the purchase")} {purchase.paidLater}{ph(". Journal")}{" "}
+          {purchase.journalBalanced ? ph("is balanced") : ph("is not balanced")}.
         </p>
       ) : (
-        <p className="text-sm text-muted">Nothing is posted for this purchase until the goods are received.</p>
+        <p className="text-sm text-muted">{ph("Nothing is posted for this purchase until the goods are received.")}</p>
       )}
       {purchase.note ? <p className="text-sm">{purchase.note}</p> : null}
     </div>

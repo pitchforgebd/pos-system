@@ -6,10 +6,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
 import { listVariationHeads } from "@/modules/catalog/variations";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Variations" };
+export const generateMetadata = phraseTitled("Variations");
 
 export default async function VariationsPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -20,13 +23,13 @@ export default async function VariationsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Variations"
-        description="A variation (Size, Colour, Pack) has values (5 kg, Red, Sack). A product's variants are described by one value of each. Add the variants on the product's own page."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Products", href: "/products" }, { label: "Variations" }]}
+        title={ph("Variations")}
+        description={ph("A variation (Size, Colour, Pack) has values (5 kg, Red, Sack). A product's variants are described by one value of each. Add the variants on the product's own page.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Products", href: "/products" }, { label: ph("Variations") }]}
       />
       {canEdit ? <AddHeadForm /> : null}
       {heads.length === 0 ? (
-        <EmptyState title="No variations yet" description="Add a variation such as Size, then its values." />
+        <EmptyState title={ph("No variations yet")} description={ph("Add a variation such as Size, then its values.")} />
       ) : (
         <div className="grid gap-3 lg:grid-cols-2">
           {heads.map((head) => (
@@ -35,7 +38,7 @@ export default async function VariationsPage() {
         </div>
       )}
       <Link href="/products" className="text-sm underline">
-        Back to products
+        {ph("Back to products")}
       </Link>
     </div>
   );

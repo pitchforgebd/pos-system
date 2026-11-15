@@ -4,10 +4,13 @@ import { StatusAction } from "@/components/commerce/forms";
 import { PageHeader } from "@/components/ui/page-header";
 import { getSession } from "@/modules/auth/current-session";
 import { getRequisition } from "@/modules/commerce/requisitions";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Requisition" };
+export const generateMetadata = phraseTitled("Requisition");
 
 export default async function RequisitionDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session?.branchId) {
     redirect("/login");
@@ -29,11 +32,11 @@ export default async function RequisitionDetailPage({ params }: { params: Promis
       <div className="flex gap-2">
         {requisition.status === "REQUESTED" ? (
           <>
-            <StatusAction url={`/api/v1/requisitions/${requisition.id}/approve`} label="Approve" />
-            <StatusAction url={`/api/v1/requisitions/${requisition.id}/reject`} label="Reject" />
+            <StatusAction url={`/api/v1/requisitions/${requisition.id}/approve`} label={ph("Approve")} />
+            <StatusAction url={`/api/v1/requisitions/${requisition.id}/reject`} label={ph("Reject")} />
           </>
         ) : null}
-        {requisition.status === "APPROVED" ? <StatusAction url={`/api/v1/requisitions/${requisition.id}/fulfill`} label="Fulfill" /> : null}
+        {requisition.status === "APPROVED" ? <StatusAction url={`/api/v1/requisitions/${requisition.id}/fulfill`} label={ph("Fulfill")} /> : null}
       </div>
     </div>
   );

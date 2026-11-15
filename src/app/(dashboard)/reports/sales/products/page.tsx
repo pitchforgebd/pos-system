@@ -7,10 +7,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
 import { salesByProduct } from "@/modules/reports/reports";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Sales report by product" };
+export const generateMetadata = phraseTitled("Sales report by product");
 
 export default async function SalesByProductPage({ searchParams }: { searchParams: Promise<{ from?: string; to?: string }> }) {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session?.branchId) {
     redirect("/login");
@@ -21,24 +24,24 @@ export default async function SalesByProductPage({ searchParams }: { searchParam
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Sales report by product"
-        description="Quantity and amount are posted sale lines minus posted returns."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Reports", href: "/reports" }, { label: "Sales by product" }]}
-        actions={<Button href="/reports" variant="secondary">Back to reports</Button>}
+        title={ph("Sales report by product")}
+        description={ph("Quantity and amount are posted sale lines minus posted returns.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Reports", href: "/reports" }, { label: ph("Sales by product") }]}
+        actions={<Button href="/reports" variant="secondary">{ph("Back to reports")}</Button>}
       />
       <DateFilter from={query.from} to={query.to} />
       <ReportNote count={report.count} shown={report.rows.length} />
       <DataTable
-        caption="Products"
+        caption={ph("Products")}
         columns={[
-          { key: "sku", header: "SKU", cell: (row) => row.sku },
-          { key: "name", header: "Product", cell: (row) => row.name },
-          { key: "quantity", header: "Quantity", cell: (row) => row.quantity },
-          { key: "total", header: "Amount", cell: (row) => row.total },
+          { key: "sku", header: ph("SKU"), cell: (row) => row.sku },
+          { key: "name", header: ph("Product"), cell: (row) => row.name },
+          { key: "quantity", header: ph("Quantity"), cell: (row) => row.quantity },
+          { key: "total", header: ph("Amount"), cell: (row) => row.total },
         ]}
         rows={report.rows}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No posted sale lines" description="Posted sales on this branch appear here." />}
+        empty={<EmptyState title={ph("No posted sale lines")} description={ph("Posted sales on this branch appear here.")} />}
       />
     </div>
   );

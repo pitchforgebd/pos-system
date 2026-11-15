@@ -3,9 +3,11 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useFormSubmit } from "@/lib/client/use-form-submit";
+import { useI18n } from "@/lib/i18n/provider";
 
 /** Closing a finished year: the owner types the year's name to confirm. It cannot be undone: the period is locked. */
 export function CloseYearForm({ startYear, label }: { startYear: number; label: string }) {
+  const { ph } = useI18n();
   const form = useFormSubmit("/api/v1/accounting/year-end", (data) => ({ startYear, confirm: data.get("confirm") }));
   return (
     <form className="flex flex-wrap items-end gap-2" onSubmit={form.onSubmit}>
@@ -14,7 +16,7 @@ export function CloseYearForm({ startYear, label }: { startYear: number; label: 
         <Input name="confirm" required maxLength={16} placeholder={label} autoComplete="off" />
       </label>
       <Button type="submit" variant="danger" size="sm" loading={form.pending}>
-        Close the year
+        {ph("Close the year")}
       </Button>
       {form.message ? <p className="w-full text-sm text-error">{form.message}</p> : null}
     </form>

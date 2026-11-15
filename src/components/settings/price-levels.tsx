@@ -3,10 +3,12 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSubmit } from "@/lib/client/use-submit";
+import { useI18n } from "@/lib/i18n/provider";
 
 type Level = { id: string; name: string; isDefault: boolean; status: "ACTIVE" | "INACTIVE"; prices: number; customerTypes: number };
 
 export function AddLevelForm() {
+  const { ph } = useI18n();
   const { submit, pending, message } = useSubmit();
   return (
     <form
@@ -17,9 +19,9 @@ export function AddLevelForm() {
         void submit({ url: "/api/v1/price-levels", body: { name: String(new FormData(element).get("name") ?? "").trim() } }, { onSuccess: () => element.reset() });
       }}
     >
-      <Input name="name" required placeholder="New price level, e.g. Export" aria-label="Price level name" />
+      <Input name="name" required placeholder={ph("New price level, e.g. Export")} aria-label={ph("Price level name")} />
       <Button type="submit" loading={pending}>
-        Add level
+        {ph("Add level")}
       </Button>
       {message ? <p className="w-full text-sm text-error">{message}</p> : null}
     </form>
@@ -28,6 +30,7 @@ export function AddLevelForm() {
 
 /** One level: rename it, switch it on or off, make it the default. */
 export function LevelRow({ level }: { level: Level }) {
+  const { ph } = useI18n();
   const { submit, pending, message } = useSubmit();
   const patch = (body: Record<string, unknown>) => void submit({ url: `/api/v1/price-levels/${level.id}`, method: "PATCH", body });
   return (
@@ -41,23 +44,23 @@ export function LevelRow({ level }: { level: Level }) {
       >
         <Input name="name" defaultValue={level.name} aria-label={`Name of ${level.name}`} />
         <Button type="submit" variant="secondary" loading={pending}>
-          Rename
+          {ph("Rename")}
         </Button>
       </form>
       {level.isDefault ? (
-        <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-semibold">Default</span>
+        <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-semibold">{ph("Default")}</span>
       ) : (
         <>
           <button type="button" className="underline" onClick={() => patch({ makeDefault: true })}>
-            Make default
+            {ph("Make default")}
           </button>
           <button type="button" className="underline" onClick={() => patch({ status: level.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" })}>
-            {level.status === "ACTIVE" ? "Switch off" : "Switch on"}
+            {level.status === "ACTIVE" ? ph("Switch off") : ph("Switch on")}
           </button>
         </>
       )}
       <span className="text-muted">
-        {level.prices} price(s) · {level.customerTypes} customer type(s) {level.status === "INACTIVE" ? "· off" : ""}
+        {level.prices} {ph("price(s) ·")} {level.customerTypes} {ph("customer type(s)")} {level.status === "INACTIVE" ? ph("· off") : ""}
       </span>
       {message ? <span className="w-full text-error">{message}</span> : null}
     </li>
@@ -66,6 +69,7 @@ export function LevelRow({ level }: { level: Level }) {
 
 /** Which level a customer type buys at. */
 export function TypeLevelSelect({ type, levels }: { type: { id: string; name: string; priceLevelId: string | null }; levels: Level[] }) {
+  const { ph } = useI18n();
   const { submit, message } = useSubmit();
   return (
     <label className="flex flex-wrap items-center gap-2 text-sm">
@@ -82,7 +86,7 @@ export function TypeLevelSelect({ type, levels }: { type: { id: string; name: st
           }
         }}
       >
-        <option value="">Default level</option>
+        <option value="">{ph("Default level")}</option>
         {levels
           .filter((level) => level.status === "ACTIVE")
           .map((level) => (

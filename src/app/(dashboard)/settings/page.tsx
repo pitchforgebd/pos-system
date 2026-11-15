@@ -8,10 +8,13 @@ import { listBranches } from "@/modules/access/users";
 import { getSession } from "@/modules/auth/current-session";
 import { getOrganizationProfile } from "@/modules/settings/profile";
 import { getSmsSettings } from "@/modules/sms/sms";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Settings" };
+export const generateMetadata = phraseTitled("Settings");
 
 export default async function SettingsPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -29,13 +32,13 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Settings"
-        description="Shop name, phone, address, BIN, TIN, logo address, and loyalty rates."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Settings" }]}
+        title={ph("Settings")}
+        description={ph("Shop name, phone, address, BIN, TIN, logo address, and loyalty rates.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: ph("Settings") }]}
       />
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Shop profile</h2>
-        {profile.logoUrl ? <img src={profile.logoUrl} alt="Shop logo" className="h-12 w-auto" /> : null}
+        <h2 className="text-lg font-semibold">{ph("Shop profile")}</h2>
+        {profile.logoUrl ? <img src={profile.logoUrl} alt={ph("Shop logo")} className="h-12 w-auto" /> : null}
         {session.permissions.has("settings.manage") ? (
           <ProfileForm
             name={profile.name}
@@ -50,29 +53,29 @@ export default async function SettingsPage() {
         ) : null}
       </section>
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Sell branch</h2>
-        <p className="text-sm text-muted">The sell branch is the branch on this session: {sellBranch}. Change it from the header. A separate default is not stored.</p>
+        <h2 className="text-lg font-semibold">{ph("Sell branch")}</h2>
+        <p className="text-sm text-muted">{ph("The sell branch is the branch on this session:")} {sellBranch}{ph(". Change it from the header. A separate default is not stored.")}</p>
         {session.permissions.has("branches.manage") ? (
           <Link href="/branches" className="text-sm font-medium text-primary">
-            Create a branch
+            {ph("Create a branch")}
           </Link>
         ) : null}
         <DataTable
-          caption="Branches"
+          caption={ph("Branches")}
           columns={[
-            { key: "name", header: "Branch", cell: (row) => row.name },
-            { key: "current", header: "Session", cell: (row) => (row.id === session.branchId ? "Current" : "") },
+            { key: "name", header: ph("Branch"), cell: (row) => row.name },
+            { key: "current", header: ph("Session"), cell: (row) => (row.id === session.branchId ? "Current" : "") },
           ]}
           rows={branches}
           getRowKey={(row) => row.id}
         />
       </section>
       <section className="space-y-2 text-sm">
-        <h2 className="text-lg font-semibold">SMS</h2>
-        <p>Sender {sms.sender ?? "not set"}</p>
-        <p>Provider {sms.provider ?? "not set"}</p>
+        <h2 className="text-lg font-semibold">{ph("SMS")}</h2>
+        <p>{ph("Sender")} {sms.sender ?? ph("not set")}</p>
+        <p>{ph("Provider")} {sms.provider ?? ph("not set")}</p>
         <p>
-          <Link href="/sms/settings">SMS Settings</Link>
+          <Link href="/sms/settings">{ph("SMS Settings")}</Link>
         </p>
       </section>
     </div>

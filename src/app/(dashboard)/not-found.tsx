@@ -1,14 +1,16 @@
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/states";
+import { getPhrase } from "@/lib/i18n/server";
 
-export default function DashboardNotFound() {
+export default async function DashboardNotFound() {
+  const ph = await getPhrase();
   return (
     <EmptyState
-      title="Page not found"
-      description="That screen is not part of this application."
+      title={ph("Page not found")}
+      description={ph("That screen is not part of this application.")}
       action={
         <Button href="/dashboard" variant="secondary">
-          Back to dashboard
+          {ph("Back to dashboard")}
         </Button>
       }
     />

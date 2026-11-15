@@ -4,8 +4,10 @@ import { PrintButton, PrintSheet } from "@/components/print/sheet";
 import { PageHeader } from "@/components/ui/page-header";
 import { getSession } from "@/modules/auth/current-session";
 import { getTakeOff } from "@/modules/inventory/documents";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Take-off" };
+export const generateMetadata = phraseTitled("Take-off");
 
 const PURPOSE_LABEL: Record<string, string> = {
   SAMPLE: "Sample",
@@ -16,6 +18,7 @@ const PURPOSE_LABEL: Record<string, string> = {
 };
 
 export default async function TakeOffDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session?.branchId) {
     redirect("/login");
@@ -29,30 +32,30 @@ export default async function TakeOffDetailPage({ params }: { params: Promise<{ 
   return (
     <div className="space-y-6">
       <PageHeader
-        title={takeOff.number || "Take-off"}
+        title={takeOff.number || ph("Take-off")}
         description={`${takeOff.businessDate} · ${takeOff.warehouseName} · ${takeOff.total}`}
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Take-off", href: "/inventory/take-off" }, { label: takeOff.number || "Take-off" }]}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Take-off", href: "/inventory/take-off" }, { label: takeOff.number || ph("Take-off") }]}
         actions={
           <div className="print:hidden">
-            <PrintButton label="Print" />
+            <PrintButton label={ph("Print")} />
           </div>
         }
       />
-      <PrintSheet title="Take-off slip" note={takeOff.number}>
-        <p>Date {takeOff.businessDate}</p>
-        <p>From {takeOff.warehouseName}</p>
-        <p>Why {PURPOSE_LABEL[takeOff.purpose ?? ""] ?? takeOff.purpose}</p>
-        <p>Given to {takeOff.recipient}</p>
-        <p>Approved by {takeOff.approvedBy}</p>
-        {takeOff.note ? <p>Note {takeOff.note}</p> : null}
+      <PrintSheet title={ph("Take-off slip")} note={takeOff.number}>
+        <p>{ph("Date")} {takeOff.businessDate}</p>
+        <p>{ph("From")} {takeOff.warehouseName}</p>
+        <p>{ph("Why")} {PURPOSE_LABEL[takeOff.purpose ?? ""] ?? takeOff.purpose}</p>
+        <p>{ph("Given to")} {takeOff.recipient}</p>
+        <p>{ph("Approved by")} {takeOff.approvedBy}</p>
+        {takeOff.note ? <p>{ph("Note")} {takeOff.note}</p> : null}
         <table className="w-full text-left text-sm">
           <thead>
             <tr>
-              <th className="py-1 pr-2">SKU</th>
-              <th className="py-1 pr-2">Product</th>
-              <th className="py-1 pr-2">Quantity</th>
-              <th className="py-1 pr-2">Unit cost</th>
-              <th className="py-1">Value</th>
+              <th className="py-1 pr-2">{ph("SKU")}</th>
+              <th className="py-1 pr-2">{ph("Product")}</th>
+              <th className="py-1 pr-2">{ph("Quantity")}</th>
+              <th className="py-1 pr-2">{ph("Unit cost")}</th>
+              <th className="py-1">{ph("Value")}</th>
             </tr>
           </thead>
           <tbody>
@@ -67,7 +70,7 @@ export default async function TakeOffDetailPage({ params }: { params: Promise<{ 
             ))}
           </tbody>
         </table>
-        <p className="font-semibold">Total value {takeOff.total}</p>
+        <p className="font-semibold">{ph("Total value")} {takeOff.total}</p>
       </PrintSheet>
     </div>
   );

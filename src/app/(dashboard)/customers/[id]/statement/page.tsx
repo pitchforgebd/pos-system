@@ -5,12 +5,15 @@ import { PageHeader } from "@/components/ui/page-header";
 import { addDays, businessDate } from "@/core/time/business-date";
 import { getSession } from "@/modules/auth/current-session";
 import { statementOf } from "@/modules/customers/profile";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Statement" };
+export const generateMetadata = phraseTitled("Statement");
 
 const iso = (value: string | undefined) => (value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null);
 
 export default async function StatementPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ from?: string; to?: string }> }) {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -27,8 +30,8 @@ export default async function StatementPage({ params, searchParams }: { params: 
     <div className="space-y-6">
       <PageHeader
         title={`Statement: ${statement.party.name}`}
-        description="Every line of the account in the period, with the balance after each. Print it or send it to the customer."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Customers", href: "/customers" }, { label: statement.party.name, href: `/customers/${id}` }, { label: "Statement" }]}
+        description={ph("Every line of the account in the period, with the balance after each. Print it or send it to the customer.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Customers", href: "/customers" }, { label: statement.party.name, href: `/customers/${id}` }, { label: ph("Statement") }]}
       />
       <PartyStatement statement={statement} kind="customer" back={`/customers/${id}`} />
     </div>

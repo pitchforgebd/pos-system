@@ -5,10 +5,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { listRoles } from "@/modules/access/roles";
 import { listBranches, listUsers } from "@/modules/access/users";
 import { getSession } from "@/modules/auth/current-session";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Users" };
+export const generateMetadata = phraseTitled("Users");
 
 export default async function UsersPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -28,9 +31,9 @@ export default async function UsersPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Users"
-        description="Accounts in this organization. Passwords are stored only as hashes."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Users" }]}
+        title={ph("Users")}
+        description={ph("Accounts in this organization. Passwords are stored only as hashes.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: ph("Users") }]}
       />
       <UserAdmin
         users={users}

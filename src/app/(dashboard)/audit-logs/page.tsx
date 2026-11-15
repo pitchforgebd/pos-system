@@ -6,8 +6,10 @@ import { deviceLabel } from "@/lib/format/device";
 import { AUDIT_PAGE_SIZE, searchAuditLogs } from "@/modules/auth/audit";
 import { getSession } from "@/modules/auth/current-session";
 import { isIsoDate } from "@/core/time/business-date";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Audit logs" };
+export const generateMetadata = phraseTitled("Audit logs");
 
 type Params = { page?: string; action?: string; module?: string; user?: string; from?: string; to?: string };
 
@@ -17,6 +19,7 @@ const clean = (value: string | undefined, max = 64) => (value ?? "").trim().slic
 const day = (value: string | undefined) => (value && isIsoDate(value) ? value : undefined);
 
 export default async function AuditLogsPage({ searchParams }: { searchParams: Promise<Params> }) {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -40,59 +43,59 @@ export default async function AuditLogsPage({ searchParams }: { searchParams: Pr
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Audit logs"
-        description="Actions in this organization, newest first. Times are Dhaka time. Passwords and tokens are not stored here."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Audit logs" }]}
+        title={ph("Audit logs")}
+        description={ph("Actions in this organization, newest first. Times are Dhaka time. Passwords and tokens are not stored here.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: ph("Audit logs") }]}
       />
       <form method="get" className="flex flex-wrap items-end gap-3 text-sm">
         <label className="grid gap-1">
-          Action
-          <input name="action" defaultValue={filters.action} className="h-10 rounded-md border border-border px-3" placeholder="e.g. login" />
+          {ph("Action")}
+          <input name="action" defaultValue={filters.action} className="h-10 rounded-md border border-border px-3" placeholder={ph("e.g. login")} />
         </label>
         <label className="grid gap-1">
-          Module
-          <input name="module" defaultValue={filters.module} className="h-10 rounded-md border border-border px-3" placeholder="e.g. auth" />
+          {ph("Module")}
+          <input name="module" defaultValue={filters.module} className="h-10 rounded-md border border-border px-3" placeholder={ph("e.g. auth")} />
         </label>
         <label className="grid gap-1">
-          User email
+          {ph("User email")}
           <input name="user" defaultValue={filters.user} className="h-10 rounded-md border border-border px-3" />
         </label>
         <label className="grid gap-1">
-          From
+          {ph("From")}
           <input name="from" type="date" defaultValue={filters.from} className="h-10 rounded-md border border-border px-3" />
         </label>
         <label className="grid gap-1">
-          To
+          {ph("To")}
           <input name="to" type="date" defaultValue={filters.to} className="h-10 rounded-md border border-border px-3" />
         </label>
         <button type="submit" className="h-10 rounded-md border border-border bg-secondary px-4 font-medium">
-          Filter
+          {ph("Filter")}
         </button>
         <Link href="/audit-logs" className="h-10 content-center text-primary">
-          Clear
+          {ph("Clear")}
         </Link>
       </form>
       <p className="text-sm text-muted" aria-live="polite">
-        {result.total === 0 ? "No entries." : `Showing ${first}-${last} of ${result.total}`}
+        {result.total === 0 ? ph("No entries.") : `${ph("Showing")} ${first}-${last} ${ph("of")} ${result.total}`}
       </p>
       <div className="overflow-x-auto rounded-md border border-border">
         <table className="min-w-full text-sm">
           <thead className="bg-secondary text-left">
             <tr>
-              <th className="px-3 py-2 font-medium">Time (Dhaka)</th>
-              <th className="px-3 py-2 font-medium">User</th>
-              <th className="px-3 py-2 font-medium">Action</th>
-              <th className="px-3 py-2 font-medium">Module</th>
-              <th className="px-3 py-2 font-medium">Record</th>
-              <th className="px-3 py-2 font-medium">IP</th>
-              <th className="px-3 py-2 font-medium">Device</th>
+              <th className="px-3 py-2 font-medium">{ph("Time (Dhaka)")}</th>
+              <th className="px-3 py-2 font-medium">{ph("User")}</th>
+              <th className="px-3 py-2 font-medium">{ph("Action")}</th>
+              <th className="px-3 py-2 font-medium">{ph("Module")}</th>
+              <th className="px-3 py-2 font-medium">{ph("Record")}</th>
+              <th className="px-3 py-2 font-medium">{ph("IP")}</th>
+              <th className="px-3 py-2 font-medium">{ph("Device")}</th>
             </tr>
           </thead>
           <tbody>
             {result.rows.map((row) => (
               <tr key={row.id} className="border-t border-border">
                 <td className="whitespace-nowrap px-3 py-2">{dhakaTime.format(row.createdAt)}</td>
-                <td className="px-3 py-2">{row.user?.email ?? "Unknown"}</td>
+                <td className="px-3 py-2">{row.user?.email ?? ph("Unknown")}</td>
                 <td className="px-3 py-2">{row.action}</td>
                 <td className="px-3 py-2">{row.module}</td>
                 <td className="px-3 py-2">{row.entityType}</td>
@@ -106,18 +109,18 @@ export default async function AuditLogsPage({ searchParams }: { searchParams: Pr
         </table>
       </div>
       {result.pages > 1 ? (
-        <nav className="flex items-center gap-4 text-sm" aria-label="Pages">
+        <nav className="flex items-center gap-4 text-sm" aria-label={ph("Pages")}>
           {result.page > 1 ? (
             <Link href={link(result.page - 1)} className="text-primary">
-              Newer
+              {ph("Newer")}
             </Link>
           ) : null}
           <span>
-            Page {result.page} of {result.pages}
+            {ph("Page")} {result.page} {ph("of")} {result.pages}
           </span>
           {result.page < result.pages ? (
             <Link href={link(result.page + 1)} className="text-primary">
-              Older
+              {ph("Older")}
             </Link>
           ) : null}
         </nav>

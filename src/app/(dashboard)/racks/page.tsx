@@ -5,10 +5,13 @@ import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { prisma } from "@/lib/db/client";
 import { getSession } from "@/modules/auth/current-session";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Racks" };
+export const generateMetadata = phraseTitled("Racks");
 
 export default async function RacksPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -29,17 +32,17 @@ export default async function RacksPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Racks"
-        description="A rack is a place inside a warehouse. It does not move stock by itself."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Racks" }]}
+        title={ph("Racks")}
+        description={ph("A rack is a place inside a warehouse. It does not move stock by itself.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: ph("Racks") }]}
       />
       {session.permissions.has("branches.manage") ? <RackForm warehouses={warehouses} /> : null}
       <DataTable
-        caption="Racks"
+        caption={ph("Racks")}
         columns={[
-          { key: "name", header: "Rack", cell: (row) => row.name },
-          { key: "warehouse", header: "Warehouse", cell: (row) => row.warehouse.name },
-          { key: "status", header: "Status", cell: (row) => row.status },
+          { key: "name", header: ph("Rack"), cell: (row) => row.name },
+          { key: "warehouse", header: ph("Warehouse"), cell: (row) => row.warehouse.name },
+          { key: "status", header: ph("Status"), cell: (row) => row.status },
         ]}
         rows={racks}
         getRowKey={(row) => row.id}

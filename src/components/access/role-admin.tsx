@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { useSubmit } from "@/lib/client/use-submit";
+import { useI18n } from "@/lib/i18n/provider";
 
 export function RoleAdmin({
   roles,
@@ -15,6 +16,7 @@ export function RoleAdmin({
   permissions: string[];
   lockedRoleIds?: string[];
 }) {
+  const { ph } = useI18n();
   const { submit, pending, message: error } = useSubmit();
 
   return (
@@ -25,18 +27,18 @@ export function RoleAdmin({
         onSubmit={(event) => {
           event.preventDefault();
           const form = new FormData(event.currentTarget);
-          void submit({ url: "/api/v1/roles", body: { name: String(form.get("name") ?? "") } }, { successMessage: "Role created." });
+          void submit({ url: "/api/v1/roles", body: { name: String(form.get("name") ?? "") } }, { successMessage: ph("Role created.") });
         }}
       >
-        <FormField label="Role name" htmlFor="role-name" required>
+        <FormField label={ph("Role name")} htmlFor="role-name" required>
           <Input id="role-name" name="name" required />
         </FormField>
-        <Button type="submit" loading={pending}>Create role</Button>
+        <Button type="submit" loading={pending}>{ph("Create role")}</Button>
       </form>
       {roles.map((role) => lockedRoleIds.includes(role.id) ? (
         <section key={role.id} className="space-y-2 rounded-md border border-border bg-surface p-4">
           <h2 className="text-sm font-semibold">{role.name}</h2>
-          <p className="text-sm text-muted">Only Super Admin can change this role.</p>
+          <p className="text-sm text-muted">{ph("Only Super Admin can change this role.")}</p>
         </section>
       ) : (
         <form
@@ -58,7 +60,7 @@ export function RoleAdmin({
             ))}
           </div>
           <Button type="submit" size="sm" loading={pending}>
-            Save permissions
+            {ph("Save permissions")}
           </Button>
         </form>
       ))}

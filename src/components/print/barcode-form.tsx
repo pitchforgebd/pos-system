@@ -7,11 +7,13 @@ import { PrintButton } from "@/components/print/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSubmit } from "@/lib/client/use-submit";
+import { useI18n } from "@/lib/i18n/provider";
 
 type Label = { barcode: string; product: string; sellingPrice: string; copies: number; level: string; format: "A4" | "LABEL_38X25" };
 
 /** Prepares labels for one barcode: copies, the price level whose price is printed, and the layout (an A4 sheet or a 38 x 25 mm label). */
 export function BarcodePrintForm({ barcodeId, levels }: { barcodeId: string; levels: string[] }) {
+  const { ph } = useI18n();
   const [copies, setCopies] = useState("1");
   const [level, setLevel] = useState(levels[0] ?? "");
   const [format, setFormat] = useState<"A4" | "LABEL_38X25">("A4");
@@ -29,9 +31,9 @@ export function BarcodePrintForm({ barcodeId, levels }: { barcodeId: string; lev
           void submit<Label>({ url: "/api/v1/products/barcodes/print", body: { barcodeId, copies: Number(copies), level: level || undefined, format } }, { quiet: true, onSuccess: (data) => setLabel(data) });
         }}
       >
-        <Input aria-label="Copies" value={copies} onChange={(event) => setCopies(event.target.value)} className="w-20" />
+        <Input aria-label={ph("Copies")} value={copies} onChange={(event) => setCopies(event.target.value)} className="w-20" />
         {levels.length > 0 ? (
-          <select aria-label="Price level" value={level} onChange={(event) => setLevel(event.target.value)} className="h-9 rounded-md border border-border bg-surface px-2 text-sm">
+          <select aria-label={ph("Price level")} value={level} onChange={(event) => setLevel(event.target.value)} className="h-9 rounded-md border border-border bg-surface px-2 text-sm">
             {levels.map((name) => (
               <option key={name} value={name}>
                 {name}
@@ -39,19 +41,19 @@ export function BarcodePrintForm({ barcodeId, levels }: { barcodeId: string; lev
             ))}
           </select>
         ) : null}
-        <select aria-label="Label size" value={format} onChange={(event) => setFormat(event.target.value as "A4" | "LABEL_38X25")} className="h-9 rounded-md border border-border bg-surface px-2 text-sm">
-          <option value="A4">A4 sheet</option>
-          <option value="LABEL_38X25">38 × 25 mm label</option>
+        <select aria-label={ph("Label size")} value={format} onChange={(event) => setFormat(event.target.value as "A4" | "LABEL_38X25")} className="h-9 rounded-md border border-border bg-surface px-2 text-sm">
+          <option value="A4">{ph("A4 sheet")}</option>
+          <option value="LABEL_38X25">{ph("38 × 25 mm label")}</option>
         </select>
         <Button type="submit" size="sm" loading={pending}>
-          Prepare label
+          {ph("Prepare label")}
         </Button>
       </form>
       {message ? <p className="text-sm text-error">{message}</p> : null}
       {label ? (
         <div className="space-y-2">
-          <PrintButton label="Print labels" />
-          {thermal ? <style>{"@media print { @page { size: 38mm 25mm; margin: 0 } }"}</style> : null}
+          <PrintButton label={ph("Print labels")} />
+          {thermal ? <style>{ph("@media print { @page { size: 38mm 25mm; margin: 0 } }")}</style> : null}
           <div className={thermal ? "print-sheet" : "print-sheet grid grid-cols-3 gap-2"}>
             {Array.from({ length: label.copies }, (_, index) => (
               <div

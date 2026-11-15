@@ -6,10 +6,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
 import { listLoyaltyTiers } from "@/modules/customers/loyalty";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Loyalty tiers" };
+export const generateMetadata = phraseTitled("Loyalty tiers");
 
 export default async function LoyaltyTiersPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -19,22 +22,22 @@ export default async function LoyaltyTiersPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Loyalty tiers"
-        description="Minimum spend and the discount percent are stored. A sale still uses the product selling price, and tiers do not auto-upgrade."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Loyalty", href: "/customers/loyalty" }, { label: "Tiers" }]}
+        title={ph("Loyalty tiers")}
+        description={ph("Minimum spend and the discount percent are stored. A sale still uses the product selling price, and tiers do not auto-upgrade.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Loyalty", href: "/customers/loyalty" }, { label: ph("Tiers") }]}
       />
       {session.permissions.has("loyalty.manage") ? <TierForm /> : null}
       <DataTable
-        caption="Tiers"
+        caption={ph("Tiers")}
         columns={[
-          { key: "name", header: "Tier", cell: (row) => row.name },
-          { key: "spend", header: "Minimum spend", cell: (row) => row.minimumSpend },
-          { key: "discount", header: "Stored percent", cell: (row) => row.discountPercent },
-          { key: "status", header: "Status", cell: (row) => row.status },
+          { key: "name", header: ph("Tier"), cell: (row) => row.name },
+          { key: "spend", header: ph("Minimum spend"), cell: (row) => row.minimumSpend },
+          { key: "discount", header: ph("Stored percent"), cell: (row) => row.discountPercent },
+          { key: "status", header: ph("Status"), cell: (row) => row.status },
         ]}
         rows={tiers}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No tiers" description="Add a tier name, a minimum spend, and a stored percent." />}
+        empty={<EmptyState title={ph("No tiers")} description={ph("Add a tier name, a minimum spend, and a stored percent.")} />}
       />
     </div>
   );

@@ -9,10 +9,13 @@ import { listQuery } from "@/core/list";
 import { listTransfers } from "@/modules/inventory/documents";
 import { prisma } from "@/lib/db/client";
 import { getSession } from "@/modules/auth/current-session";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Transfers" };
+export const generateMetadata = phraseTitled("Transfers");
 
 export default async function TransfersPage({ searchParams }: { searchParams: Promise<{ page?: string; pageSize?: string }> }) {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -40,28 +43,28 @@ export default async function TransfersPage({ searchParams }: { searchParams: Pr
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Product Transfer"
-        description="Stock stays at the source until this receive. Receive posts the out and the in together. Nothing sits in transit."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Product Transfer" }]}
+        title={ph("Product Transfer")}
+        description={ph("Stock stays at the source until this receive. Receive posts the out and the in together. Nothing sits in transit.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: ph("Product Transfer") }]}
       />
       {session.permissions.has("inventory.transfer") ? <TransferForm branches={branches} products={products} /> : null}
       {transfers ? (
         <section className="space-y-3">
-          <h2 className="text-lg font-semibold">Transfers</h2>
+          <h2 className="text-lg font-semibold">{ph("Transfers")}</h2>
           <DataTable
-            caption="Transfers"
+            caption={ph("Transfers")}
             columns={[
-              { key: "number", header: "Number", cell: (row) => row.number },
-              { key: "date", header: "Date", cell: (row) => row.date },
+              { key: "number", header: ph("Number"), cell: (row) => row.number },
+              { key: "date", header: ph("Date"), cell: (row) => row.date },
               { key: "direction", header: "", cell: (row) => (row.direction === "OUT" ? "Sent" : row.direction === "IN" ? "Received" : "Within the branch") },
-              { key: "from", header: "From", cell: (row) => row.from },
-              { key: "to", header: "To", cell: (row) => row.to },
-              { key: "items", header: "Products", cell: (row) => row.items },
-              { key: "value", header: "Value (avg cost)", cell: (row) => row.value },
+              { key: "from", header: ph("From"), cell: (row) => row.from },
+              { key: "to", header: ph("To"), cell: (row) => row.to },
+              { key: "items", header: ph("Products"), cell: (row) => row.items },
+              { key: "value", header: ph("Value (avg cost)"), cell: (row) => row.value },
             ]}
             rows={transfers.rows}
             getRowKey={(row) => row.id}
-            empty={<EmptyState title="No transfers" description="A transfer that leaves or reaches this branch appears here." />}
+            empty={<EmptyState title={ph("No transfers")} description={ph("A transfer that leaves or reaches this branch appears here.")} />}
           />
           <Pagination page={transfers.page.page} pageCount={transfers.page.pageCount} total={transfers.page.total} pageSize={transfers.page.pageSize} path="/inventory/transfers" />
         </section>

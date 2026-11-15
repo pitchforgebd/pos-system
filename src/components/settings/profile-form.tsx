@@ -5,6 +5,7 @@ import { type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSubmit } from "@/lib/client/use-submit";
+import { useI18n } from "@/lib/i18n/provider";
 
 export function ProfileForm({
   name,
@@ -25,6 +26,7 @@ export function ProfileForm({
   pointsPerHundred: string;
   takaPerPoint: string;
 }) {
+  const { ph } = useI18n();
   const { submit, pending, message } = useSubmit();
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -47,23 +49,23 @@ export function ProfileForm({
 
   return (
     <form className="grid max-w-xl gap-3" onSubmit={onSubmit}>
-      <Input name="name" required defaultValue={name} placeholder="Shop name" aria-label="Shop name" />
-      <Input name="phone" defaultValue={phone} placeholder="Phone" aria-label="Phone" />
+      <Input name="name" required defaultValue={name} placeholder={ph("Shop name")} aria-label={ph("Shop name")} />
+      <Input name="phone" defaultValue={phone} placeholder={ph("Phone")} aria-label={ph("Phone")} />
       <textarea
         name="address"
         defaultValue={address}
-        aria-label="Address"
-        placeholder="Address"
+        aria-label={ph("Address")}
+        placeholder={ph("Address")}
         className="min-h-24 rounded-md border border-border bg-surface px-3 py-2 text-sm"
       />
-      <Input name="bin" defaultValue={bin} placeholder="BIN" aria-label="BIN" />
-      <Input name="tin" defaultValue={tin} placeholder="TIN" aria-label="TIN" />
-      <Input name="logoUrl" defaultValue={logoUrl} placeholder="Logo URL" aria-label="Logo URL" />
-      <Input name="pointsPerHundred" defaultValue={pointsPerHundred} placeholder="Points per 100 taka" aria-label="Points per hundred" />
-      <Input name="takaPerPoint" defaultValue={takaPerPoint} placeholder="Taka per point" aria-label="Taka per point" />
+      <Input name="bin" defaultValue={bin} placeholder={ph("BIN")} aria-label={ph("BIN")} />
+      <Input name="tin" defaultValue={tin} placeholder={ph("TIN")} aria-label={ph("TIN")} />
+      <Input name="logoUrl" defaultValue={logoUrl} placeholder={ph("Logo URL")} aria-label={ph("Logo URL")} />
+      <Input name="pointsPerHundred" defaultValue={pointsPerHundred} placeholder={ph("Points per 100 taka")} aria-label={ph("Points per hundred")} />
+      <Input name="takaPerPoint" defaultValue={takaPerPoint} placeholder={ph("Taka per point")} aria-label={ph("Taka per point")} />
       {message ? <p className="text-sm text-error">{message}</p> : null}
       <Button type="submit" loading={pending}>
-        Save shop profile
+        {ph("Save shop profile")}
       </Button>
     </form>
   );

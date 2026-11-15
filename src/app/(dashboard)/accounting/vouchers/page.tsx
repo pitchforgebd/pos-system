@@ -9,12 +9,15 @@ import { GROUP } from "@/core/ledger/groups";
 import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
 import { listAccounts, listVouchers } from "@/modules/accounting/books";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Vouchers" };
+export const generateMetadata = phraseTitled("Vouchers");
 
 const voucherTypes = ["JOURNAL", "CONTRA", "PAYMENT", "RECEIPT"] as const;
 
 export default async function VouchersPage({ searchParams }: { searchParams: Promise<{ type?: string; q?: string }> }) {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session?.branchId) {
     redirect("/login");
@@ -45,9 +48,9 @@ export default async function VouchersPage({ searchParams }: { searchParams: Pro
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Vouchers"
-        description="A payment credits cash or bank. A receipt debits cash or bank. Customer dues and supplier payables stay on their own screens. Money moved between your own cash, bank and mobile accounts is on Bank & Cash."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Accounting", href: "/accounting" }, { label: "Vouchers" }]}
+        title={ph("Vouchers")}
+        description={ph("A payment credits cash or bank. A receipt debits cash or bank. Customer dues and supplier payables stay on their own screens. Money moved between your own cash, bank and mobile accounts is on Bank & Cash.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Accounting", href: "/accounting" }, { label: ph("Vouchers") }]}
       />
       {session.permissions.has("accounting.post") ? (
         <>
@@ -56,9 +59,9 @@ export default async function VouchersPage({ searchParams }: { searchParams: Pro
       ) : null}
       <form className="flex flex-wrap items-end gap-2" action="/accounting/vouchers">
         <label className="grid gap-1 text-sm">
-          Type
+          {ph("Type")}
           <select name="type" defaultValue={type} className="h-10 rounded-md border border-border bg-surface px-2">
-            <option value="">All</option>
+            <option value="">{ph("All")}</option>
             {voucherTypes.map((item) => (
               <option key={item} value={item}>
                 {item}
@@ -67,25 +70,25 @@ export default async function VouchersPage({ searchParams }: { searchParams: Pro
           </select>
         </label>
         <label className="grid min-w-56 flex-1 gap-1 text-sm">
-          Search
-          <input name="q" defaultValue={params.q ?? ""} placeholder="Number or type" className="h-10 rounded-md border border-border px-3" />
+          {ph("Search")}
+          <input name="q" defaultValue={params.q ?? ""} placeholder={ph("Number or type")} className="h-10 rounded-md border border-border px-3" />
         </label>
         <Button type="submit" variant="secondary">
-          Filter
+          {ph("Filter")}
         </Button>
       </form>
       <DataTable
-        caption="Vouchers"
+        caption={ph("Vouchers")}
         columns={[
-          { key: "number", header: "Voucher", cell: (row) => row.journalId ? <Link href={`/accounting/journals/${row.journalId}`}>{row.number}</Link> : row.number },
-          { key: "date", header: "Date", cell: (row) => row.businessDate },
-          { key: "type", header: "Type", cell: (row) => row.voucherType },
-          { key: "amount", header: "Amount", cell: (row) => row.amount },
-          { key: "status", header: "Status", cell: (row) => row.status },
+          { key: "number", header: ph("Voucher"), cell: (row) => row.journalId ? <Link href={`/accounting/journals/${row.journalId}`}>{row.number}</Link> : row.number },
+          { key: "date", header: ph("Date"), cell: (row) => row.businessDate },
+          { key: "type", header: ph("Type"), cell: (row) => row.voucherType },
+          { key: "amount", header: ph("Amount"), cell: (row) => row.amount },
+          { key: "status", header: ph("Status"), cell: (row) => row.status },
         ]}
         rows={vouchers}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No vouchers" description="Post a payment, a receipt, a journal, or a cash and bank transfer." />}
+        empty={<EmptyState title={ph("No vouchers")} description={ph("Post a payment, a receipt, a journal, or a cash and bank transfer.")} />}
       />
     </div>
   );

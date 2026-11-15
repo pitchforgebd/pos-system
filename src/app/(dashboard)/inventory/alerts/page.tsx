@@ -12,8 +12,10 @@ import { listQuery } from "@/core/list";
 import { listBrands, listCategories } from "@/modules/catalog/references";
 import { getSession } from "@/modules/auth/current-session";
 import { expiryWarnings, listLowStock, reorderList } from "@/modules/inventory/alerts";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Stock Alert Quantity" };
+export const generateMetadata = phraseTitled("Stock Alert Quantity");
 
 function recordId(value: string | undefined) {
   return value && /^[0-9a-f-]{36}$/i.test(value) ? value : undefined;
@@ -24,6 +26,7 @@ export default async function AlertsPage({
 }: {
   searchParams: Promise<{ q?: string; brandId?: string; categoryId?: string; page?: string; pageSize?: string }>;
 }) {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session?.branchId) {
     redirect("/login");
@@ -50,19 +53,19 @@ export default async function AlertsPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Stock Alert Quantity"
-        description="Low means stock is above zero and at or below the reorder level. Out of stock means zero. Generic is the category."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Stock Alert Quantity" }]}
+        title={ph("Stock Alert Quantity")}
+        description={ph("Low means stock is above zero and at or below the reorder level. Out of stock means zero. Generic is the category.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: ph("Stock Alert Quantity") }]}
       />
       <form className="flex flex-wrap items-end gap-2" action="/inventory/alerts">
         <label className="grid min-w-48 flex-1 gap-1 text-sm">
-          Search
-          <input name="q" defaultValue={q} placeholder="Name or SKU" className="h-10 rounded-md border border-border px-3" />
+          {ph("Search")}
+          <input name="q" defaultValue={q} placeholder={ph("Name or SKU")} className="h-10 rounded-md border border-border px-3" />
         </label>
         <label className="grid gap-1 text-sm">
-          Brand
+          {ph("Brand")}
           <select name="brandId" defaultValue={brandId ?? ""} className="h-10 rounded-md border border-border bg-surface px-2">
-            <option value="">All brands</option>
+            <option value="">{ph("All brands")}</option>
             {brands.map((brand) => (
               <option key={brand.id} value={brand.id}>
                 {brand.name}
@@ -71,9 +74,9 @@ export default async function AlertsPage({
           </select>
         </label>
         <label className="grid gap-1 text-sm">
-          Generic
+          {ph("Generic")}
           <select name="categoryId" defaultValue={categoryId ?? ""} className="h-10 rounded-md border border-border bg-surface px-2">
-            <option value="">All categories</option>
+            <option value="">{ph("All categories")}</option>
             {categories.map((category) => (
               <option key={category.id} value={category.id}>
                 {category.name}
@@ -82,78 +85,78 @@ export default async function AlertsPage({
           </select>
         </label>
         <Button type="submit" variant="secondary">
-          Search
+          {ph("Search")}
         </Button>
         <PrintButton />
       </form>
       <div className="print-sheet space-y-3">
-        <h2 className="text-lg font-semibold">Low and out of stock ({low.page.total})</h2>
+        <h2 className="text-lg font-semibold">{ph("Low and out of stock (")}{low.page.total})</h2>
         <DataTable
-          caption="Stock alerts"
+          caption={ph("Stock alerts")}
           columns={[
-            { key: "sku", header: "SKU", cell: (row) => row.sku },
-            { key: "name", header: "Product", cell: (row) => row.name },
-            { key: "brand", header: "Brand", cell: (row) => (row.brandId ? brandName.get(row.brandId) ?? "" : "") },
-            { key: "generic", header: "Generic", cell: (row) => (row.categoryId ? categoryName.get(row.categoryId) ?? "" : "") },
-            { key: "warehouse", header: "Place", cell: (row) => row.warehouseName },
-            { key: "quantity", header: "Quantity", cell: (row) => row.quantity },
-            { key: "reorder", header: "Reorder level", cell: (row) => row.reorderLevel },
-            { key: "alert", header: "Status", cell: (row) => row.alert },
+            { key: "sku", header: ph("SKU"), cell: (row) => row.sku },
+            { key: "name", header: ph("Product"), cell: (row) => row.name },
+            { key: "brand", header: ph("Brand"), cell: (row) => (row.brandId ? brandName.get(row.brandId) ?? "" : "") },
+            { key: "generic", header: ph("Generic"), cell: (row) => (row.categoryId ? categoryName.get(row.categoryId) ?? "" : "") },
+            { key: "warehouse", header: ph("Place"), cell: (row) => row.warehouseName },
+            { key: "quantity", header: ph("Quantity"), cell: (row) => row.quantity },
+            { key: "reorder", header: ph("Reorder level"), cell: (row) => row.reorderLevel },
+            { key: "alert", header: ph("Status"), cell: (row) => row.alert },
           ]}
           rows={low.rows}
           getRowKey={(row) => row.id}
-          empty={<EmptyState title="No alerts" description="Nothing is low or out of stock on this branch." />}
+          empty={<EmptyState title={ph("No alerts")} description={ph("Nothing is low or out of stock on this branch.")} />}
         />
         <Pagination page={low.page.page} pageCount={low.page.pageCount} total={low.page.total} pageSize={low.page.pageSize} path="/inventory/alerts" params={keep} />
       </div>
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Reorder list</h2>
-        <p className="text-sm text-muted">Suggested is enough for the next 30 days at the recent selling rate, or twice the reorder level, whichever is more, less what is on hand.</p>
+        <h2 className="text-lg font-semibold">{ph("Reorder list")}</h2>
+        <p className="text-sm text-muted">{ph("Suggested is enough for the next 30 days at the recent selling rate, or twice the reorder level, whichever is more, less what is on hand.")}</p>
         {session.permissions.has("purchase.create") && reorder.some((row) => row.lastVendorId && Number(row.suggested) > 0) ? <ReorderDraftsButton /> : null}
         <DataTable
-          caption="Reorder list"
+          caption={ph("Reorder list")}
           columns={[
-            { key: "sku", header: "SKU", cell: (row) => row.sku },
-            { key: "name", header: "Product", cell: (row) => row.name },
-            { key: "onHand", header: "On hand", cell: (row) => row.onHand },
-            { key: "vendor", header: "Last vendor", cell: (row) => row.lastVendor || "—" },
-            { key: "cost", header: "Last price", cell: (row) => row.lastCost || "—" },
-            { key: "sold", header: "Sold, 30 days", cell: (row) => row.sold30 },
-            { key: "avg", header: "Per day", cell: (row) => row.avgPerDay },
-            { key: "suggested", header: "Suggested", cell: (row) => row.suggested },
+            { key: "sku", header: ph("SKU"), cell: (row) => row.sku },
+            { key: "name", header: ph("Product"), cell: (row) => row.name },
+            { key: "onHand", header: ph("On hand"), cell: (row) => row.onHand },
+            { key: "vendor", header: ph("Last vendor"), cell: (row) => row.lastVendor || "—" },
+            { key: "cost", header: ph("Last price"), cell: (row) => row.lastCost || "—" },
+            { key: "sold", header: ph("Sold, 30 days"), cell: (row) => row.sold30 },
+            { key: "avg", header: ph("Per day"), cell: (row) => row.avgPerDay },
+            { key: "suggested", header: ph("Suggested"), cell: (row) => row.suggested },
           ]}
           rows={reorder}
           getRowKey={(row) => row.productId}
-          empty={<EmptyState title="Nothing to reorder" description="No product is at or below its reorder level." />}
+          empty={<EmptyState title={ph("Nothing to reorder")} description={ph("No product is at or below its reorder level.")} />}
         />
       </section>
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Expiry warnings</h2>
+        <h2 className="text-lg font-semibold">{ph("Expiry warnings")}</h2>
         <div className="grid gap-3 sm:grid-cols-4">
           {expiry.buckets.map((bucket) => (
             <p key={bucket.label} className="rounded-xl border border-border bg-surface px-4 py-3 text-sm">
-              {bucket.label}
+              {ph(bucket.label)}
               <span className="mt-1 block text-lg font-semibold">
-                {bucket.lots} lot(s) · {bucket.quantity}
+                {bucket.lots} {ph("lot(s) ·")} {bucket.quantity}
               </span>
             </p>
           ))}
         </div>
         <DataTable
-          caption="Lots near expiry"
+          caption={ph("Lots near expiry")}
           columns={[
-            { key: "sku", header: "SKU", cell: (row) => row.sku },
-            { key: "name", header: "Product", cell: (row) => row.name },
-            { key: "lot", header: "Lot", cell: (row) => row.lot },
-            { key: "warehouse", header: "Place", cell: (row) => row.warehouseName },
-            { key: "quantity", header: "Quantity", cell: (row) => row.quantity },
-            { key: "expires", header: "Expires", cell: (row) => row.expiresOn },
-            { key: "days", header: "Days left", cell: (row) => (row.daysLeft < 0 ? `expired ${-row.daysLeft} day(s) ago` : row.daysLeft) },
-            { key: "action", header: "", cell: (row) => (row.daysLeft < 0 ? <Link href="/inventory/expiry">Write off</Link> : null) },
+            { key: "sku", header: ph("SKU"), cell: (row) => row.sku },
+            { key: "name", header: ph("Product"), cell: (row) => row.name },
+            { key: "lot", header: ph("Lot"), cell: (row) => row.lot },
+            { key: "warehouse", header: ph("Place"), cell: (row) => row.warehouseName },
+            { key: "quantity", header: ph("Quantity"), cell: (row) => row.quantity },
+            { key: "expires", header: ph("Expires"), cell: (row) => row.expiresOn },
+            { key: "days", header: ph("Days left"), cell: (row) => (row.daysLeft < 0 ? `expired ${-row.daysLeft} day(s) ago` : row.daysLeft) },
+            { key: "action", header: "", cell: (row) => (row.daysLeft < 0 ? <Link href="/inventory/expiry">{ph("Write off")}</Link> : null) },
           ]}
           rows={expiry.lots}
           getRowKey={(row) => row.id}
-          empty={<EmptyState title="No lots near expiry" description="No lot with stock expires within 90 days." />}
+          empty={<EmptyState title={ph("No lots near expiry")} description={ph("No lot with stock expires within 90 days.")} />}
         />
       </section>
     </div>

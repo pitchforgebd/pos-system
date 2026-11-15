@@ -7,10 +7,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
 import { profitAndLoss } from "@/modules/reports/reports";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Profit and loss" };
+export const generateMetadata = phraseTitled("Profit and loss");
 
 export default async function ProfitLossPage({ searchParams }: { searchParams: Promise<{ from?: string; to?: string }> }) {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session?.branchId) {
     redirect("/login");
@@ -21,23 +24,23 @@ export default async function ProfitLossPage({ searchParams }: { searchParams: P
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Profit and loss"
+        title={ph("Profit and loss")}
         description={`Revenue ${report.revenue}. Cost of sales ${report.cost}. Gross profit ${report.gross}. Expenses ${report.expenses}. Net ${report.net}.`}
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Reports", href: "/reports" }, { label: "Profit and loss" }]}
-        actions={<Button href="/reports" variant="secondary">Back to reports</Button>}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Reports", href: "/reports" }, { label: ph("Profit and loss") }]}
+        actions={<Button href="/reports" variant="secondary">{ph("Back to reports")}</Button>}
       />
       <DateFilter from={query.from} to={query.to} />
-      <p className="text-sm text-muted">Revenue is group 4000. Cost of sales is group 5000. Expenses are group 6000. Other groups are omitted.</p>
+      <p className="text-sm text-muted">{ph("Revenue is group 4000. Cost of sales is group 5000. Expenses are group 6000. Other groups are omitted.")}</p>
       <DataTable
-        caption="Posted accounts"
+        caption={ph("Posted accounts")}
         columns={[
-          { key: "code", header: "Account", cell: (row) => `${row.code} ${row.name}` },
-          { key: "group", header: "Group", cell: (row) => row.group },
-          { key: "amount", header: "Amount", cell: (row) => row.amount },
+          { key: "code", header: ph("Account"), cell: (row) => `${row.code} ${row.name}` },
+          { key: "group", header: ph("Group"), cell: (row) => row.group },
+          { key: "amount", header: ph("Amount"), cell: (row) => row.amount },
         ]}
         rows={report.rows}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No posted profit or loss" description="Posted revenue, cost, and expense accounts appear here." />}
+        empty={<EmptyState title={ph("No posted profit or loss")} description={ph("Posted revenue, cost, and expense accounts appear here.")} />}
       />
     </div>
   );

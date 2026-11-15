@@ -7,10 +7,13 @@ import { getSession } from "@/modules/auth/current-session";
 import { moneyAccountOptions } from "@/modules/purchasing/lookups";
 import { listCouriers } from "@/modules/shipping/couriers";
 import { unsettledParcels } from "@/modules/shipping/settlements";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Courier settlement" };
+export const generateMetadata = phraseTitled("Courier settlement");
 
 export default async function SettleCourierPage({ searchParams }: { searchParams: Promise<{ courierId?: string }> }) {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session?.branchId || !session.permissions.has("couriers.settle")) {
     redirect("/couriers");
@@ -23,9 +26,9 @@ export default async function SettleCourierPage({ searchParams }: { searchParams
   return (
     <div className="space-y-6">
       <PageHeader
-        title={courier ? `Settle ${courier.name}` : "Courier settlement"}
-        description="Tick the parcels this payment is for. A parcel is settled once. If what came is not what should have, give the reason: it needs the owner's approval."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Courier dues", href: "/couriers" }, { label: "Settle" }]}
+        title={courier ? `Settle ${courier.name}` : ph("Courier settlement")}
+        description={ph("Tick the parcels this payment is for. A parcel is settled once. If what came is not what should have, give the reason: it needs the owner's approval.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Courier dues", href: "/couriers" }, { label: ph("Settle") }]}
       />
       {courier ? (
         <SettleForm

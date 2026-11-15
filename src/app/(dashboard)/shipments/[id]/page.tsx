@@ -7,12 +7,15 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { businessDate } from "@/core/time/business-date";
 import { getSession } from "@/modules/auth/current-session";
 import { getShipment } from "@/modules/shipping/shipments";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Shipment" };
+export const generateMetadata = phraseTitled("Shipment");
 
 const TONE = { CREATED: "neutral", PICKED: "info", IN_TRANSIT: "info", DELIVERED: "success", RETURNED: "error", LOST: "error" } as const;
 
 export default async function ShipmentPage({ params }: { params: Promise<{ id: string }> }) {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session?.branchId) {
     redirect("/login");
@@ -28,7 +31,7 @@ export default async function ShipmentPage({ params }: { params: Promise<{ id: s
     <div className="space-y-6">
       <PageHeader
         title={title}
-        description={`${shipment.customer?.name ?? ""} · ${shipment.method === "COURIER" ? (shipment.courier?.name ?? "Courier") : "Own vehicle"}${shipment.trackingCode ? ` · tracking ${shipment.trackingCode}` : ""}`}
+        description={`${shipment.customer?.name ?? ""} · ${shipment.method === "COURIER" ? (shipment.courier?.name ?? ph("Courier")) : ph("Own vehicle")}${shipment.trackingCode ? ` · ${ph("tracking")} ${shipment.trackingCode}` : ""}`}
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Shipments", href: "/shipments" }, { label: title }]}
         actions={<StatusBadge tone={TONE[shipment.status]}>{shipment.status.replace("_", " ")}</StatusBadge>}
       />
@@ -36,62 +39,62 @@ export default async function ShipmentPage({ params }: { params: Promise<{ id: s
       <dl className="grid max-w-xl grid-cols-2 gap-x-4 gap-y-1 text-sm">
         {shipment.method === "COURIER" ? (
           <>
-            <dt>Cash to collect from the customer</dt>
+            <dt>{ph("Cash to collect from the customer")}</dt>
             <dd className="text-right tabular-nums">{shipment.codAmount}</dd>
-            <dt>Delivery charge ({shipment.deliveryPaidWith === "DEDUCT" ? "kept out of the settlement" : shipment.deliveryPaidWith === "BANK" ? "paid by bank" : "paid in cash"})</dt>
+            <dt>{ph("Delivery charge (")}{shipment.deliveryPaidWith === "DEDUCT" ? ph("kept out of the settlement") : shipment.deliveryPaidWith === "BANK" ? ph("paid by bank") : ph("paid in cash")})</dt>
             <dd className="text-right tabular-nums">{shipment.deliveryCharge}</dd>
-            <dt>Condition charge ({shipment.conditionPercent}%)</dt>
+            <dt>{ph("Condition charge (")}{shipment.conditionPercent}%)</dt>
             <dd className="text-right tabular-nums">{shipment.conditionCharge}</dd>
             {shipment.returnCharge !== "0.00" ? (
               <>
-                <dt>Return charge</dt>
+                <dt>{ph("Return charge")}</dt>
                 <dd className="text-right tabular-nums">{shipment.returnCharge}</dd>
               </>
             ) : null}
-            <dt className="font-medium">What the courier should pay the shop</dt>
+            <dt className="font-medium">{ph("What the courier should pay the shop")}</dt>
             <dd className="text-right font-medium tabular-nums">{shipment.expectedNet}</dd>
           </>
         ) : (
           <>
-            <dt>Vehicle</dt>
+            <dt>{ph("Vehicle")}</dt>
             <dd className="text-right">{shipment.vehicleNo ?? ""}</dd>
-            <dt>Driver</dt>
+            <dt>{ph("Driver")}</dt>
             <dd className="text-right">{[shipment.driverName, shipment.driverPhone].filter(Boolean).join(" · ")}</dd>
-            <dt>Fare</dt>
+            <dt>{ph("Fare")}</dt>
             <dd className="text-right tabular-nums">{shipment.deliveryCharge}</dd>
           </>
         )}
-        <dt>Sent</dt>
+        <dt>{ph("Sent")}</dt>
         <dd className="text-right">{shipment.dispatchedOn ?? ""}</dd>
         {shipment.deliveredOn ? (
           <>
-            <dt>Delivered</dt>
+            <dt>{ph("Delivered")}</dt>
             <dd className="text-right">{shipment.deliveredOn}</dd>
           </>
         ) : null}
         {shipment.returnedOn ? (
           <>
-            <dt>Came back</dt>
+            <dt>{ph("Came back")}</dt>
             <dd className="text-right">{shipment.returnedOn}</dd>
           </>
         ) : null}
       </dl>
-      {shipment.address ? <p className="text-sm">Deliver to: {shipment.address}</p> : null}
+      {shipment.address ? <p className="text-sm">{ph("Deliver to:")} {shipment.address}</p> : null}
       <p className="text-sm">
         {shipment.sale ? (
           <>
-            Invoice <Link href={`/sales/${shipment.sale.id}`}>{shipment.sale.number}</Link>
+            {ph("Invoice")} <Link href={`/sales/${shipment.sale.id}`}>{shipment.sale.number}</Link>
           </>
         ) : null}
         {shipment.order ? (
           <>
-            {" · "}Order <Link href={`/orders/${shipment.order.id}`}>{shipment.order.number}</Link>
+            {" · "}{ph("Order")} <Link href={`/orders/${shipment.order.id}`}>{shipment.order.number}</Link>
           </>
         ) : null}
         {shipment.settlement ? ` · settled in ${shipment.settlement.number}` : ""}
       </p>
-      <section aria-label="History">
-        <h2 className="mb-2 text-sm font-semibold">History</h2>
+      <section aria-label={ph("History")}>
+        <h2 className="mb-2 text-sm font-semibold">{ph("History")}</h2>
         <ol className="space-y-1 text-sm">
           {shipment.events.map((event) => (
             <li key={event.id}>

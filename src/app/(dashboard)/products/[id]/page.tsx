@@ -9,10 +9,13 @@ import { getProductDetail } from "@/modules/catalog/detail";
 import { getProduct } from "@/modules/catalog/products";
 import { listBrands, listCategories, listUnits } from "@/modules/catalog/references";
 import { listVariationHeads } from "@/modules/catalog/variations";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Product" };
+export const generateMetadata = phraseTitled("Product");
 
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -42,7 +45,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       />
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">General</h2>
+        <h2 className="text-lg font-semibold">{ph("General")}</h2>
         {canEdit ? (
           <ProductEditForm
             product={{
@@ -73,23 +76,23 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           />
         ) : (
           <dl className="grid max-w-xl grid-cols-2 gap-2 text-sm">
-            <dt>Retail price</dt>
+            <dt>{ph("Retail price")}</dt>
             <dd>{detail.sellingPrice}</dd>
-            <dt>Wholesale price</dt>
+            <dt>{ph("Wholesale price")}</dt>
             <dd>{detail.wholesalePrice}</dd>
-            <dt>Minimum price</dt>
+            <dt>{ph("Minimum price")}</dt>
             <dd>{detail.minimumPrice}</dd>
-            <dt>Category</dt>
+            <dt>{ph("Category")}</dt>
             <dd>{detail.category?.name ?? "—"}</dd>
-            <dt>Generic</dt>
+            <dt>{ph("Generic")}</dt>
             <dd>{detail.genericName ?? "—"}</dd>
           </dl>
         )}
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Prices by level</h2>
-        <p className="text-sm text-muted">A price starts at a quantity and holds until the next step. A level with no price for a quantity falls back to {detail.levels.find((level) => level.isDefault)?.level ?? "Retail"}. The price never goes below the minimum price ({detail.minimumPrice}).</p>
+        <h2 className="text-lg font-semibold">{ph("Prices by level")}</h2>
+        <p className="text-sm text-muted">{ph("A price starts at a quantity and holds until the next step. A level with no price for a quantity falls back to")} {detail.levels.find((level) => level.isDefault)?.level ?? ph("Retail")}{ph(". The price never goes below the minimum price (")}{detail.minimumPrice}).</p>
         {canEdit ? (
           <PriceStepsForm
             productId={detail.id}
@@ -98,10 +101,10 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           />
         ) : (
           <DataTable
-            caption="Prices by level"
+            caption={ph("Prices by level")}
             columns={[
-              { key: "level", header: "Level", cell: (row) => row.level },
-              { key: "steps", header: "Steps", cell: (row) => row.steps.map((step) => `${step.minQty.replace(/\.?0+$/, "")}+ = ${step.price}`).join(", ") || "—" },
+              { key: "level", header: ph("Level"), cell: (row) => row.level },
+              { key: "steps", header: ph("Steps"), cell: (row) => row.steps.map((step) => `${step.minQty.replace(/\.?0+$/, "")}+ = ${step.price}`).join(", ") || "—" },
             ]}
             rows={detail.levels}
             getRowKey={(row) => row.level}
@@ -110,44 +113,44 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Stock</h2>
+        <h2 className="text-lg font-semibold">{ph("Stock")}</h2>
         <DataTable
-          caption="Stock by warehouse"
+          caption={ph("Stock by warehouse")}
           columns={[
-            { key: "branch", header: "Branch", cell: (row) => row.branchName },
-            { key: "warehouse", header: "Warehouse", cell: (row) => row.warehouseName },
-            { key: "quantity", header: "On hand", cell: (row) => row.quantity },
-            { key: "reserved", header: "Reserved", cell: (row) => row.reserved },
+            { key: "branch", header: ph("Branch"), cell: (row) => row.branchName },
+            { key: "warehouse", header: ph("Warehouse"), cell: (row) => row.warehouseName },
+            { key: "quantity", header: ph("On hand"), cell: (row) => row.quantity },
+            { key: "reserved", header: ph("Reserved"), cell: (row) => row.reserved },
           ]}
           rows={detail.stock}
           getRowKey={(row) => row.warehouseId}
         />
         {detail.cost ? (
           <p className="text-sm">
-            Average cost {detail.cost.averageCost ?? "—"} · stock value {detail.cost.stockValue} · margin {detail.cost.marginPercent === null ? "—" : `${detail.cost.marginPercent}%`} (retail price less average cost)
+            {ph("Average cost")} {detail.cost.averageCost ?? "—"} {ph("· stock value")} {detail.cost.stockValue} {ph("· margin")} {detail.cost.marginPercent === null ? "—" : `${detail.cost.marginPercent}%`} {ph("(retail price less average cost)")}
           </p>
         ) : null}
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Barcodes</h2>
+        <h2 className="text-lg font-semibold">{ph("Barcodes")}</h2>
         <ul className="text-sm">
-          {detail.barcodes.length === 0 ? <li className="text-muted">No barcode yet.</li> : detail.barcodes.map((barcode) => <li key={barcode.id}>{barcode.barcode}</li>)}
+          {detail.barcodes.length === 0 ? <li className="text-muted">{ph("No barcode yet.")}</li> : detail.barcodes.map((barcode) => <li key={barcode.id}>{barcode.barcode}</li>)}
         </ul>
         {canEdit ? <BarcodeAddForm productId={detail.id} /> : null}
         <Link href="/products/barcodes" className="text-sm underline">
-          Print labels
+          {ph("Print labels")}
         </Link>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Variants</h2>
+        <h2 className="text-lg font-semibold">{ph("Variants")}</h2>
         <DataTable
-          caption="Variants"
+          caption={ph("Variants")}
           columns={[
-            { key: "sku", header: "SKU", cell: (row) => row.sku },
-            { key: "values", header: "Values", cell: (row) => row.values.join(", ") || "—" },
-            { key: "price", header: "Own price", cell: (row) => row.price ?? "—" },
+            { key: "sku", header: ph("SKU"), cell: (row) => row.sku },
+            { key: "values", header: ph("Values"), cell: (row) => row.values.join(", ") || "—" },
+            { key: "price", header: ph("Own price"), cell: (row) => row.price ?? "—" },
           ]}
           rows={detail.variants}
           getRowKey={(row) => row.id}
@@ -156,21 +159,21 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Stock ledger</h2>
+        <h2 className="text-lg font-semibold">{ph("Stock ledger")}</h2>
         <DataTable
-          caption="Latest stock movements"
+          caption={ph("Latest stock movements")}
           columns={[
-            { key: "date", header: "Date", cell: (row) => row.date },
-            { key: "type", header: "Movement", cell: (row) => row.movementType },
+            { key: "date", header: ph("Date"), cell: (row) => row.date },
+            { key: "type", header: ph("Movement"), cell: (row) => row.movementType },
             { key: "direction", header: "", cell: (row) => row.direction },
-            { key: "quantity", header: "Quantity", cell: (row) => row.quantity },
-            { key: "warehouse", header: "Warehouse", cell: (row) => row.warehouseName },
+            { key: "quantity", header: ph("Quantity"), cell: (row) => row.quantity },
+            { key: "warehouse", header: ph("Warehouse"), cell: (row) => row.warehouseName },
           ]}
           rows={detail.ledger}
           getRowKey={(row) => row.id}
         />
         <Link href="/inventory/ledger" className="text-sm underline">
-          Whole stock ledger
+          {ph("Whole stock ledger")}
         </Link>
       </section>
     </div>

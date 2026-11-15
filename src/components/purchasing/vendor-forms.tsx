@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ChargeInput } from "@/components/treasury/charge-input";
 import { Input } from "@/components/ui/input";
 import { useSubmit } from "@/lib/client/use-submit";
+import { useI18n } from "@/lib/i18n/provider";
 
 // The three things done with a vendor's money from the vendor's page: pay (from a chosen account, with the charge, for named bills or the
 // oldest debt), pay ahead (an advance), and use the advance against bills. The server checks every amount; nothing is added up here.
@@ -16,16 +17,17 @@ type Bill = { id: string; number: string | null; businessDate: string; owed: str
 const select = "h-10 rounded-md border border-border bg-surface px-2";
 
 function BillShares({ bills, shares, onChange }: { bills: Bill[]; shares: Record<string, string>; onChange: (shares: Record<string, string>) => void }) {
+  const { ph } = useI18n();
   if (bills.length === 0) {
     return null;
   }
   return (
     <div className="grid gap-1 text-sm">
-      <p className="font-medium">For these bills (leave empty to settle the oldest first)</p>
+      <p className="font-medium">{ph("For these bills (leave empty to settle the oldest first)")}</p>
       {bills.map((bill) => (
         <label key={bill.id} className="flex items-center justify-between gap-3">
           <span>
-            {bill.number ?? "Bill"} · {bill.businessDate} · owed {bill.owed}
+            {bill.number ?? ph("Bill")} · {bill.businessDate} {ph("· owed")} {bill.owed}
           </span>
           <input
             className="h-9 w-28 rounded-md border border-border bg-surface px-2 text-sm"
@@ -48,6 +50,7 @@ const allocationsOf = (shares: Record<string, string>) => {
 };
 
 export function VendorPayForm({ supplierId, accounts, bills, today }: { supplierId: string; accounts: AccountOption[]; bills: Bill[]; today: string }) {
+  const { ph } = useI18n();
   const { submit, pending, message, reset } = useSubmit();
   const [date, setDate] = useState(today);
   const [amount, setAmount] = useState("");
@@ -71,18 +74,18 @@ export function VendorPayForm({ supplierId, accounts, bills, today }: { supplier
         );
       }}
     >
-      <h3 className="font-medium">Pay the vendor</h3>
+      <h3 className="font-medium">{ph("Pay the vendor")}</h3>
       <div className="grid gap-3 md:grid-cols-4">
         <label className="grid gap-1 text-sm">
-          Date
+          {ph("Date")}
           <Input type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
         </label>
         <label className="grid gap-1 text-sm">
-          Amount
+          {ph("Amount")}
           <Input inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} required />
         </label>
         <label className="grid gap-1 text-sm">
-          Paid from
+          {ph("Paid from")}
           <select value={accountId} onChange={(event) => { setAccountId(event.target.value); setChargeTyped(false); setCharge(""); }} className={select}>
             {accounts.map((row) => (
               <option key={row.id} value={row.id}>
@@ -99,7 +102,7 @@ export function VendorPayForm({ supplierId, accounts, bills, today }: { supplier
       {message ? <p className="text-sm text-error" role="alert">{message}</p> : null}
       <div>
         <Button type="submit" loading={pending} disabled={accounts.length === 0}>
-          Record payment
+          {ph("Record payment")}
         </Button>
       </div>
     </form>
@@ -107,6 +110,7 @@ export function VendorPayForm({ supplierId, accounts, bills, today }: { supplier
 }
 
 export function VendorAdvanceForm({ supplierId, accounts, today }: { supplierId: string; accounts: AccountOption[]; today: string }) {
+  const { ph } = useI18n();
   const { submit, pending, message, reset } = useSubmit();
   const [date, setDate] = useState(today);
   const [amount, setAmount] = useState("");
@@ -124,18 +128,18 @@ export function VendorAdvanceForm({ supplierId, accounts, today }: { supplierId:
         );
       }}
     >
-      <h3 className="font-medium">Pay ahead (advance)</h3>
+      <h3 className="font-medium">{ph("Pay ahead (advance)")}</h3>
       <div className="grid gap-3 md:grid-cols-3">
         <label className="grid gap-1 text-sm">
-          Date
+          {ph("Date")}
           <Input type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
         </label>
         <label className="grid gap-1 text-sm">
-          Amount
+          {ph("Amount")}
           <Input inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} required />
         </label>
         <label className="grid gap-1 text-sm">
-          Paid from
+          {ph("Paid from")}
           <select value={accountId} onChange={(event) => setAccountId(event.target.value)} className={select}>
             {accounts.map((row) => (
               <option key={row.id} value={row.id}>
@@ -148,7 +152,7 @@ export function VendorAdvanceForm({ supplierId, accounts, today }: { supplierId:
       {message ? <p className="text-sm text-error" role="alert">{message}</p> : null}
       <div>
         <Button type="submit" loading={pending} disabled={accounts.length === 0}>
-          Record advance
+          {ph("Record advance")}
         </Button>
       </div>
     </form>
@@ -156,6 +160,7 @@ export function VendorAdvanceForm({ supplierId, accounts, today }: { supplierId:
 }
 
 export function VendorApplyAdvanceForm({ supplierId, bills, held, today }: { supplierId: string; bills: Bill[]; held: string; today: string }) {
+  const { ph } = useI18n();
   const { submit, pending, message, reset } = useSubmit();
   const [date, setDate] = useState(today);
   const [amount, setAmount] = useState("");
@@ -172,15 +177,15 @@ export function VendorApplyAdvanceForm({ supplierId, bills, held, today }: { sup
         );
       }}
     >
-      <h3 className="font-medium">Use the advance against bills</h3>
-      <p className="text-sm text-muted">{held} is held with this vendor. No cash or bank account moves.</p>
+      <h3 className="font-medium">{ph("Use the advance against bills")}</h3>
+      <p className="text-sm text-muted">{held} {ph("is held with this vendor. No cash or bank account moves.")}</p>
       <div className="grid gap-3 md:grid-cols-2">
         <label className="grid gap-1 text-sm">
-          Date
+          {ph("Date")}
           <Input type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
         </label>
         <label className="grid gap-1 text-sm">
-          Amount
+          {ph("Amount")}
           <Input inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} required />
         </label>
       </div>
@@ -188,7 +193,7 @@ export function VendorApplyAdvanceForm({ supplierId, bills, held, today }: { sup
       {message ? <p className="text-sm text-error" role="alert">{message}</p> : null}
       <div>
         <Button type="submit" loading={pending}>
-          Use advance
+          {ph("Use advance")}
         </Button>
       </div>
     </form>

@@ -4,11 +4,13 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useSubmit } from "@/lib/client/use-submit";
+import { useI18n } from "@/lib/i18n/provider";
 
 type PreviewRow = { rowNumber: number; sku: string; name: string; status: string; message: string };
 type ResultRow = { rowNumber: number; status: string; message: string };
 
 export function ProductImportForm({ canExport }: { canExport: boolean }) {
+  const { ph } = useI18n();
   const [csv, setCsv] = useState("sku,name,purchasePrice,sellingPrice,wholesalePrice,minimumPrice,reorderLevel,barcode,genericName,vatType,vatRate,isService,dealerPrice\n");
   const [preview, setPreview] = useState<PreviewRow[]>([]);
   const [result, setResult] = useState<ResultRow[]>([]);
@@ -35,17 +37,17 @@ export function ProductImportForm({ canExport }: { canExport: boolean }) {
 
   return (
     <div className="grid max-w-3xl gap-3">
-      <textarea aria-label="Product CSV" className="min-h-40 rounded-md border border-border bg-surface px-3 py-2 font-mono text-sm" value={csv} onChange={(event) => setCsv(event.target.value)} />
+      <textarea aria-label={ph("Product CSV")} className="min-h-40 rounded-md border border-border bg-surface px-3 py-2 font-mono text-sm" value={csv} onChange={(event) => setCsv(event.target.value)} />
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant="secondary" loading={pending} onClick={() => void run("/api/v1/products/import/preview", false)}>
-          Preview
+          {ph("Preview")}
         </Button>
         <Button type="button" loading={pending} onClick={() => void run("/api/v1/products/import", true)}>
-          Confirm import
+          {ph("Confirm import")}
         </Button>
         {canExport ? (
           <Button href="/api/v1/products/export" variant="secondary">
-            Export CSV
+            {ph("Export CSV")}
           </Button>
         ) : null}
       </div>
@@ -73,6 +75,7 @@ export function ProductImportForm({ canExport }: { canExport: boolean }) {
 }
 
 export function OpeningImportForm() {
+  const { ph } = useI18n();
   const [csv, setCsv] = useState("sku,quantity,unitCost,lot,manufacturedOn,expiresOn,rack\n");
   const [openingDate, setOpeningDate] = useState("");
   const { submit, pending, message } = useSubmit();
@@ -86,14 +89,14 @@ export function OpeningImportForm() {
       }}
     >
       <label className="grid gap-1 text-sm">
-        Date
-        <input name="businessDate" type="date" required aria-label="Opening date" className="h-10 rounded-md border border-border bg-surface px-3 text-sm" value={openingDate} onChange={(event) => setOpeningDate(event.target.value)} />
+        {ph("Date")}
+        <input name="businessDate" type="date" required aria-label={ph("Opening date")} className="h-10 rounded-md border border-border bg-surface px-3 text-sm" value={openingDate} onChange={(event) => setOpeningDate(event.target.value)} />
       </label>
-      <textarea aria-label="Opening stock CSV" className="min-h-32 rounded-md border border-border bg-surface px-3 py-2 font-mono text-sm" value={csv} onChange={(event) => setCsv(event.target.value)} />
-      <p className="text-sm text-muted">Rack is kept in the file and is not stored. The rows that import become one opening-stock document with one journal, valued at the unit cost in the file.</p>
+      <textarea aria-label={ph("Opening stock CSV")} className="min-h-32 rounded-md border border-border bg-surface px-3 py-2 font-mono text-sm" value={csv} onChange={(event) => setCsv(event.target.value)} />
+      <p className="text-sm text-muted">{ph("Rack is kept in the file and is not stored. The rows that import become one opening-stock document with one journal, valued at the unit cost in the file.")}</p>
       {message ? <p className="text-sm text-error">{message}</p> : null}
       <Button type="submit" loading={pending}>
-        Import opening stock
+        {ph("Import opening stock")}
       </Button>
     </form>
   );

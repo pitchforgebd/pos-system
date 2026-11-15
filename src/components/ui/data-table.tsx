@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { getPhrase } from "@/lib/i18n/server";
+
 export type Column<T> = {
   key: string;
   header: string;
@@ -7,7 +9,7 @@ export type Column<T> = {
   sortable?: boolean;
 };
 
-export function DataTable<T>({
+export async function DataTable<T>({
   caption,
   columns,
   rows,
@@ -30,6 +32,12 @@ export function DataTable<T>({
   empty?: ReactNode;
   error?: ReactNode;
 }) {
+  // a header, a caption and a text cell are English sentences or words (a status, a method): they are shown in the language of the screen
+  const ph = await getPhrase();
+  const cellOf = (column: Column<T>, row: T) => {
+    const value = column.cell(row);
+    return typeof value === "string" ? ph(value) : value;
+  };
   if (status === "error") {
     return <>{error}</>;
   }
@@ -42,7 +50,7 @@ export function DataTable<T>({
     <>
       <div className="hidden overflow-hidden rounded-md border border-border bg-surface md:block">
         <table className="w-full border-collapse text-sm">
-          <caption className="sr-only">{caption}</caption>
+          <caption className="sr-only">{ph(caption)}</caption>
           <thead className="bg-surface-muted text-left text-muted">
             <tr>
               {columns.map((column) => (
@@ -53,13 +61,13 @@ export function DataTable<T>({
                       className="inline-flex items-center gap-1 hover:text-text"
                       onClick={() => onSort(column.key)}
                     >
-                      {column.header}
+                      {ph(column.header)}
                       {sortKey === column.key ? (
                         <span className="text-xs">{sortDirection === "asc" ? "↑" : "↓"}</span>
                       ) : null}
                     </button>
                   ) : (
-                    column.header
+                    ph(column.header)
                   )}
                 </th>
               ))}
@@ -80,7 +88,7 @@ export function DataTable<T>({
                   <tr key={getRowKey(row)} className="border-t border-border">
                     {columns.map((column) => (
                       <td key={column.key} className="px-3 py-2.5 align-middle">
-                        {column.cell(row)}
+                        {cellOf(column, row)}
                       </td>
                     ))}
                   </tr>
@@ -100,8 +108,8 @@ export function DataTable<T>({
               <li key={getRowKey(row)} className="space-y-2 p-3">
                 {columns.map((column) => (
                   <div key={column.key} className="flex items-start justify-between gap-3 text-sm">
-                    <span className="text-muted">{column.header}</span>
-                    <span className="text-right">{column.cell(row)}</span>
+                    <span className="text-muted">{ph(column.header)}</span>
+                    <span className="text-right">{cellOf(column, row)}</span>
                   </div>
                 ))}
               </li>

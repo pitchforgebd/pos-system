@@ -7,10 +7,13 @@ import { EmptyState } from "@/components/ui/states";
 import { listProducts } from "@/modules/catalog/products";
 import { getSession } from "@/modules/auth/current-session";
 import { listOwnInvoices } from "@/modules/inventory/documents";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Own stock" };
+export const generateMetadata = phraseTitled("Own stock");
 
 export default async function OwnStockPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -26,26 +29,26 @@ export default async function OwnStockPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Own Stock"
-        description="Uses the same permission as opening stock. The ledger type is OWN_STOCK."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Inventory", href: "/inventory" }, { label: "Own stock" }]}
+        title={ph("Own Stock")}
+        description={ph("Uses the same permission as opening stock. The ledger type is OWN_STOCK.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Inventory", href: "/inventory" }, { label: ph("Own stock") }]}
       />
       <InboundForm
         action="/api/v1/inventory/own-stock"
-        submitLabel="Post own stock"
+        submitLabel={ph("Post own stock")}
         products={products.map((product) => ({ id: product.id, label: `${product.sku} · ${product.name}` }))}
       />
-      <h2 className="text-lg font-semibold">Own Stock Invoices</h2>
+      <h2 className="text-lg font-semibold">{ph("Own Stock Invoices")}</h2>
       <DataTable
-        caption="Own stock invoices"
+        caption={ph("Own stock invoices")}
         columns={[
-          { key: "number", header: "Number", cell: (row) => row.number },
-          { key: "date", header: "Date", cell: (row) => row.businessDate },
-          { key: "place", header: "Place", cell: (row) => row.warehouseName },
+          { key: "number", header: ph("Number"), cell: (row) => row.number },
+          { key: "date", header: ph("Date"), cell: (row) => row.businessDate },
+          { key: "place", header: ph("Place"), cell: (row) => row.warehouseName },
         ]}
         rows={invoices}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No own-stock invoices" description="A posted own-stock line creates an invoice here." />}
+        empty={<EmptyState title={ph("No own-stock invoices")} description={ph("A posted own-stock line creates an invoice here.")} />}
       />
     </div>
   );

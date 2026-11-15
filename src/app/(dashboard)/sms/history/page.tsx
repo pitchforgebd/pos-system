@@ -7,12 +7,15 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
 import { listMessages, listNotificationLogs } from "@/modules/sms/sms";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "SMS Histories" };
+export const generateMetadata = phraseTitled("SMS Histories");
 
 const messageStatuses = ["QUEUED", "SENDING", "SENT", "FAILED"] as const;
 
 export default async function SmsHistoryPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string }> }) {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -37,15 +40,15 @@ export default async function SmsHistoryPage({ searchParams }: { searchParams: P
   return (
     <div className="space-y-6">
       <PageHeader
-        title="SMS Histories"
-        description="Each try is logged. A message is tried four times; a failed one can be put back in the outbox. A sent one is never sent again."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "SMS", href: "/sms" }, { label: "History" }]}
+        title={ph("SMS Histories")}
+        description={ph("Each try is logged. A message is tried four times; a failed one can be put back in the outbox. A sent one is never sent again.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "SMS", href: "/sms" }, { label: ph("History") }]}
       />
       <form className="flex flex-wrap items-end gap-2" action="/sms/history">
         <label className="grid gap-1 text-sm">
-          Status
+          {ph("Status")}
           <select name="status" defaultValue={status} className="h-10 rounded-md border border-border bg-surface px-2">
-            <option value="">All</option>
+            <option value="">{ph("All")}</option>
             {messageStatuses.map((item) => (
               <option key={item} value={item}>
                 {item}
@@ -54,39 +57,39 @@ export default async function SmsHistoryPage({ searchParams }: { searchParams: P
           </select>
         </label>
         <label className="grid min-w-56 flex-1 gap-1 text-sm">
-          Search
-          <input name="q" defaultValue={params.q ?? ""} placeholder="Phone or message" className="h-10 rounded-md border border-border px-3" />
+          {ph("Search")}
+          <input name="q" defaultValue={params.q ?? ""} placeholder={ph("Phone or message")} className="h-10 rounded-md border border-border px-3" />
         </label>
         <Button type="submit" variant="secondary">
-          Search
+          {ph("Search")}
         </Button>
       </form>
       <DataTable
-        caption="Messages"
+        caption={ph("Messages")}
         columns={[
-          { key: "date", header: "Date", cell: (row) => row.createdAt.slice(0, 10) },
-          { key: "to", header: "To", cell: (row) => row.recipient },
-          { key: "message", header: "Message", cell: (row) => row.body },
-          { key: "parts", header: "SMS", cell: (row) => row.parts },
-          { key: "status", header: "Status", cell: (row) => row.status },
-          { key: "tries", header: "Tries", cell: (row) => row.attempts },
-          { key: "note", header: "Note", cell: (row) => (row.status === "SENT" ? "" : row.result) },
-          { key: "retry", header: "Retry", cell: (row) => (row.status === "FAILED" ? <RetryForm messageId={row.id} /> : null) },
+          { key: "date", header: ph("Date"), cell: (row) => row.createdAt.slice(0, 10) },
+          { key: "to", header: ph("To"), cell: (row) => row.recipient },
+          { key: "message", header: ph("Message"), cell: (row) => row.body },
+          { key: "parts", header: ph("SMS"), cell: (row) => row.parts },
+          { key: "status", header: ph("Status"), cell: (row) => row.status },
+          { key: "tries", header: ph("Tries"), cell: (row) => row.attempts },
+          { key: "note", header: ph("Note"), cell: (row) => (row.status === "SENT" ? "" : row.result) },
+          { key: "retry", header: ph("Retry"), cell: (row) => (row.status === "FAILED" ? <RetryForm messageId={row.id} /> : null) },
         ]}
         rows={rows}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No messages" description="Sent and failed messages appear here." />}
+        empty={<EmptyState title={ph("No messages")} description={ph("Sent and failed messages appear here.")} />}
       />
       <DataTable
-        caption="Notification log"
+        caption={ph("Notification log")}
         columns={[
-          { key: "date", header: "Date", cell: (row) => row.createdAt.slice(0, 10) },
-          { key: "to", header: "To", cell: (row) => row.recipient },
-          { key: "status", header: "Status", cell: (row) => row.status },
+          { key: "date", header: ph("Date"), cell: (row) => row.createdAt.slice(0, 10) },
+          { key: "to", header: ph("To"), cell: (row) => row.recipient },
+          { key: "status", header: ph("Status"), cell: (row) => row.status },
         ]}
         rows={logs}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No notification log" description="An SMS attempt writes a notification row." />}
+        empty={<EmptyState title={ph("No notification log")} description={ph("An SMS attempt writes a notification row.")} />}
       />
     </div>
   );

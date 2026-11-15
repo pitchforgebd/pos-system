@@ -1,6 +1,7 @@
 import { formatCount, formatDate, formatDateTime, formatDayMonth, formatNumber, formatQty, formatTaka, formatWeekday } from "@/lib/format/locale";
 import type { Digits, Fmt, Lang } from "@/lib/i18n/lang";
 import type { MessageKey } from "@/lib/i18n/messages";
+import { translatePhrase } from "@/lib/i18n/phrases";
 import { makeT, type Params } from "@/lib/i18n/translate";
 
 // One object with everything a screen needs to write in the person's language: the texts and the number, money and date formats. The server makes it from
@@ -11,6 +12,8 @@ export type I18n = {
   digits: Digits;
   fmt: Fmt;
   t: (key: MessageKey, params?: Params) => string;
+  /** An English sentence written on a screen, in the language of the screen (the phrase dictionary; English stays English when it has no entry). */
+  ph: (text: string) => string;
   /** ৳12,34,567.00 */
   taka: (value: string | number | null | undefined) => string;
   /** 12,34,567.50 */
@@ -32,6 +35,7 @@ export function buildI18n(prefs: Fmt, messages: Readonly<Record<string, string>>
     digits,
     fmt: prefs,
     t: makeT<MessageKey>(messages, lang),
+    ph: (text) => translatePhrase(lang, text),
     taka: (value) => formatTaka(value, { digits }),
     num: (value, decimals) => formatNumber(value, { digits, decimals }),
     qty: (value) => formatQty(value, digits),

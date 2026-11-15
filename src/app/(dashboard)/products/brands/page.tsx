@@ -6,10 +6,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/states";
 import { listBrands } from "@/modules/catalog/references";
 import { getSession } from "@/modules/auth/current-session";
+import { phraseTitled } from "@/lib/i18n/metadata";
+import { getPhrase } from "@/lib/i18n/server";
 
-export const metadata = { title: "Brands" };
+export const generateMetadata = phraseTitled("Brands");
 
 export default async function BrandsPage() {
+  const ph = await getPhrase();
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -19,21 +22,21 @@ export default async function BrandsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Brands"
-        description="Brands in this organization."
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Products", href: "/products" }, { label: "Brands" }]}
+        title={ph("Brands")}
+        description={ph("Brands in this organization.")}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Products", href: "/products" }, { label: ph("Brands") }]}
       />
-      {session.permissions.has("products.create") ? <NamedRecordForm action="/api/v1/brands" label="Brand name" /> : null}
+      {session.permissions.has("products.create") ? <NamedRecordForm action="/api/v1/brands" label={ph("Brand name")} /> : null}
       <DataTable
-        caption="Brands"
+        caption={ph("Brands")}
         columns={[
-          { key: "name", header: "Brand", cell: (row) => row.name },
-          { key: "products", header: "Products", cell: (row) => row._count.products },
-          { key: "status", header: "Status", cell: (row) => row.status },
+          { key: "name", header: ph("Brand"), cell: (row) => row.name },
+          { key: "products", header: ph("Products"), cell: (row) => row._count.products },
+          { key: "status", header: ph("Status"), cell: (row) => row.status },
         ]}
         rows={brands}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No brands" description="Add a brand before assigning it to a product." />}
+        empty={<EmptyState title={ph("No brands")} description={ph("Add a brand before assigning it to a product.")} />}
       />
     </div>
   );
