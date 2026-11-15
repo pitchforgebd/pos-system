@@ -8,12 +8,10 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { describedBy, FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
-
-const schema = z.object({
-  email: z.string().trim().email("Enter a valid email."),
-});
+import { useI18n } from "@/lib/i18n/provider";
 
 export default function ForgotPasswordPage() {
+  const { t } = useI18n();
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | undefined>();
   const [message, setMessage] = useState<string | null>(null);
@@ -25,7 +23,7 @@ export default function ForgotPasswordPage() {
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
-        const parsed = schema.safeParse({ email });
+        const parsed = z.object({ email: z.string().trim().email(t("auth.invalidEmail")) }).safeParse({ email });
         if (!parsed.success) {
           setError(parsed.error.issues[0]?.message);
           setMessage(null);
@@ -38,23 +36,22 @@ export default function ForgotPasswordPage() {
           headers: { "content-type": "application/json" },
           body: JSON.stringify(parsed.data),
         })
-          .then(async (response) => {
-            const body = (await response.json()) as { message?: string; error?: { message?: string } };
-            setMessage(body.error?.message ?? body.message ?? "Request received.");
+          .then((response) => {
+            setMessage(response.status === 429 ? t("auth.tooMany") : response.ok ? t("auth.received") : t("auth.requestFailed"));
             setPending(false);
           })
           .catch(() => {
-            setMessage("Request failed.");
+            setMessage(t("auth.requestFailed"));
             setPending(false);
           });
       }}
     >
       <div>
-        <h1 className="text-xl font-semibold">Forgot password</h1>
-        <p className="mt-1 text-sm text-muted">Reset instructions are issued for an active account. The response does not say whether the email exists.</p>
+        <h1 className="text-xl font-semibold">{t("auth.forgotTitle")}</h1>
+        <p className="mt-1 text-sm text-muted">{t("auth.forgotHint")}</p>
       </div>
       {message ? <Alert tone="info" title={message} /> : null}
-      <FormField label="Email" htmlFor="forgot-email" required error={error}>
+      <FormField label={t("auth.email")} htmlFor="forgot-email" required error={error}>
         <Input
           id="forgot-email"
           type="email"
@@ -66,11 +63,11 @@ export default function ForgotPasswordPage() {
         />
       </FormField>
       <Button type="submit" className="w-full" disabled={pending}>
-        Send reset
+        {t("auth.send")}
       </Button>
       <p className="text-sm">
         <Link href="/login" className="text-primary">
-          Back to sign in
+          {t("auth.back")}
         </Link>
       </p>
     </form>

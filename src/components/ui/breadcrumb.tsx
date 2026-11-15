@@ -1,12 +1,16 @@
 import Link from "next/link";
 
-export function Breadcrumb({
+import { translateNav } from "@/lib/i18n/nav";
+import { getPrefs } from "@/lib/i18n/server";
+
+export async function Breadcrumb({
   items,
 }: {
   items: { label: string; href?: string }[];
 }) {
+  const { lang } = await getPrefs();
   return (
-    <nav aria-label="Breadcrumb">
+    <nav aria-label={lang === "bn" ? "পথ" : "Breadcrumb"}>
       <ol className="flex flex-wrap items-center gap-1 text-sm text-muted">
         {items.map((item, index) => {
           const last = index === items.length - 1;
@@ -15,11 +19,11 @@ export function Breadcrumb({
               {index > 0 ? <span aria-hidden="true">/</span> : null}
               {item.href && !last ? (
                 <Link href={item.href} className="hover:text-text">
-                  {item.label}
+                  {translateNav(lang, item.label)}
                 </Link>
               ) : (
                 <span className={last ? "text-text" : undefined} aria-current={last ? "page" : undefined}>
-                  {item.label}
+                  {translateNav(lang, item.label)}
                 </span>
               )}
             </li>

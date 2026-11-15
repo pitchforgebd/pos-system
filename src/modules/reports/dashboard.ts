@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 
-import { addDays, businessDate, dateOnly } from "@/core/time/business-date";
+import { addDays, businessDate, dateOnly, fiscalYear } from "@/core/time/business-date";
 import { prisma } from "@/lib/db/client";
 import { alertStatus } from "@/modules/inventory/stock";
 import { dec, docBranches, money, day, ZERO, type ReportCtx } from "@/modules/reports/kit";
@@ -21,6 +21,21 @@ export type Dashboard = {
   expiring: { expired: number; soon: number };
   /** How many identities of the day's reports do not agree (the banner). */
   mismatches: number;
+  /** What the day-to-day cards need besides the figures: returns, money in, the best sellers, the biggest dues, the month and the year, the counts. */
+  more: {
+    returns: string;
+    net: string;
+    moneyIn: string;
+    paidAtSale: string;
+    dueCollected: string;
+    grossProfit: string | null;
+    customersOwing: string;
+    topProducts: Array<{ name: string; quantity: string; amount: string }>;
+    topDues: Array<{ name: string; owed: string; since: string | null; late: boolean }>;
+    month: { sales: string; returns: string };
+    year: { sales: string; from: string };
+    counts: { customers: number; products: number; suppliers: number };
+  };
 };
 
 const TTL_MS = 30_000;
@@ -73,12 +88,29 @@ async function build(ctx: ReportCtx): Promise<Dashboard> {
   ];
   const mismatches = results.reduce((sum, result) => sum + result.identities.filter((check) => !check.ok).length, 0);
 
-  const [week, orders, low, lots] = await Promise.all([
+  const startMonth = (await prisma.organization.findUniqueOrThrow({ where: { id: ctx.organizationId }, select: { fiscalYearStartMonth: true } })).fiscalYearStartMonth;
+  const yearFrom = fiscalYear(ctx.to, startMonth).start;
+  const monthFrom = `${ctx.to.slice(0, 7)}-01`;
+  const posted = { organizationId: ctx.organizationId, status: "POSTED" as const, ...docBranches(ctx) };
+  const [week, orders, low, lots, top, monthSales, monthReturns, yearSales, customerCount, productCount, supplierCount] = await Promise.all([
     salesByDay(ctx, ctx.to),
     prisma.salesOrder.groupBy({ by: ["status"], where: { organizationId: ctx.organizationId, isQuotation: false, status: { in: ["CONFIRMED", "PACKED", "DISPATCHED"] }, ...docBranches(ctx) }, _count: { _all: true } }),
     stockAlerts(ctx),
     prisma.expiryBatch.findMany({ where: { organizationId: ctx.organizationId, quantity: { gt: 0 }, expiresOn: { lte: day(addDays(ctx.to, 30)) }, ...docBranches(ctx) }, select: { expiresOn: true } }),
+    bestSellers(ctx),
+    prisma.sale.aggregate({ where: { ...posted, businessDate: { gte: day(monthFrom), lte: day(ctx.to) } }, _sum: { total: true } }),
+    prisma.saleReturn.aggregate({ where: { ...posted, businessDate: { gte: day(monthFrom), lte: day(ctx.to) } }, _sum: { total: true } }),
+    prisma.sale.aggregate({ where: { ...posted, businessDate: { gte: day(yearFrom), lte: day(ctx.to) } }, _sum: { total: true } }),
+    prisma.customer.count({ where: { organizationId: ctx.organizationId } }),
+    prisma.product.count({ where: { organizationId: ctx.organizationId, deletedAt: null } }),
+    prisma.supplier.count({ where: { organizationId: ctx.organizationId } }),
   ]);
+  // the biggest customer dues come from the due report that already ran (its rows are worst first), so no second query
+  const dueRows = (due?.sections.find((section) => section.key === "customers")?.rows ?? []) as Array<Record<string, string>>;
+  const topDues = dueRows
+    .filter((row) => Number(row.closing) > 0)
+    .slice(0, 5)
+    .map((row) => ({ name: row.name ?? "", owed: row.closing ?? "0.00", since: row.since ? row.since : null, late: row.late === "Yes" || row.late === "হ্যাঁ" || row.late === "true" }));
   const todayMs = day(ctx.to).getTime();
   return {
     day: ctx.to,
@@ -89,7 +121,37 @@ async function build(ctx: ReportCtx): Promise<Dashboard> {
     lowStock: low,
     expiring: { expired: lots.filter((lot) => lot.expiresOn.getTime() < todayMs).length, soon: lots.filter((lot) => lot.expiresOn.getTime() >= todayMs).length },
     mismatches,
+    more: {
+      returns: figure(sales, "returns"),
+      net: figure(sales, "net"),
+      moneyIn: figure(receive, "withoutTransfers"),
+      paidAtSale: figure(sales, "paidSameDay"),
+      dueCollected: figure(receive, "dueCollected"),
+      grossProfit: ctx.canProfit ? figure(profit, "gross") : null,
+      customersOwing: figure(due, "customersOwing"),
+      topProducts: top,
+      topDues,
+      month: { sales: money(dec(monthSales._sum.total)), returns: money(dec(monthReturns._sum.total)) },
+      year: { sales: money(dec(yearSales._sum.total)), from: yearFrom },
+      counts: { customers: customerCount, products: productCount, suppliers: supplierCount },
+    },
   };
+}
+
+/** The five products that brought in most today (posted sales of the branches), by line total. */
+async function bestSellers(ctx: Pick<ReportCtx, "organizationId" | "branchIds" | "to">) {
+  const rows = await prisma.$queryRaw<Array<{ name: string; quantity: Prisma.Decimal; amount: Prisma.Decimal }>>`
+    SELECT p.name AS name, SUM(si.quantity) AS quantity, SUM(si.lineTotal) AS amount
+    FROM sale_items si
+    JOIN sales s ON s.id = si.saleId AND s.status = 'POSTED' AND s.businessDate = ${ctx.to}
+    JOIN products p ON p.id = si.productId
+    WHERE si.organizationId = ${ctx.organizationId}
+      ${ctx.branchIds === null ? Prisma.empty : ctx.branchIds.length === 0 ? Prisma.sql`AND 1 = 0` : Prisma.sql`AND s.branchId IN (${Prisma.join(ctx.branchIds)})`}
+    GROUP BY p.id, p.name
+    ORDER BY amount DESC
+    LIMIT 5
+  `;
+  return rows.map((row) => ({ name: row.name, quantity: dec(row.quantity).toDecimalPlaces(2).toString(), amount: money(dec(row.amount)) }));
 }
 
 /** Products at or under their reorder level in the branches, worst first (10). */

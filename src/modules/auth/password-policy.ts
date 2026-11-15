@@ -53,33 +53,51 @@ function rootOf(password: string) {
 
 export type PasswordContext = { email?: string | null; name?: string | null };
 
-/** The reason a password is not acceptable, or null when it is. The messages are for the person choosing it. */
-export function passwordProblem(password: string, context: PasswordContext = {}): string | null {
+export type PasswordProblemCode = "short" | "long" | "repeat" | "common" | "sequence" | "email" | "name";
+
+/** Why a password is not acceptable, as a code (a screen turns it into a sentence in the person's language), or null when it is acceptable. */
+export function passwordProblemCode(password: string, context: PasswordContext = {}): PasswordProblemCode | null {
   if (password.length < PASSWORD_MIN) {
-    return `Use at least ${PASSWORD_MIN} characters.`;
+    return "short";
   }
   if (password.length > PASSWORD_MAX) {
-    return `Use at most ${PASSWORD_MAX} characters.`;
+    return "long";
   }
   if (new Set(password).size <= 2) {
-    return "That password repeats the same characters. Choose another.";
+    return "repeat";
   }
   const { lower, trimmed, swapped } = rootOf(password);
   if (COMMON.has(lower) || COMMON.has(trimmed) || COMMON.has(swapped)) {
-    return "That password is too common. Choose another.";
+    return "common";
   }
   // a run along the keyboard or the alphabet, nothing else
   if (/^(0123456789|1234567890|abcdefghij|qwertyuiop|asdfghjkl|zxcvbnm)/u.test(lower) && lower.length <= 14) {
-    return "That password is a simple sequence. Choose another.";
+    return "sequence";
   }
   const letters = lower.replace(/[^a-z0-9]/gu, "");
   const local = ((context.email ?? "").split("@")[0] ?? "").toLowerCase().replace(/[^a-z0-9]/gu, "");
   if (local.length >= 4 && letters.includes(local)) {
-    return "The password must not contain your email name.";
+    return "email";
   }
   const name = (context.name ?? "").trim().toLowerCase().replace(/[^a-z0-9]/gu, "");
   if (name.length >= 4 && letters.includes(name)) {
-    return "The password must not contain your name.";
+    return "name";
   }
   return null;
+}
+
+const MESSAGES: Record<PasswordProblemCode, string> = {
+  short: `Use at least ${PASSWORD_MIN} characters.`,
+  long: `Use at most ${PASSWORD_MAX} characters.`,
+  repeat: "That password repeats the same characters. Choose another.",
+  common: "That password is too common. Choose another.",
+  sequence: "That password is a simple sequence. Choose another.",
+  email: "The password must not contain your email name.",
+  name: "The password must not contain your name.",
+};
+
+/** The reason a password is not acceptable, in English (what the server answers), or null when it is acceptable. */
+export function passwordProblem(password: string, context: PasswordContext = {}): string | null {
+  const code = passwordProblemCode(password, context);
+  return code ? MESSAGES[code] : null;
 }

@@ -3,16 +3,17 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { IconButton } from "@/components/ui/icon-button";
+import { useI18n } from "@/lib/i18n/provider";
+import { monthName, weekdayName, withDigits } from "@/lib/format/locale";
 import {
   daysInMonth,
-  formatMonthLabel,
   shiftMonth,
   toIsoDate,
   weekdayIndex,
 } from "@/lib/format/date";
 import { cn } from "@/lib/utils";
 
-const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"] as const;
+const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6] as const;
 
 export function Calendar({
   year,
@@ -31,6 +32,7 @@ export function Calendar({
   rangeEnd?: string | null;
   onSelect: (isoDate: string) => void;
 }) {
+  const { t, lang, digits } = useI18n();
   const count = daysInMonth(year, month);
   const leading = weekdayIndex(year, month, 1);
   const cells = [
@@ -42,7 +44,7 @@ export function Calendar({
     <div className="w-72">
       <div className="mb-2 flex items-center justify-between">
         <IconButton
-          label="Previous month"
+          label={t("common.prevMonth")}
           onClick={() => {
             const next = shiftMonth(year, month, -1);
             onMonthChange(next.year, next.month);
@@ -50,9 +52,9 @@ export function Calendar({
         >
           <ChevronLeft className="size-4" aria-hidden="true" />
         </IconButton>
-        <p className="text-sm font-medium">{formatMonthLabel(year, month)}</p>
+        <p className="text-sm font-medium">{withDigits(`${monthName(month, lang)} ${year}`, digits)}</p>
         <IconButton
-          label="Next month"
+          label={t("common.nextMonth")}
           onClick={() => {
             const next = shiftMonth(year, month, 1);
             onMonthChange(next.year, next.month);
@@ -64,7 +66,7 @@ export function Calendar({
       <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted">
         {WEEKDAYS.map((day) => (
           <div key={day} className="py-1">
-            {day}
+            {weekdayName(day, lang).slice(0, lang === "bn" ? 3 : 2)}
           </div>
         ))}
       </div>
@@ -88,7 +90,7 @@ export function Calendar({
                 isSelected && "bg-primary text-primary-foreground hover:bg-primary-hover",
               )}
             >
-              {day}
+              {withDigits(String(day), digits)}
             </button>
           );
         })}

@@ -2,6 +2,7 @@
 
 import { ChevronDown, Menu, PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { APP_NAME } from "@/constants/app";
@@ -12,6 +13,8 @@ import { IconButton } from "@/components/ui/icon-button";
 import { Menu as Dropdown, MenuItem, MenuLabel } from "@/components/ui/dropdown-menu";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useSubmit } from "@/lib/client/use-submit";
+import { withDigits } from "@/lib/format/locale";
+import { useI18n } from "@/lib/i18n/provider";
 
 export function Header({
   onOpenMenu,
@@ -28,10 +31,13 @@ export function Header({
 }) {
   const current = session.branches.find((item) => item.id === session.branchId) ?? session.branches[0];
   const { submit } = useSubmit();
-  const [branchName, setBranchName] = useState(current?.name ?? "No branch");
+  const router = useRouter();
+  const { t, digits } = useI18n();
+  const [branchName, setBranchName] = useState(current?.name ?? t("shell.noBranch"));
   const [query, setQuery] = useState("");
   const [clock, setClock] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
+  const [mobileSearch, setMobileSearch] = useState(false);
   const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
   const matches = useMemo(() => searchReferenceNav(debouncedQuery), [debouncedQuery]);
   // Customers by name, phone or code (P10): only shown for the query they were found for, and not at all without customers.view.
@@ -53,6 +59,10 @@ export function Header({
 
   function chooseLanguage(next: UiLang) {
     void submit({ url: "/api/v1/locale", body: { lang: next } }, { quiet: true, refresh: true });
+  }
+
+  function chooseDigits(next: "bn" | "en") {
+    void submit({ url: "/api/v1/locale", body: { digits: next } }, { quiet: true, refresh: true });
   }
 
   useEffect(() => {
@@ -85,79 +95,87 @@ export function Header({
     );
   }
 
+  const searchBox = (wrapperClass: string, attach: boolean) => (
+        <div className={wrapperClass}>
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-white/80" aria-hidden="true" />
+          <input
+            ref={attach ? searchRef : undefined}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t("shell.searchPlaceholder")}
+            aria-label={t("shell.searchLabel")}
+            className="h-9 w-full rounded-full bg-[#7c4dff] pr-16 pl-9 text-sm text-white outline-none placeholder:text-white/80"
+          />
+          <span className="pointer-events-none absolute top-1/2 right-2 hidden -translate-y-1/2 rounded bg-white/20 px-1.5 py-0.5 text-[10px] text-white md:block">
+            Ctrl K
+          </span>
+          {debouncedQuery.trim().length >= 2 ? (
+            <div className="absolute top-11 z-30 w-full rounded-md border border-border bg-surface p-2 text-text shadow-[0_8px_24px_rgba(15,39,68,0.12)]">
+              {customers.length > 0 ? (
+                <ul className="mb-1 border-b border-border pb-1" aria-label={t("shell.customers")}>
+                  {customers.map((customer) => (
+                    <li key={customer.id}>
+                      <Link href={`/customers/${customer.id}`} className="flex justify-between gap-2 rounded-md px-2 py-2 text-sm hover:bg-secondary" onClick={() => setQuery("")}>
+                        <span>
+                          {customer.name} <span className="text-xs text-muted">{[customer.code, customer.phone].filter(Boolean).join(" · ")}</span>
+                        </span>
+                        {customer.outstanding !== "0.00" ? <span className="text-xs tabular-nums">{customer.outstanding}</span> : null}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {matches.length === 0 ? (
+                customers.length === 0 ? <p className="px-2 py-2 text-sm text-muted">{t("shell.noMatch")}</p> : null
+              ) : (
+                <ul>
+                  {matches.map((item) => (
+                    <li key={`${item.href}-${item.label}`}>
+                      <Link href={item.href} className="block rounded-md px-2 py-2 text-sm hover:bg-secondary" onClick={() => setQuery("")}>
+                        {translateNav(lang, item.label)}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : null}
+        </div>
+  );
+
   return (
+    <>
     <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border bg-surface px-3">
-      <IconButton label="Open menu" className="lg:hidden" onClick={onOpenMenu}>
+      <IconButton label={t("shell.openMenu")} className="lg:hidden" onClick={onOpenMenu}>
         <Menu className="size-4" aria-hidden="true" />
       </IconButton>
-      <IconButton label={menuCollapsed ? "Show menu" : "Hide menu"} className="hidden lg:inline-flex" onClick={onToggleMenu}>
+      <IconButton label={menuCollapsed ? t("shell.showMenu") : t("shell.hideMenu")} className="hidden lg:inline-flex" onClick={onToggleMenu}>
         {menuCollapsed ? <PanelLeftOpen className="size-4" aria-hidden="true" /> : <PanelLeftClose className="size-4" aria-hidden="true" />}
       </IconButton>
       <Link href="/dashboard" className="text-sm font-semibold lg:hidden">
         {APP_NAME}
       </Link>
-      <Link href="/dashboard" className="hidden h-8 items-center rounded-md bg-[#e25b2a] px-3 text-xs font-semibold text-white sm:inline-flex">
-        Wings
+      <Link href="/dashboard" className="hidden h-8 items-center rounded-md bg-[#c2410c] px-3 text-xs font-semibold text-white sm:inline-flex">
+        {t("shell.wings")}
       </Link>
       <Link href="/accounting/bank-cash" className="hidden h-8 items-center rounded-md bg-[#2f6fed] px-3 text-xs font-semibold text-white sm:inline-flex">
-        Balance
+        {t("shell.balance")}
       </Link>
-      <Link href="/pos" className="hidden h-8 items-center rounded-md bg-[#1f9d55] px-3 text-xs font-semibold text-white sm:inline-flex">
-        Sell
+      <Link href="/pos" className="hidden h-8 items-center rounded-md bg-[#15803d] px-3 text-xs font-semibold text-white sm:inline-flex">
+        {t("shell.sell")}
       </Link>
-      <div className="relative ml-auto hidden min-w-0 md:block md:w-72">
-        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-white/80" aria-hidden="true" />
-        <input
-          ref={searchRef}
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search anything..."
-          aria-label="Search screens and customers"
-          className="h-9 w-full rounded-full bg-[#7c4dff] pr-16 pl-9 text-sm text-white outline-none placeholder:text-white/80"
-        />
-        <span className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 rounded bg-white/20 px-1.5 py-0.5 text-[10px] text-white">
-          Ctrl K
-        </span>
-        {debouncedQuery.trim().length >= 2 ? (
-          <div className="absolute top-11 z-30 w-full rounded-md border border-border bg-surface p-2 text-text shadow-[0_8px_24px_rgba(15,39,68,0.12)]">
-            {customers.length > 0 ? (
-              <ul className="mb-1 border-b border-border pb-1" aria-label="Customers">
-                {customers.map((customer) => (
-                  <li key={customer.id}>
-                    <Link href={`/customers/${customer.id}`} className="flex justify-between gap-2 rounded-md px-2 py-2 text-sm hover:bg-secondary" onClick={() => setQuery("")}>
-                      <span>
-                        {customer.name} <span className="text-xs text-muted">{[customer.code, customer.phone].filter(Boolean).join(" · ")}</span>
-                      </span>
-                      {customer.outstanding !== "0.00" ? <span className="text-xs tabular-nums">{customer.outstanding}</span> : null}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-            {matches.length === 0 ? (
-              customers.length === 0 ? <p className="px-2 py-2 text-sm text-muted">No matching screen or customer</p> : null
-            ) : (
-              <ul>
-                {matches.map((item) => (
-                  <li key={`${item.href}-${item.label}`}>
-                    <Link href={item.href} className="block rounded-md px-2 py-2 text-sm hover:bg-secondary" onClick={() => setQuery("")}>
-                      {translateNav(lang, item.label)}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        ) : null}
-      </div>
+      {searchBox("relative ml-auto hidden min-w-0 md:block md:w-72", true)}
+      <IconButton label={t("shell.searchOpen")} className="ml-auto md:hidden" onClick={() => setMobileSearch((open) => !open)}>
+        <Search className="size-4" aria-hidden="true" />
+      </IconButton>
       <span className="hidden font-mono text-sm text-muted xl:inline" suppressHydrationWarning>
-        {clock}
+        {withDigits(clock, digits)}
       </span>
       <Link href="/pos/open-tickets" className="hidden h-8 items-center rounded-md bg-[#7c4dff] px-3 text-xs font-semibold text-white md:inline-flex">
-        Open Ticket
+        {t("shell.openTicket")}
       </Link>
       <Dropdown
-        label={translateNav(lang, "Language")}
+        label={t("shell.language")}
         trigger={
           <button type="button" className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-sm hover:bg-secondary">
             {lang === "bn" ? "বাংলা" : "English"}
@@ -167,9 +185,12 @@ export function Header({
       >
         <MenuItem onSelect={() => chooseLanguage("en")}>English</MenuItem>
         <MenuItem onSelect={() => chooseLanguage("bn")}>বাংলা</MenuItem>
+        <MenuLabel>{t("shell.digits")}</MenuLabel>
+        <MenuItem onSelect={() => chooseDigits("en")}>{t("shell.digitsEn")}</MenuItem>
+        <MenuItem onSelect={() => chooseDigits("bn")}>{t("shell.digitsBn")}</MenuItem>
       </Dropdown>
       <Dropdown
-        label="Account"
+        label={t("shell.account")}
         trigger={
           <button type="button" className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-sm hover:bg-secondary">
             <span className="max-w-28 truncate">{session.name}</span>
@@ -177,6 +198,7 @@ export function Header({
           </button>
         }
       >
+        <MenuItem onSelect={() => router.push("/profile")}>{t("shell.profile")}</MenuItem>
         <MenuLabel>{branchName}</MenuLabel>
         {session.branches.map((item) => (
           <MenuItem key={item.id} onSelect={() => selectBranch(item.id)}>
@@ -188,9 +210,11 @@ export function Header({
             void submit({ url: "/api/v1/auth/logout" }, { quiet: true, goTo: "/login" });
           }}
         >
-          Log Out
+          {t("shell.logout")}
         </MenuItem>
       </Dropdown>
     </header>
+      {mobileSearch ? <div className="sticky top-14 z-20 border-b border-border bg-surface px-3 py-2 md:hidden">{searchBox("relative w-full", false)}</div> : null}
+    </>
   );
 }

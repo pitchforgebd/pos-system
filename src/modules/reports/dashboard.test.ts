@@ -60,3 +60,32 @@ test("a user without reports.profit gets no profit card; the answer is kept for 
     assert.notEqual(await dashboardFor(base, day), first);
   });
 });
+
+test("what the cards add: returns and net, money in, the best sellers, the biggest dues, the month and the year, the counts", async () => {
+  await withTestOrg(async (t) => {
+    const { day } = await buildAgriDay(t);
+    forgetDashboards();
+    const board = await dashboardFor({ organizationId: t.org.id, branchIds: [t.branch.id], canProfit: true }, day);
+    const more = board.more;
+    assert.deepEqual([more.returns, more.net], [EXPECTED.sales.returns, EXPECTED.sales.net]);
+    assert.equal(more.moneyIn, EXPECTED.receive.withoutTransfers);
+    assert.equal(more.dueCollected, "1000.00");
+    assert.equal(more.grossProfit, EXPECTED.profit.gross);
+    // the best sellers are the products of today's posted sales, biggest first, and never more than the day's sales
+    assert.ok(more.topProducts.length >= 1 && more.topProducts.length <= 5);
+    const amounts = more.topProducts.map((row) => Number(row.amount));
+    assert.deepEqual([...amounts].sort((a, b) => b - a), amounts);
+    assert.ok(amounts.reduce((a, b) => a + b, 0) <= Number(EXPECTED.sales.sales) + 0.001);
+    // the biggest dues: Karim owes 1,400 at the end of the day
+    assert.equal(more.topDues[0]?.owed, EXPECTED.due.karim.closing);
+    assert.match(more.topDues[0]?.name ?? "", /Karim/);
+    // the golden day is the only trading in its month and year
+    assert.equal(more.month.sales, EXPECTED.sales.sales);
+    assert.equal(more.year.sales, EXPECTED.sales.sales);
+    assert.equal(more.month.returns, EXPECTED.sales.returns);
+    assert.ok(more.counts.customers >= 1 && more.counts.products >= 3);
+    // a user without profit sees no gross profit
+    forgetDashboards();
+    assert.equal((await dashboardFor({ organizationId: t.org.id, branchIds: [t.branch.id], canProfit: false }, day)).more.grossProfit, null);
+  });
+});

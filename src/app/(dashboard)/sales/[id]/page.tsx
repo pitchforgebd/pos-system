@@ -4,12 +4,17 @@ import { PrintButton, PrintSheet } from "@/components/print/sheet";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
+import { buildI18n } from "@/lib/i18n/build";
+import { getI18n } from "@/lib/i18n/server";
 import { getSession } from "@/modules/auth/current-session";
 import { getSale } from "@/modules/sales/sales";
 
-export const metadata = { title: "Sale" };
+export async function generateMetadata() {
+  return { title: (await getI18n("sales")).t("sales.fallback") };
+}
 
-// What the invoice says, in the language the cashier chose (?lang=bn or en) and on the paper the shop prints on (?print=thermal for 80 mm).
+// What the invoice says, in the language the cashier chose (the language of the screen, or ?lang=bn or en for this one) and on the paper the shop prints on
+// (?print=thermal for 80 mm). Amounts are in taka with the lakh grouping and dates are written out, in the digits the person chose (P13).
 const WORDS = {
   en: { invoice: "Invoice", receipt: "Receipt", date: "Date", customer: "Customer", level: "Price level", item: "Item", qty: "Qty", price: "Price", total: "Total", goods: "Goods", discount: "Discount", vat: "VAT", charges: "Charges", paid: "Paid", change: "Still owed on this invoice", owes: "Total due from the customer now", status: "Status", thanks: "Thank you" },
   bn: { invoice: "ইনভয়েস", receipt: "রসিদ", date: "তারিখ", customer: "কাস্টমার", level: "দামের লেভেল", item: "পণ্য", qty: "পরিমাণ", price: "দাম", total: "মোট", goods: "পণ্যের মূল্য", discount: "ছাড়", vat: "ভ্যাট", charges: "চার্জ", paid: "পরিশোধ", change: "এই ইনভয়েসে বাকি", owes: "কাস্টমারের মোট বাকি এখন", status: "অবস্থা", thanks: "ধন্যবাদ" },
@@ -27,33 +32,39 @@ export default async function SaleDetailPage({ params, searchParams }: { params:
     notFound();
   }
   const thermal = query.print === "thermal";
-  const t = WORDS[query.lang === "bn" ? "bn" : "en"];
-  const link = (print: boolean, lang: "bn" | "en") => `/sales/${sale.id}?${print ? "print=thermal&" : ""}lang=${lang}`;
+  const page = await getI18n("sales");
+  const lang: "bn" | "en" = query.lang === "bn" || query.lang === "en" ? query.lang : page.lang;
+  const t = WORDS[lang];
+  // the invoice itself follows ?lang, the rest of the page the screen's language
+  const f = buildI18n({ lang, digits: page.digits }, {});
+  const s = page.t;
+  const fallback = s("sales.fallback");
+  const link = (print: boolean, next: "bn" | "en") => `/sales/${sale.id}?${print ? "print=thermal&" : ""}lang=${next}`;
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title={sale.number ?? "Sale"}
-        description={`${sale.customerName} · ${sale.businessDate} · ${sale.total}`}
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Sales", href: "/sales" }, { label: sale.number ?? "Sale" }]}
+        title={sale.number ?? fallback}
+        description={`${sale.customerName} · ${page.date(sale.businessDate)} · ${page.taka(sale.total)}`}
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Sales", href: "/sales" }, { label: sale.number ?? fallback }]}
         actions={
           <div className="flex flex-wrap items-center gap-2 print:hidden">
             <Button variant="secondary" href="/pos">
-              New sale
+              {s("sales.newSale")}
             </Button>
-            <PrintButton label={thermal ? "Print 80mm receipt" : "Print A4 invoice"} />
-            <a className="text-sm underline" href={link(!thermal, query.lang === "bn" ? "bn" : "en")}>
-              {thermal ? "A4 invoice" : "80mm receipt"}
+            <PrintButton label={thermal ? s("sales.print80") : s("sales.printA4")} />
+            <a className="text-sm underline" href={link(!thermal, lang)}>
+              {thermal ? s("sales.a4") : s("sales.r80")}
             </a>
-            <a className="text-sm underline" href={link(thermal, query.lang === "bn" ? "en" : "bn")}>
-              {query.lang === "bn" ? "English" : "বাংলা"}
+            <a className="text-sm underline" href={link(thermal, lang === "bn" ? "en" : "bn")}>
+              {lang === "bn" ? "English" : "বাংলা"}
             </a>
           </div>
         }
       />
       <PrintSheet title={thermal ? t.receipt : t.invoice} note={thermal ? "80mm" : "A4"} thermal={thermal}>
         <p>
-          {t.invoice} {sale.number ?? "Sale"} · {t.date} {sale.businessDate}
+          {t.invoice} {sale.number ?? fallback} · {t.date} {f.date(sale.businessDate)}
         </p>
         <p>
           {t.customer}: {sale.customerName}
@@ -72,38 +83,38 @@ export default async function SaleDetailPage({ params, searchParams }: { params:
             {sale.items.map((item) => (
               <tr key={item.id}>
                 <td className="py-0.5">{item.name}</td>
-                <td className="py-0.5 text-right tabular-nums">{item.quantity}</td>
-                <td className="py-0.5 text-right tabular-nums">{item.unitPrice}</td>
-                <td className="py-0.5 text-right tabular-nums">{item.lineTotal}</td>
+                <td className="py-0.5 text-right tabular-nums">{f.qty(item.quantity)}</td>
+                <td className="py-0.5 text-right tabular-nums">{f.taka(item.unitPrice)}</td>
+                <td className="py-0.5 text-right tabular-nums">{f.taka(item.lineTotal)}</td>
               </tr>
             ))}
           </tbody>
         </table>
         <dl className="ml-auto grid max-w-xs grid-cols-2 gap-x-4 text-sm">
           <dt>{t.goods}</dt>
-          <dd className="text-right tabular-nums">{sale.subtotal}</dd>
+          <dd className="text-right tabular-nums">{f.taka(sale.subtotal)}</dd>
           <dt>{t.discount}</dt>
-          <dd className="text-right tabular-nums">{sale.discountTotal}</dd>
+          <dd className="text-right tabular-nums">{f.taka(sale.discountTotal)}</dd>
           <dt>{t.vat}</dt>
-          <dd className="text-right tabular-nums">{sale.vatTotal}</dd>
+          <dd className="text-right tabular-nums">{f.taka(sale.vatTotal)}</dd>
           <dt>{t.charges}</dt>
-          <dd className="text-right tabular-nums">{sale.chargesTotal}</dd>
+          <dd className="text-right tabular-nums">{f.taka(sale.chargesTotal)}</dd>
           <dt className="font-semibold">{t.total}</dt>
-          <dd className="text-right font-semibold tabular-nums">{sale.total}</dd>
+          <dd className="text-right font-semibold tabular-nums">{f.taka(sale.total)}</dd>
           {sale.payments.map((payment) => (
             <div key={payment.id} className="contents">
               <dt>
                 {t.paid} ({payment.method})
               </dt>
-              <dd className="text-right tabular-nums">{payment.amount}</dd>
+              <dd className="text-right tabular-nums">{f.taka(payment.amount)}</dd>
             </div>
           ))}
           <dt>{t.change}</dt>
-          <dd className="text-right tabular-nums">{sale.owed}</dd>
+          <dd className="text-right tabular-nums">{f.taka(sale.owed)}</dd>
           {sale.customerDue !== "0.00" ? (
             <>
               <dt>{t.owes}</dt>
-              <dd className="text-right tabular-nums">{sale.customerDue}</dd>
+              <dd className="text-right tabular-nums">{f.taka(sale.customerDue)}</dd>
             </>
           ) : null}
         </dl>
@@ -111,19 +122,19 @@ export default async function SaleDetailPage({ params, searchParams }: { params:
       </PrintSheet>
       <div className="space-y-3 print:hidden">
         <DataTable
-          caption="Sale lines"
+          caption={s("sales.caption")}
           columns={[
-            { key: "sku", header: "SKU", cell: (row) => row.sku },
-            { key: "name", header: "Product", cell: (row) => row.name },
-            { key: "quantity", header: "Quantity", cell: (row) => row.quantity },
-            { key: "price", header: "Unit price", cell: (row) => row.unitPrice },
-            { key: "total", header: "Line total", cell: (row) => row.lineTotal },
+            { key: "sku", header: s("sales.sku"), cell: (row) => row.sku },
+            { key: "name", header: s("sales.product"), cell: (row) => row.name },
+            { key: "quantity", header: s("sales.quantity"), cell: (row) => page.qty(row.quantity) },
+            { key: "price", header: s("sales.unitPrice"), cell: (row) => page.taka(row.unitPrice) },
+            { key: "total", header: s("sales.lineTotal"), cell: (row) => page.taka(row.lineTotal) },
           ]}
           rows={sale.items}
           getRowKey={(row) => row.id}
         />
         <p className="text-sm text-muted">
-          Payment status {sale.paymentStatus}. Owed {sale.owed}, received {sale.received}. Journal {sale.journalBalanced ? "is balanced" : "is not balanced"}.
+          {s("sales.statusLine", { status: sale.paymentStatus === "PAID" ? s("sales.PAID") : sale.paymentStatus === "PARTIAL" ? s("sales.PARTIAL") : sale.paymentStatus === "UNPAID" ? s("sales.UNPAID") : sale.paymentStatus, owed: page.taka(sale.owed), received: page.taka(sale.received), journal: sale.journalBalanced ? s("sales.balanced") : s("sales.unbalanced") })}
         </p>
       </div>
     </div>

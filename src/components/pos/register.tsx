@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ChargeInput } from "@/components/treasury/charge-input";
 import { Input } from "@/components/ui/input";
 import { useSubmit } from "@/lib/client/use-submit";
+import { useI18n } from "@/lib/i18n/provider";
 
 // The register (P06 task 5). Products come from the server's search (never a preloaded list), the price comes from the customer's level and
 // the quantity, and every figure shown is the server's own preview: the register adds up nothing but what is paid and what is left.
@@ -29,6 +30,8 @@ const text = (value: number) => (value / 100).toFixed(2);
 export function Register({ accounts, categories, levels, canLevel, canDiscount, today, branchName, initial }: { accounts: RegisterAccount[]; categories: Array<{ id: string; name: string }>; levels: string[]; canLevel: boolean; canDiscount: boolean; today: string; branchName: string; initial: RegisterInitial }) {
   const { submit, pending, message } = useSubmit();
   const { submit: ask } = useSubmit();
+  const { t, taka } = useI18n();
+  const money = (value?: string | null) => (value ? taka(value) : "—");
   const [query, setQuery] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [hits, setHits] = useState<Hit[]>([]);
@@ -167,7 +170,7 @@ export function Register({ accounts, categories, levels, canLevel, canDiscount, 
   function complete() {
     void submit<{ id: string }>(
       { url: "/api/v1/sales", body: { ...sale, businessDate: today, ticketId: initial?.ticketId, takePreviousDue: takePreviousDue || undefined, tenders: tendersForServer() } },
-      { successMessage: "বিক্রি সম্পন্ন। (Sale complete.)", goTo: (data) => `/sales/${data.id}` },
+      { successMessage: t("pos.saleDone"), goTo: (data) => `/sales/${data.id}` },
     );
   }
 
@@ -175,7 +178,7 @@ export function Register({ accounts, categories, levels, canLevel, canDiscount, 
     if (lines.length === 0) return;
     void submit<{ warnings?: string[] }>(
       { url: "/api/v1/pos/tickets", body: { customerId: customer?.id, lines: lines.map((line) => ({ productId: line.productId, variantId: line.variantId ?? undefined, quantity: line.quantity })) } },
-      { successMessage: "টিকেট হোল্ড করা হয়েছে। (Ticket held.)", onSuccess: (data) => { setNotice((data.warnings ?? []).join(" · ")); clear(); } },
+      { successMessage: t("pos.held"), onSuccess: (data) => { setNotice((data.warnings ?? []).join(" · ")); clear(); } },
     );
   }
 
@@ -207,11 +210,11 @@ export function Register({ accounts, categories, levels, canLevel, canDiscount, 
   }, []);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]" aria-label="Register">
+    <div className="grid gap-4 md:grid-cols-[1.3fr_1fr] pointer-coarse:[&_button]:min-h-11 pointer-coarse:[&_input]:min-h-11 pointer-coarse:[&_select]:min-h-11" aria-label={t("pos.register")}>
       <section className="grid content-start gap-3">
         <div className="flex flex-wrap items-end gap-2">
           <label className="grid min-w-60 flex-1 gap-1 text-sm">
-            Search or scan (F2)
+            {t("pos.searchLabel")}
             <Input
               ref={searchRef}
               value={query}
@@ -222,15 +225,15 @@ export function Register({ accounts, categories, levels, canLevel, canDiscount, 
                   add(shownHits[0]);
                 }
               }}
-              placeholder="Name, SKU or barcode"
+              placeholder={t("pos.searchPlaceholder")}
               autoComplete="off"
               autoFocus
             />
           </label>
           <label className="grid gap-1 text-sm">
-            Category
+            {t("pos.category")}
             <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)} className={select}>
-              <option value="">All</option>
+              <option value="">{t("pos.all")}</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.name}
@@ -241,7 +244,7 @@ export function Register({ accounts, categories, levels, canLevel, canDiscount, 
           <span className="pb-2 text-sm text-muted">{branchName}</span>
         </div>
         {shownHits.length > 0 ? (
-          <ul className="grid max-h-60 gap-1 overflow-auto sm:grid-cols-2" aria-label="Products found">
+          <ul className="grid max-h-60 gap-1 overflow-auto sm:grid-cols-2" aria-label={t("pos.productsFound")}>
             {shownHits.map((hit) => (
               <li key={hit.id}>
                 <button type="button" className="flex w-full items-center justify-between gap-2 rounded-md border border-border bg-surface px-3 py-2 text-left text-sm hover:bg-surface-muted" onClick={() => add(hit)}>
@@ -250,8 +253,8 @@ export function Register({ accounts, categories, levels, canLevel, canDiscount, 
                     <span className="block text-xs text-muted">{hit.sku}</span>
                   </span>
                   <span className="text-right">
-                    <span className="block font-medium tabular-nums">{hit.price}</span>
-                    <span className="block text-xs text-muted">{hit.available !== null ? `${hit.available} avail.` : hit.levelName}</span>
+                    <span className="block font-medium tabular-nums">{taka(hit.price)}</span>
+                    <span className="block text-xs text-muted">{hit.available !== null ? t("pos.avail", { n: hit.available }) : hit.levelName}</span>
                   </span>
                 </button>
               </li>
@@ -261,14 +264,14 @@ export function Register({ accounts, categories, levels, canLevel, canDiscount, 
 
         <div className="overflow-x-auto rounded-md border border-border">
           <table className="w-full min-w-[34rem] text-sm">
-            <caption className="sr-only">Cart</caption>
+            <caption className="sr-only">{t("pos.cart")}</caption>
             <thead className="text-left text-muted">
               <tr>
-                <th className="p-2">Item</th>
-                <th className="p-2">Qty</th>
-                <th className="p-2 text-right">Price</th>
-                {canDiscount ? <th className="p-2">Discount</th> : null}
-                <th className="p-2 text-right">Total</th>
+                <th className="p-2">{t("pos.colItem")}</th>
+                <th className="p-2">{t("pos.colQty")}</th>
+                <th className="p-2 text-right">{t("pos.colPrice")}</th>
+                {canDiscount ? <th className="p-2">{t("pos.colDiscount")}</th> : null}
+                <th className="p-2 text-right">{t("pos.colTotal")}</th>
                 <th className="p-2" />
               </tr>
             </thead>
@@ -276,7 +279,7 @@ export function Register({ accounts, categories, levels, canLevel, canDiscount, 
               {lines.length === 0 ? (
                 <tr>
                   <td className="p-4 text-muted" colSpan={6}>
-                    The cart is empty. Scan or search for a product.
+                    {t("pos.emptyCart")}
                   </td>
                 </tr>
               ) : null}
@@ -284,21 +287,21 @@ export function Register({ accounts, categories, levels, canLevel, canDiscount, 
                 <tr key={line.key} className="align-top">
                   <td className="p-2">
                     {line.label}
-                    {line.available !== null ? <span className="ml-2 text-xs text-muted">{line.available} available</span> : null}
-                    {line.trackSerial ? <input className={`${cell} mt-1 block w-full`} placeholder="IMEI / serial" aria-label="Serial" value={line.serial} onChange={(event) => setLines((current) => current.map((row) => (row.key === line.key ? { ...row, serial: event.target.value } : row)))} /> : null}
+                    {line.available !== null ? <span className="ml-2 text-xs text-muted">{t("pos.available", { n: line.available })}</span> : null}
+                    {line.trackSerial ? <input className={`${cell} mt-1 block w-full`} placeholder={t("pos.serialPlaceholder")} aria-label={t("pos.serial")} value={line.serial} onChange={(event) => setLines((current) => current.map((row) => (row.key === line.key ? { ...row, serial: event.target.value } : row)))} /> : null}
                   </td>
                   <td className="p-2">
-                    <input className={`${cell} w-20`} inputMode="decimal" aria-label="Quantity" value={line.quantity} onChange={(event) => setLines((current) => current.map((row) => (row.key === line.key ? { ...row, quantity: event.target.value } : row)))} />
+                    <input className={`${cell} w-20`} inputMode="decimal" aria-label={t("pos.quantity")} value={line.quantity} onChange={(event) => setLines((current) => current.map((row) => (row.key === line.key ? { ...row, quantity: event.target.value } : row)))} />
                   </td>
-                  <td className="p-2 text-right tabular-nums">{shownPreview?.lines[index]?.unitPrice ?? ""}</td>
+                  <td className="p-2 text-right tabular-nums">{shownPreview?.lines[index]?.unitPrice ? taka(shownPreview.lines[index].unitPrice) : ""}</td>
                   {canDiscount ? (
                     <td className="p-2">
-                      <input className={`${cell} w-20`} inputMode="decimal" aria-label="Line discount" value={line.discount} onChange={(event) => setLines((current) => current.map((row) => (row.key === line.key ? { ...row, discount: event.target.value } : row)))} />
+                      <input className={`${cell} w-20`} inputMode="decimal" aria-label={t("pos.lineDiscount")} value={line.discount} onChange={(event) => setLines((current) => current.map((row) => (row.key === line.key ? { ...row, discount: event.target.value } : row)))} />
                     </td>
                   ) : null}
-                  <td className="p-2 text-right tabular-nums">{shownPreview?.lines[index]?.payable ?? ""}</td>
+                  <td className="p-2 text-right tabular-nums">{shownPreview?.lines[index]?.payable ? taka(shownPreview.lines[index].payable) : ""}</td>
                   <td className="p-2">
-                    <Button variant="ghost" size="sm" aria-label={`Remove ${line.label}`} onClick={() => setLines((current) => current.filter((row) => row.key !== line.key))}>
+                    <Button variant="ghost" size="sm" aria-label={t("pos.remove", { item: line.label })} onClick={() => setLines((current) => current.filter((row) => row.key !== line.key))}>
                       ✕
                     </Button>
                   </td>
@@ -314,21 +317,21 @@ export function Register({ accounts, categories, levels, canLevel, canDiscount, 
       <section className="grid content-start gap-3">
         <div className="grid gap-1">
           <label className="grid gap-1 text-sm">
-            Customer (F4)
-            <Input ref={customerRef} value={customer ? customer.name : customerQuery} onChange={(event) => { setCustomer(null); setCustomerQuery(event.target.value); }} placeholder="Walk-in (search to choose)" autoComplete="off" />
+            {t("pos.customer")}
+            <Input ref={customerRef} value={customer ? customer.name : customerQuery} onChange={(event) => { setCustomer(null); setCustomerQuery(event.target.value); }} placeholder={t("pos.walkIn")} autoComplete="off" />
           </label>
           {customer ? (
             <p className="text-xs text-muted">
-              {customer.phone ?? ""} · owes {customer.outstanding} · advance {customer.advance}
+              {t("pos.customerLine", { phone: customer.phone ?? "", owes: taka(customer.outstanding), advance: taka(customer.advance) })}
             </p>
           ) : null}
           {shownCustomers.length > 0 && !customer ? (
-            <ul className="max-h-48 overflow-auto rounded-md border border-border bg-surface text-sm" aria-label="Customers found">
+            <ul className="max-h-48 overflow-auto rounded-md border border-border bg-surface text-sm" aria-label={t("pos.customersFound")}>
               {shownCustomers.map((row) => (
                 <li key={row.id}>
                   <button type="button" className="flex w-full justify-between gap-2 px-3 py-2 text-left hover:bg-surface-muted" onClick={() => { setCustomer(row); setCustomerQuery(""); setCustomers([]); }}>
                     <span>{row.name}</span>
-                    <span className="text-muted">owes {row.outstanding}</span>
+                    <span className="text-muted">{t("pos.owes", { amount: taka(row.outstanding) })}</span>
                   </button>
                 </li>
               ))}
@@ -337,9 +340,9 @@ export function Register({ accounts, categories, levels, canLevel, canDiscount, 
         </div>
         {canLevel ? (
           <label className="grid gap-1 text-sm">
-            Price level
+            {t("pos.priceLevel")}
             <select value={level} onChange={(event) => setLevel(event.target.value)} className={select}>
-              <option value="">The customer&apos;s own</option>
+              <option value="">{t("pos.ownLevel")}</option>
               {levels.map((name) => (
                 <option key={name} value={name}>
                   {name}
@@ -351,105 +354,105 @@ export function Register({ accounts, categories, levels, canLevel, canDiscount, 
         <div className="grid grid-cols-2 gap-2">
           {canDiscount ? (
             <label className="grid gap-1 text-sm">
-              Discount
+              {t("pos.discount")}
               <Input inputMode="decimal" value={headerDiscount} onChange={(event) => setHeaderDiscount(event.target.value)} placeholder="0.00" />
             </label>
           ) : null}
           <label className="grid gap-1 text-sm">
-            Delivery / charges
+            {t("pos.charges")}
             <Input inputMode="decimal" value={charges} onChange={(event) => setCharges(event.target.value)} placeholder="0.00" />
           </label>
         </div>
 
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-md border border-border p-3 text-sm" aria-live="polite">
-          <dt>Goods</dt>
-          <dd className="text-right tabular-nums">{shownPreview?.gross ?? "—"}</dd>
-          <dt>Discount</dt>
-          <dd className="text-right tabular-nums">{shownPreview?.discount ?? "—"}</dd>
-          <dt>VAT</dt>
-          <dd className="text-right tabular-nums">{shownPreview?.vat ?? "—"}</dd>
-          <dt>Charges</dt>
-          <dd className="text-right tabular-nums">{shownPreview?.charges ?? "—"}</dd>
-          <dt className="text-base font-semibold">Total</dt>
-          <dd className="text-right text-base font-semibold tabular-nums">{shownPreview?.total ?? "—"}</dd>
+          <dt>{t("pos.goods")}</dt>
+          <dd className="text-right tabular-nums">{money(shownPreview?.gross)}</dd>
+          <dt>{t("pos.discount")}</dt>
+          <dd className="text-right tabular-nums">{money(shownPreview?.discount)}</dd>
+          <dt>{t("pos.vat")}</dt>
+          <dd className="text-right tabular-nums">{money(shownPreview?.vat)}</dd>
+          <dt>{t("pos.chargesRow")}</dt>
+          <dd className="text-right tabular-nums">{money(shownPreview?.charges)}</dd>
+          <dt className="text-base font-semibold">{t("pos.total")}</dt>
+          <dd className="text-right text-base font-semibold tabular-nums">{money(shownPreview?.total)}</dd>
           {customer && owedBefore > 0 ? (
             <>
-              <dt>Previous due</dt>
-              <dd className="text-right tabular-nums">{customer.outstanding}</dd>
+              <dt>{t("pos.previousDue")}</dt>
+              <dd className="text-right tabular-nums">{taka(customer.outstanding)}</dd>
             </>
           ) : null}
           {customer && advance > 0 ? (
             <>
-              <dt>Advance held</dt>
-              <dd className="text-right tabular-nums">{customer.advance}</dd>
+              <dt>{t("pos.advanceHeld")}</dt>
+              <dd className="text-right tabular-nums">{taka(customer.advance)}</dd>
             </>
           ) : null}
         </dl>
         {customer && owedBefore > 0 ? (
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={takePreviousDue} onChange={(event) => setTakePreviousDue(event.target.checked)} />
-            Take the previous due with this sale (settles the oldest invoice first)
+            {t("pos.takeDue")}
           </label>
         ) : null}
 
         <fieldset className="grid gap-2 rounded-md border border-border p-3">
-          <legend className="px-1 text-sm font-medium">Payment (F9)</legend>
+          <legend className="px-1 text-sm font-medium">{t("pos.payment")}</legend>
           {tenders.map((tender) => {
             const account = accounts.find((row) => row.id === tender.source);
             return (
               <div key={tender.key} className="grid grid-cols-[1fr_6rem_5rem_auto] items-center gap-1 text-sm">
-                <span>{tender.source === "WALLET" ? "Advance" : (account?.label ?? "")}</span>
-                <input className={cell} inputMode="decimal" aria-label="Amount" value={tender.amount} onChange={(event) => setTenders((current) => current.map((row) => (row.key === tender.key ? { ...row, amount: event.target.value } : row)))} />
+                <span>{tender.source === "WALLET" ? t("pos.advance") : (account?.label ?? "")}</span>
+                <input className={cell} inputMode="decimal" aria-label={t("pos.amount")} value={tender.amount} onChange={(event) => setTenders((current) => current.map((row) => (row.key === tender.key ? { ...row, amount: event.target.value } : row)))} />
                 {account && account.kind !== "CASH" ? <ChargeInput bare className={cell} accountId={tender.source} amount={tender.amount} value={tender.charge} typed={tender.chargeTyped === true} onChange={(value, typed) => setTenders((current) => current.map((row) => (row.key === tender.key ? { ...row, charge: value, chargeTyped: typed } : row)))} /> : <span />}
-                <Button variant="ghost" size="sm" aria-label="Remove payment" onClick={() => setTenders((current) => current.filter((row) => row.key !== tender.key))}>
+                <Button variant="ghost" size="sm" aria-label={t("pos.removePayment")} onClick={() => setTenders((current) => current.filter((row) => row.key !== tender.key))}>
                   ✕
                 </Button>
               </div>
             );
           })}
           <div className="flex flex-wrap items-center gap-2">
-            <select ref={undefined} aria-label="Add a payment" className={`${select} min-w-0 flex-1`} value="" onChange={(event) => { if (event.target.value) addTender(event.target.value, text(Math.max(due, 0))); }}>
-              <option value="">Add a payment…</option>
+            <select ref={undefined} aria-label={t("pos.addPaymentLabel")} className={`${select} min-w-0 flex-1`} value="" onChange={(event) => { if (event.target.value) addTender(event.target.value, text(Math.max(due, 0))); }}>
+              <option value="">{t("pos.addPayment")}</option>
               {accounts.map((account) => (
                 <option key={account.id} value={account.id}>
                   {account.label}
                 </option>
               ))}
-              {customer && advance > 0 ? <option value="WALLET">From the advance ({customer.advance})</option> : null}
+              {customer && advance > 0 ? <option value="WALLET">{t("pos.fromAdvance", { amount: taka(customer.advance) })}</option> : null}
             </select>
             {accounts.find((account) => account.kind === "CASH") ? (
               <Button variant="secondary" size="sm" onClick={() => { const cash = accounts.find((account) => account.kind === "CASH"); if (cash) { setTenders([{ key: nextKey, source: cash.id, amount: text(total), charge: "" }]); setNextKey((n) => n + 1); } }}>
-                Cash = total
+                {t("pos.cashTotal")}
               </Button>
             ) : null}
           </div>
           <input ref={payRef} className="sr-only" aria-hidden tabIndex={-1} readOnly />
           <dl className="grid grid-cols-2 gap-x-4 text-sm">
-            <dt>Paid</dt>
-            <dd className="text-right tabular-nums">{text(paid)}</dd>
+            <dt>{t("pos.paid")}</dt>
+            <dd className="text-right tabular-nums">{taka(text(paid))}</dd>
             {change > 0 ? (
               <>
-                <dt className="font-medium">Change to give back</dt>
-                <dd className="text-right font-medium tabular-nums">{text(change)}</dd>
+                <dt className="font-medium">{t("pos.change")}</dt>
+                <dd className="text-right font-medium tabular-nums">{taka(text(change))}</dd>
               </>
             ) : null}
-            <dt>On credit (customer owes)</dt>
-            <dd className="text-right tabular-nums">{text(due)}</dd>
+            <dt>{t("pos.onCredit")}</dt>
+            <dd className="text-right tabular-nums">{taka(text(due))}</dd>
           </dl>
-          {needsCustomer ? <p className="text-sm text-error">Choose a customer for the unpaid amount.</p> : null}
-          {tooMuch ? <p className="text-sm text-error">The payment is more than the sale{takePreviousDue ? " and the previous due" : ""}; only cash gives change.</p> : null}
+          {needsCustomer ? <p className="text-sm text-error">{t("pos.needCustomer")}</p> : null}
+          {tooMuch ? <p className="text-sm text-error">{takePreviousDue ? t("pos.tooMuchDue") : t("pos.tooMuch")}</p> : null}
         </fieldset>
 
         {message ? <p className="text-sm text-error" role="alert">{message}</p> : null}
         <div className="flex flex-wrap gap-2">
           <Button loading={pending} disabled={!ready} onClick={complete}>
-            Complete sale (F10)
+            {t("pos.complete")}
           </Button>
           <Button variant="secondary" disabled={lines.length === 0} onClick={hold}>
-            Hold (F6)
+            {t("pos.hold")}
           </Button>
           <Button variant="ghost" onClick={clear}>
-            Clear
+            {t("pos.clear")}
           </Button>
         </div>
       </section>

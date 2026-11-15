@@ -139,8 +139,9 @@ test("a browser's text becomes a short device name", () => {
 
 test("the language cookie is HttpOnly (only the server reads it)", async () => {
   const response = await localeRoute(new Request("http://127.0.0.1/api/v1/locale", { method: "POST", headers: { origin: "http://127.0.0.1", "content-type": "application/json" }, body: JSON.stringify({ lang: "bn" }) }), { params: Promise.resolve({}) });
-  // no session: the route is for signed-in users, so the answer is 401; the cookie flag is checked in the source the route is built from
-  assert.equal(response.status, 401);
+  // the language is a cookie only the server reads; the cookie flag is checked in the source the route is built from
+  assert.equal(response.status, 200);
   const source = (await import("node:fs")).readFileSync(new URL("../../app/api/v1/locale/route.ts", import.meta.url), "utf8");
-  assert.match(source, /meridian_lang=.*HttpOnly/);
+  assert.match(source, /Max-Age=31536000; SameSite=Lax; HttpOnly/);
+  assert.match(response.headers.get("set-cookie") ?? "", /meridian_lang=bn/);
 });

@@ -4,6 +4,7 @@ import { Minus, Plus } from "lucide-react";
 
 import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
+import { useI18n } from "@/lib/i18n/provider";
 
 export function QuantityInput({
   id,
@@ -18,10 +19,11 @@ export function QuantityInput({
   invalid?: boolean;
   describedById?: string;
 }) {
+  const { t } = useI18n();
   return (
     <div className="flex">
       <IconButton
-        label="Decrease quantity"
+        label={t("common.decrease")}
         className="rounded-r-none border border-border"
         onClick={() => onChange(Math.max(0, value - 1))}
       >
@@ -40,7 +42,7 @@ export function QuantityInput({
         }}
       />
       <IconButton
-        label="Increase quantity"
+        label={t("common.increase")}
         className="rounded-l-none border border-border"
         onClick={() => onChange(value + 1)}
       >

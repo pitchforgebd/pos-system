@@ -2,30 +2,16 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { z } from "zod";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { describedBy, FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
-import { passwordProblem } from "@/modules/auth/password-policy";
-
-const schema = z
-  .object({
-    password: z.string().superRefine((value, context) => {
-      const problem = passwordProblem(value);
-      if (problem) {
-        context.addIssue({ code: "custom", message: problem });
-      }
-    }),
-    confirm: z.string().min(1, "Enter the password again."),
-  })
-  .refine((value) => value.password === value.confirm, {
-    path: ["confirm"],
-    message: "Enter the same password again.",
-  });
+import { useI18n } from "@/lib/i18n/provider";
+import { PASSWORD_MAX, PASSWORD_MIN, passwordProblemCode } from "@/modules/auth/password-policy";
 
 export default function ResetPasswordPage() {
+  const { t } = useI18n();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [errors, setErrors] = useState<{ password?: string; confirm?: string }>({});
@@ -39,18 +25,21 @@ export default function ResetPasswordPage() {
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
-        const parsed = schema.safeParse({ password, confirm });
-        if (!parsed.success) {
-          const next: { password?: string; confirm?: string } = {};
-          for (const issue of parsed.error.issues) {
-            const key = issue.path[0];
-            if ((key === "password" || key === "confirm") && !next[key]) {
-              next[key] = issue.message;
-            }
-          }
+        const next: { password?: string; confirm?: string } = {};
+        const problem = passwordProblemCode(password);
+        if (problem) {
+          next.password = t(`auth.pw.${problem}` as const, { min: PASSWORD_MIN, max: PASSWORD_MAX });
+        }
+        if (confirm.length === 0) {
+          next.confirm = t("auth.again");
+        } else if (password !== confirm) {
+          next.confirm = t("auth.same");
+        }
+        if (next.password || next.confirm) {
           setErrors(next);
           return;
         }
+        setErrors({});
         // the link carries the token after the #; an older link carried it in the address (?token=) and is still read
         const fromHash = new URLSearchParams(window.location.hash.replace("#", "")).get("token");
         const token = fromHash ?? new URLSearchParams(window.location.search).get("token") ?? "";
@@ -58,26 +47,27 @@ export default function ResetPasswordPage() {
         void fetch("/api/v1/auth/reset-password", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ token, password: parsed.data.password }),
+          body: JSON.stringify({ token, password }),
         })
           .then(async (response) => {
-            const body = (await response.json()) as { message?: string; error?: { message?: string } };
-            setMessage(body.error?.message ?? body.message ?? "Password was changed.");
+            const body = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
+            // a password the server refuses comes back with its own sentence (English); the link problem and the limit have Bangla ones
+            setMessage(response.ok ? t("auth.changed") : response.status === 429 ? t("auth.tooMany") : /invalid or expired/i.test(body?.error?.message ?? "") ? t("auth.invalidLink") : (body?.error?.message ?? t("auth.resetFailed")));
             setDone(response.ok);
             setPending(false);
           })
           .catch(() => {
-            setMessage("Reset failed.");
+            setMessage(t("auth.resetFailed"));
             setPending(false);
           });
       }}
     >
       <div>
-        <h1 className="text-xl font-semibold">Reset password</h1>
-        <p className="mt-1 text-sm text-muted">Choose a new password. This link works once.</p>
+        <h1 className="text-xl font-semibold">{t("auth.resetTitle")}</h1>
+        <p className="mt-1 text-sm text-muted">{t("auth.resetHint")}</p>
       </div>
       {message ? <Alert tone={done ? "success" : "error"} title={message} /> : null}
-      <FormField label="New password" htmlFor="reset-password" required error={errors.password}>
+      <FormField label={t("auth.newPassword")} htmlFor="reset-password" required error={errors.password}>
         <Input
           id="reset-password"
           type="password"
@@ -88,7 +78,7 @@ export default function ResetPasswordPage() {
           onChange={(event) => setPassword(event.target.value)}
         />
       </FormField>
-      <FormField label="Confirm password" htmlFor="reset-confirm" required error={errors.confirm}>
+      <FormField label={t("auth.confirm")} htmlFor="reset-confirm" required error={errors.confirm}>
         <Input
           id="reset-confirm"
           type="password"
@@ -100,11 +90,11 @@ export default function ResetPasswordPage() {
         />
       </FormField>
       <Button type="submit" className="w-full" disabled={pending || done}>
-        Change password
+        {t("auth.change")}
       </Button>
       <p className="text-sm">
         <Link href="/login" className="text-primary">
-          Back to sign in
+          {t("auth.back")}
         </Link>
       </p>
     </form>

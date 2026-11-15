@@ -1,141 +1,107 @@
 import type { Metadata } from "next";
-import { businessDate, isIsoDate } from "@/core/time/business-date";
-
-import Link from "next/link";
-
-import { cookies } from "next/headers";
 import { after } from "next/server";
 
-import { DashboardView } from "@/components/dashboard/dashboard-view";
-import { TodayBoard } from "@/components/reports/today-board";
-import { dashboardFor } from "@/modules/reports/dashboard";
-import { ensureSnapshots } from "@/modules/reports/snapshots";
+import { Today } from "@/components/dashboard/today";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState, PermissionDenied } from "@/components/ui/states";
+import { businessDate, isIsoDate } from "@/core/time/business-date";
+import { getI18n, I18nBoundary } from "@/lib/i18n/server";
 import { depreciationReminder } from "@/modules/assets/assets";
 import { companyWorth } from "@/modules/assets/worth";
 import { getSession } from "@/modules/auth/current-session";
-import { wingSummary, type WingSummary } from "@/modules/reports/wing-summary";
+import { dashboardFor } from "@/modules/reports/dashboard";
+import { ensureSnapshots } from "@/modules/reports/snapshots";
 
-export const metadata: Metadata = {
-  title: "Dashboard",
-};
-
-const emptySummary: WingSummary = {
-  totalSales: "0.00",
-  instantPaid: "0.00",
-  totalDueSale: "0.00",
-  dueReceived: "0.00",
-  totalReturn: "0.00",
-  totalExpense: "0.00",
-  previousReturn: "0.00",
-  stockAlertQty: "0",
-  totalPayment: "0.00",
-  dueReceivedAlert: "0",
-  netProfit: "0.00",
-  totalPurchases: "0.00",
-  walletUsedBalance: "0.00",
-  supplierAdvanceBalance: "0.00",
-  customerAdvanceBalance: "0.00",
-  weekSales: "0.00",
-  weekDays: [],
-  sell: {},
-  products: {},
-  suppliers: {},
-  dealers: {},
-};
-
-function previewView(value: string | undefined): "ready" | "loading" | "error" | "denied" {
-  if (value === "loading" || value === "error" || value === "denied") {
-    return value;
-  }
-  return "ready";
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getI18n("dashboard")).t("dashboard.title") };
 }
 
-function today() {
-  return businessDate();
+type View = "ready" | "loading" | "error" | "denied";
+
+function previewView(value: string | undefined): View {
+  return value === "loading" || value === "error" || value === "denied" ? value : "ready";
 }
 
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ view?: string; date?: string; scope?: string }>;
-}) {
+/** The hour in Dhaka, for the greeting. */
+const dhakaHour = () => Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Dhaka", hour: "2-digit", hourCycle: "h23" }).format(new Date()));
+
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ view?: string; date?: string; scope?: string }> }) {
   const params = await searchParams;
   const view = previewView(params.view);
-  const day = params.date && isIsoDate(params.date) ? params.date : today();
-  const session = view === "ready" ? await getSession() : null;
-  const scope = params.scope === "all" || !session?.branchId ? "all" : "branch";
-  const lang = (await cookies()).get("meridian_lang")?.value === "bn" ? "bn" : "en";
+  const { t } = await getI18n("dashboard");
+
+  // The loading, error and denied looks can be opened on purpose (?view=loading) to check them.
+  if (view === "loading") {
+    return (
+      <div className="space-y-4" aria-busy="true" aria-live="polite">
+        <Skeleton className="h-20 w-full" />
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 8 }, (_, index) => (
+            <Skeleton key={index} className="h-28" />
+          ))}
+        </div>
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+  if (view === "error") {
+    return <ErrorState title={t("dashboard.errorTitle")} description={t("dashboard.errorBody")} />;
+  }
+  if (view === "denied") {
+    return <PermissionDenied title={t("dashboard.deniedTitle")} description={t("dashboard.deniedBody")} />;
+  }
+
+  const session = await getSession();
+  if (!session) {
+    return <PermissionDenied title={t("dashboard.deniedTitle")} description={t("dashboard.deniedBody")} />;
+  }
+  const day = params.date && isIsoDate(params.date) ? params.date : businessDate();
+  const scope = params.scope === "all" || !session.branchId ? "all" : "branch";
+  const can = (code: string) => session.permissions.has(code);
+  const canReports = can("reports.view");
+  const branchIds = scope === "all" || !session.branchId ? [...session.branchIds] : [session.branchId];
+
   // Today's cards come from the reports themselves (I16): the same figure is on the card and in its report.
-  const canReports = Boolean(session && view === "ready" && session.permissions.has("reports.view"));
-  const board =
-    canReports && session
-      ? await dashboardFor({ organizationId: session.organizationId, branchIds: scope === "all" || !session.branchId ? [...session.branchIds] : [session.branchId], canProfit: session.permissions.has("reports.profit") }, day)
-      : null;
-  // The first sign-in after midnight makes the days that are over snapshots (the cron job does the same): after the answer has gone, never in its way.
-  if (session && view === "ready" && canReports) {
+  const board = canReports ? await dashboardFor({ organizationId: session.organizationId, branchIds, canProfit: can("reports.profit") }, day) : null;
+  if (canReports) {
     const organizationId = session.organizationId;
+    // The first sign-in after midnight makes the days that are over snapshots (the cron job does the same): after the answer has gone, never in its way.
     after(async () => {
       await ensureSnapshots(organizationId).catch(() => undefined);
     });
   }
-  const legacy =
-    session && view === "ready"
-      ? await wingSummary(
-          session.organizationId,
-          scope === "all" ? null : session.branchId,
-          session.branches.map((branch) => branch.id),
-          day,
-        )
-      : emptySummary;
-  const card = (key: string) => board?.cards.find((row) => row.key === key)?.value;
-  const summary = board
-    ? {
-        ...legacy,
-        totalSales: card("sales") ?? legacy.totalSales,
-        instantPaid: card("paid") ?? legacy.instantPaid,
-        totalDueSale: card("newDue") ?? legacy.totalDueSale,
-        dueReceived: card("dueCollected") ?? legacy.dueReceived,
-        totalExpense: card("expenses") ?? legacy.totalExpense,
-        ...(card("profit") ? { netProfit: card("profit") as string } : {}),
-        stockAlertQty: card("lowStock") ?? legacy.stockAlertQty,
-        products: { ...legacy.products, cashInHand: card("cash") ?? legacy.products.cashInHand, cashAtBank: card("bank") ?? legacy.products.cashAtBank, ...(card("stockValue") ? { stockValue: card("stockValue") as string } : {}) },
-        sell: { ...legacy.sell, customersDue: card("customersOwe") ?? legacy.sell.customersDue, salesDue: card("customersOwe") ?? legacy.sell.salesDue },
-        suppliers: { ...legacy.suppliers, suppliersDue: card("vendorsOwed") ?? legacy.suppliers.suppliersDue },
-      }
-    : legacy;
 
   // The company's worth and the month-end depreciation reminder (P09), for those who see the books.
-  const books = session && view === "ready" && session.permissions.has("accounting.view");
+  const books = can("accounting.view");
   const [worth, reminder] = books ? await Promise.all([companyWorth(session.organizationId), depreciationReminder(session.organizationId)]) : [null, null];
+  const branchName = session.branches.find((branch) => branch.id === session.branchId)?.name ?? session.branches[0]?.name ?? "";
 
   return (
-    <>
-      {board ? <TodayBoard board={board} lang={lang} /> : null}
-      {worth || reminder ? (
-        <div className="mb-4 grid gap-3 sm:grid-cols-2">
-          {worth ? (
-            <Link href="/accounting/worth" className="rounded-xl bg-[#0f8f78] px-4 py-3 text-white">
-              <span className="text-xs font-semibold tracking-wide">COMPANY WORTH</span>
-              <span className="mt-1 block text-2xl font-semibold">{worth.net}</span>
-              <span className="text-xs">{`Owns ${worth.assets} · owes ${worth.liabilities}`}</span>
-            </Link>
-          ) : null}
-          {reminder ? (
-            <Link href={`/accounting/depreciation?month=${reminder.month}`} className="rounded-xl border border-warning/40 bg-warning-subtle px-4 py-3 text-sm">
-              <span className="font-semibold">{`Depreciation for ${reminder.month} is not posted`}</span>
-              <span className="mt-1 block">{`${reminder.assets} asset${reminder.assets === 1 ? "" : "s"}, ${reminder.total}. Post it now.`}</span>
-            </Link>
-          ) : null}
-        </div>
-      ) : null}
-      <DashboardView
-        view={view}
+    <I18nBoundary areas={["dashboard"]}>
+      <Today
+        board={board}
+        name={session.name}
+        branchName={branchName}
         day={day}
         scope={scope}
-        branches={session?.branches ?? []}
-        branchId={session?.branchId ?? null}
-        summary={summary}
+        branches={session.branches}
+        branchId={session.branchId}
+        can={{
+          sale: can("sales.create"),
+          order: can("orders.create"),
+          payment: can("customers.payment"),
+          purchase: can("purchase.create"),
+          expense: can("accounting.create"),
+          product: can("products.create"),
+          customer: can("customers.create"),
+          reports: canReports,
+          books,
+          profit: can("reports.profit"),
+        }}
+        worth={worth ? { net: worth.net, assets: worth.assets, liabilities: worth.liabilities } : null}
+        reminder={reminder ? { month: reminder.month, assets: reminder.assets, total: reminder.total } : null}
+        hour={dhakaHour()}
       />
-    </>
+    </I18nBoundary>
   );
 }

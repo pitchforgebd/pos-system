@@ -66,7 +66,7 @@ export default async function BankCashPage({ searchParams }: { searchParams: Pro
         </section>
       ) : null}
       <div className="grid gap-3 sm:grid-cols-2">
-        <Link href={`/accounting/statements?accountCode=${cash?.code ?? ""}`} className="rounded-xl bg-[#0f8f78] px-4 py-4 text-white">
+        <Link href={`/accounting/statements?accountCode=${cash?.code ?? ""}`} className="rounded-xl bg-[#0b7a66] px-4 py-4 text-white">
           <span className="text-xs font-semibold tracking-wide">CASH IN HAND</span>
           <span className="mt-3 block text-2xl font-semibold">{cash?.balance ?? "0.00"}</span>
         </Link>

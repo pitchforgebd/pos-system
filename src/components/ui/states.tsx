@@ -24,10 +24,12 @@ export function ErrorState({
   title,
   description,
   onRetry,
+  retryLabel = "Try again",
 }: {
   title: string;
   description: string;
   onRetry?: () => void;
+  retryLabel?: string;
 }) {
   return (
     <div role="alert" className="rounded-md border border-error/30 bg-error-subtle px-6 py-12 text-center">
@@ -36,7 +38,7 @@ export function ErrorState({
       {onRetry ? (
         <div className="mt-4">
           <Button variant="secondary" onClick={onRetry}>
-            Try again
+            {retryLabel}
           </Button>
         </div>
       ) : null}

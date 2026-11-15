@@ -6,19 +6,20 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { formatDisplayDate } from "@/lib/format/date";
+import { useI18n } from "@/lib/i18n/provider";
 
 export function DatePicker({
   id,
   value,
   onChange,
-  placeholder = "Select a date",
+  placeholder,
 }: {
   id?: string;
   value: string | null;
   onChange: (value: string | null) => void;
   placeholder?: string;
 }) {
+  const { t, date } = useI18n();
   const today = new Date();
   const [year, setYear] = useState(value ? Number(value.slice(0, 4)) : today.getFullYear());
   const [month, setMonth] = useState(value ? Number(value.slice(5, 7)) : today.getMonth() + 1);
@@ -29,7 +30,7 @@ export function DatePicker({
       <Popover.Trigger asChild>
         <Button id={id} variant="secondary" className="w-full justify-start font-normal">
           <CalendarDays className="size-4 text-muted" aria-hidden="true" />
-          {value ? formatDisplayDate(value) : placeholder}
+          {value ? date(value) : (placeholder ?? t("common.selectDate"))}
         </Button>
       </Popover.Trigger>
       <Popover.Portal>

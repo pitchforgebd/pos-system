@@ -61,7 +61,7 @@ function Lines({ title, lines, total }: { title: string; lines: Array<{ key: str
 
 function Figure({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
-    <p className={`rounded-xl border border-border px-4 py-3 text-sm ${strong ? "bg-[#0f8f78] text-white" : "bg-surface"}`}>
+    <p className={`rounded-xl border border-border px-4 py-3 text-sm ${strong ? "bg-[#0b7a66] text-white" : "bg-surface"}`}>
       {label}
       <span className="mt-1 block text-2xl font-semibold">{value}</span>
     </p>

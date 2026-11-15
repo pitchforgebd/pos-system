@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { pageHref } from "@/core/list";
+import { useI18n } from "@/lib/i18n/provider";
 
 type PaginationProps = {
   page: number;
@@ -28,6 +29,7 @@ type PaginationProps = {
 );
 
 export function Pagination({ page, pageCount, total, pageSize, onPageChange, path, params }: PaginationProps) {
+  const { t, count } = useI18n();
   // A page past the last one (an old link, a typed number) shows nothing, and Previous goes back to the last real page.
   const pastEnd = page > pageCount;
   const start = total === 0 || pastEnd ? 0 : (page - 1) * pageSize + 1;
@@ -55,16 +57,16 @@ export function Pagination({ page, pageCount, total, pageSize, onPageChange, pat
   }
 
   return (
-    <nav aria-label="Pagination" className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <nav aria-label={t("common.pagination")} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <p className="text-sm text-muted">
-        Showing {start}–{end} of {total}
+        {t("common.showing", { first: count(start), last: count(end), total: count(total) })}
       </p>
       <div className="flex items-center gap-2">
-        {control("Previous", Math.min(page - 1, pageCount), hasPrevious)}
+        {control(t("common.previous"), Math.min(page - 1, pageCount), hasPrevious)}
         <span className="text-sm tabular-nums text-muted">
-          {page} / {pageCount}
+          {count(page)} / {count(pageCount)}
         </span>
-        {control("Next", page + 1, hasNext)}
+        {control(t("common.next"), page + 1, hasNext)}
       </div>
     </nav>
   );

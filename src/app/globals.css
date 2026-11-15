@@ -55,14 +55,14 @@
   --color-sidebar-active: var(--sidebar-active);
   --color-sidebar-border: var(--sidebar-border);
   --color-ring: var(--ring);
-  --font-sans: var(--font-ibm);
+  --font-sans: var(--font-ibm), var(--font-bn);
   --radius-md: var(--radius);
 }
 
 body {
   background: var(--background);
   color: var(--text);
-  font-family: var(--font-ibm), "Segoe UI", sans-serif;
+  font-family: var(--font-ibm), var(--font-bn), "Segoe UI", "Noto Sans Bengali", sans-serif;
 }
 
 @media print {

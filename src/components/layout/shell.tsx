@@ -6,22 +6,26 @@ import { usePathname } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import type { UiLang } from "@/lib/i18n/nav";
 import { NavLinks } from "@/components/layout/nav-links";
-import { Sidebar } from "@/components/layout/sidebar";
 import { Drawer } from "@/components/ui/drawer";
+import { useI18n } from "@/lib/i18n/provider";
 
+/**
+ * The frame. The sidebar is made by the layout (on the server, where its text and links are plain markup) and handed in as `sidebar`; only what
+ * needs state (the menu being open or closed, the header's search) is a client component (U3).
+ */
 export function AppShell({
   children,
+  sidebar,
   allowed,
   badges,
   session,
   lang,
-  logoUrl,
 }: {
   children: ReactNode;
+  sidebar: ReactNode;
   allowed: readonly string[];
   badges?: Record<string, number>;
   lang: UiLang;
-  logoUrl: string;
   session: {
     name: string;
     organizationName: string;
@@ -34,6 +38,7 @@ export function AppShell({
   // The sell-page menu stays open only for the path where it was opened, so a route change closes it.
   const [sellMenuPath, setSellMenuPath] = useState<string | null>(null);
   const pathname = usePathname();
+  const { t } = useI18n();
   const menuOpen = menuPath === pathname;
   const sellPage = pathname === "/pos" || pathname === "/sales/new";
   const sellMenuOpen = sellMenuPath === pathname;
@@ -53,17 +58,9 @@ export function AppShell({
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-surface focus:px-3 focus:py-2"
       >
-        Skip to content
+        {t("shell.skip")}
       </a>
-      <Sidebar
-        allowed={allowed}
-        badges={badges}
-        collapsed={menuCollapsed}
-        lang={lang}
-        logoUrl={logoUrl}
-        organizationName={session.organizationName}
-        branchName={session.branches.find((item) => item.id === session.branchId)?.name ?? session.branches[0]?.name ?? "No branch"}
-      />
+      <div className={menuCollapsed ? "hidden" : "contents"}>{sidebar}</div>
       <div className={menuCollapsed ? "" : "lg:pl-64"}>
         <Header
           lang={lang}
@@ -76,7 +73,7 @@ export function AppShell({
           {children}
         </main>
       </div>
-      <Drawer open={menuOpen} onOpenChange={(open) => setMenuPath(open ? pathname : null)} title="Menu" side="left">
+      <Drawer open={menuOpen} onOpenChange={(open) => setMenuPath(open ? pathname : null)} title={t("shell.menu")} side="left">
         <NavLinks allowed={allowed} lang={lang} badges={badges} onNavigate={() => setMenuPath(null)} variant="canvas" />
       </Drawer>
     </div>

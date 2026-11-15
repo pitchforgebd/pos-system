@@ -6,6 +6,7 @@ import { Register, type RegisterInitial } from "@/components/pos/register";
 import { Alert } from "@/components/ui/alert";
 import { businessDate } from "@/core/time/business-date";
 import { getSession } from "@/modules/auth/current-session";
+import { getI18n, I18nBoundary } from "@/lib/i18n/server";
 import { listCategories } from "@/modules/catalog/references";
 import { listPriceLevels } from "@/modules/pricing/admin";
 import { moneyAccountOptions } from "@/modules/purchasing/lookups";
@@ -13,7 +14,9 @@ import { getHeldTicket } from "@/modules/sales/tickets";
 import { geography } from "@/modules/parties/profile";
 import { activeShiftOf, shiftRequired } from "@/modules/shifts/shifts";
 
-export const metadata = { title: "Sell" };
+export async function generateMetadata() {
+  return { title: (await getI18n()).t("shell.sell") };
+}
 
 export default async function PosPage({ searchParams }: { searchParams: Promise<{ ticket?: string }> }) {
   const session = await getSession();
@@ -21,6 +24,7 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
     redirect("/login");
   }
   const params = await searchParams;
+  const { t } = await getI18n("pos", "customers");
   const [accounts, categories, levels, ticket, needShift, myShift, places] = await Promise.all([
     moneyAccountOptions(session.organizationId),
     listCategories(session.organizationId),
@@ -30,17 +34,18 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
     activeShiftOf(session.organizationId, session.branchId, session.userId),
     geography(),
   ]);
-  const branchName = session.branches.find((branch) => branch.id === session.branchId)?.name ?? "Branch";
+  const branchName = session.branches.find((branch) => branch.id === session.branchId)?.name ?? t("pos.branchFallback");
   const initial: RegisterInitial = ticket ? { ticketId: ticket.id, customer: ticket.customer, lines: ticket.lines, warnings: ticket.warnings } : null;
 
   return (
     <div className="space-y-4">
       {needShift && !myShift ? (
-        <Alert tone="warning" title="Open a shift first">
-          This shop takes cash only inside a shift, so a cash sale is refused until you open one. <Link href="/shifts">Open a shift</Link>
+        <Alert tone="warning" title={t("pos.shiftTitle")}>
+          {t("pos.shiftBody")} <Link href="/shifts">{t("pos.openShift")}</Link>
         </Alert>
       ) : null}
       {session.permissions.has("sales.create") ? (
+        <I18nBoundary areas={["pos"]}>
         <Register
           key={initial?.ticketId ?? "new"}
           today={businessDate()}
@@ -52,8 +57,13 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
           canLevel={session.permissions.has("sales.price_level")}
           canDiscount={session.permissions.has("sales.discount")}
         />
+        </I18nBoundary>
       ) : null}
-      {session.permissions.has("customers.create") ? <QuickCustomerForm places={places} /> : null}
+      {session.permissions.has("customers.create") ? (
+        <I18nBoundary areas={["customers"]}>
+          <QuickCustomerForm places={places} />
+        </I18nBoundary>
+      ) : null}
     </div>
   );
 }

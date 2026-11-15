@@ -1,0 +1,46 @@
+import { area } from "@/lib/i18n/messages/define";
+
+// The sale page (the invoice and the receipt are printed from it; their own words are on the page, in both languages).
+
+export const sales = area(
+  {
+    "sales.fallback": "Sale",
+    "sales.newSale": "New sale",
+    "sales.print80": "Print 80mm receipt",
+    "sales.printA4": "Print A4 invoice",
+    "sales.a4": "A4 invoice",
+    "sales.r80": "80mm receipt",
+    "sales.caption": "Sale lines",
+    "sales.sku": "SKU",
+    "sales.product": "Product",
+    "sales.quantity": "Quantity",
+    "sales.unitPrice": "Unit price",
+    "sales.lineTotal": "Line total",
+    "sales.statusLine": "Payment status: {status}. Still owed {owed}, received {received}. The books for this sale {journal}.",
+    "sales.balanced": "balance",
+    "sales.unbalanced": "do not balance",
+    "sales.PAID": "Paid",
+    "sales.PARTIAL": "Part paid",
+    "sales.UNPAID": "Unpaid",
+  },
+  {
+    "sales.fallback": "বিক্রি",
+    "sales.newSale": "নতুন বিক্রি",
+    "sales.print80": "৮০মিমি রসিদ প্রিন্ট",
+    "sales.printA4": "A4 ইনভয়েস প্রিন্ট",
+    "sales.a4": "A4 ইনভয়েস",
+    "sales.r80": "৮০মিমি রসিদ",
+    "sales.caption": "বিক্রির পণ্য",
+    "sales.sku": "SKU",
+    "sales.product": "পণ্য",
+    "sales.quantity": "সংখ্যা",
+    "sales.unitPrice": "একক দাম",
+    "sales.lineTotal": "মোট",
+    "sales.statusLine": "পেমেন্টের অবস্থা: {status}। এখনো বাকি {owed}, পেয়েছি {received}। এই বিক্রির হিসাব {journal}।",
+    "sales.balanced": "মিলছে",
+    "sales.unbalanced": "মিলছে না",
+    "sales.PAID": "পরিশোধিত",
+    "sales.PARTIAL": "আংশিক পরিশোধ",
+    "sales.UNPAID": "অপরিশোধিত",
+  },
+);

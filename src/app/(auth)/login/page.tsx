@@ -8,11 +8,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { describedBy, FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
-
-const schema = z.object({
-  email: z.string().trim().email("Enter a valid email."),
-  password: z.string().min(8, "Use at least 8 characters."),
-});
+import { useI18n } from "@/lib/i18n/provider";
 
 function nextPath() {
   const next = new URLSearchParams(window.location.search).get("next");
@@ -23,6 +19,7 @@ function nextPath() {
 }
 
 export default function LoginPage() {
+  const { t } = useI18n();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
@@ -35,6 +32,10 @@ export default function LoginPage() {
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
+        const schema = z.object({
+          email: z.string().trim().email(t("auth.invalidEmail")),
+          password: z.string().min(8, t("auth.passwordMin", { min: 8 })),
+        });
         const parsed = schema.safeParse({ email, password });
         if (!parsed.success) {
           const next: { email?: string; password?: string } = {};
@@ -56,26 +57,26 @@ export default function LoginPage() {
           body: JSON.stringify(parsed.data),
         })
           .then(async (response) => {
-            const body = (await response.json()) as { error?: { message?: string } };
             if (!response.ok) {
-              setFormError(body.error?.message ?? "Sign in failed.");
+              // the server's answer is English; the screen says it in the person's language
+              setFormError(response.status === 429 ? t("auth.tooMany") : response.status === 401 ? t("auth.wrong") : t("auth.signInFailed"));
               setPending(false);
               return;
             }
             window.location.assign(nextPath());
           })
           .catch(() => {
-            setFormError("Sign in failed.");
+            setFormError(t("auth.signInFailed"));
             setPending(false);
           });
       }}
     >
       <div>
-        <h1 className="text-xl font-semibold">Sign in</h1>
-        <p className="mt-1 text-sm text-muted">Use the email and password for your organization.</p>
+        <h1 className="text-xl font-semibold">{t("auth.signIn")}</h1>
+        <p className="mt-1 text-sm text-muted">{t("auth.signInHint")}</p>
       </div>
       {formError ? <Alert tone="error" title={formError} /> : null}
-      <FormField label="Email" htmlFor="login-email" required error={errors.email}>
+      <FormField label={t("auth.email")} htmlFor="login-email" required error={errors.email}>
         <Input
           id="login-email"
           type="email"
@@ -86,7 +87,7 @@ export default function LoginPage() {
           onChange={(event) => setEmail(event.target.value)}
         />
       </FormField>
-      <FormField label="Password" htmlFor="login-password" required error={errors.password}>
+      <FormField label={t("auth.password")} htmlFor="login-password" required error={errors.password}>
         <Input
           id="login-password"
           type="password"
@@ -98,11 +99,11 @@ export default function LoginPage() {
         />
       </FormField>
       <Button type="submit" className="w-full" disabled={pending}>
-        Sign in
+        {t("auth.signInButton")}
       </Button>
       <p className="text-sm">
         <Link href="/forgot-password" className="text-primary">
-          Forgot password
+          {t("auth.forgot")}
         </Link>
       </p>
     </form>

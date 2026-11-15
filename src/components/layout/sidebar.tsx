@@ -6,7 +6,6 @@ import type { UiLang } from "@/lib/i18n/nav";
 export function Sidebar({
   allowed,
   badges,
-  collapsed = false,
   lang,
   logoUrl,
   organizationName,
@@ -14,14 +13,13 @@ export function Sidebar({
 }: {
   allowed: readonly string[];
   badges?: Record<string, number>;
-  collapsed?: boolean;
   lang: UiLang;
   logoUrl: string;
   organizationName: string;
   branchName: string;
 }) {
   return (
-    <aside className={collapsed ? "hidden" : "fixed inset-y-0 left-0 z-30 hidden w-64 flex-col bg-[#2b3142] text-sidebar-foreground lg:flex"}>
+    <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col bg-[#2b3142] text-sidebar-foreground lg:flex">
       <Link href="/dashboard" className="flex h-14 items-center gap-2 px-4 text-sm font-semibold tracking-tight">
         {logoUrl ? <img src={logoUrl} alt="" className="h-8 w-8 rounded object-contain" /> : null}
         <span className="truncate">{organizationName}</span>

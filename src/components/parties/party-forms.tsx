@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { useSubmit } from "@/lib/client/use-submit";
+import { useI18n } from "@/lib/i18n/provider";
 
 // The customer and vendor forms (P10 tasks 2-3): a Bangladeshi phone (a number another customer already has is a warning, not a refusal), where
 // they are (division -> district, required -> upazila, D15), and for a customer the type (its price level), credit, payment days, tags and SMS.
@@ -379,6 +380,7 @@ export function VendorForm({ places, initial }: { places: Places; initial?: Vend
 /** The register's quick add: name, phone and district (D15), the rest later on the customer's page. */
 export function QuickCustomerForm({ places }: { places: Places }) {
   const { submit, pending, message } = useSubmit();
+  const { t } = useI18n();
   const [district, setDistrict] = useState("");
   return (
     <form
@@ -390,7 +392,7 @@ export function QuickCustomerForm({ places }: { places: Places }) {
         void submit(
           { url: "/api/v1/customers", body: { name: data.get("name"), phone: text(data, "phone"), districtId: number(data, "districtId"), creditLimit: text(data, "creditLimit") } },
           {
-            successMessage: "কাস্টমার যোগ হয়েছে। (Customer added.)",
+            successMessage: t("customers.quickDone"),
             onSuccess: () => {
               element.reset();
               setDistrict("");
@@ -399,11 +401,11 @@ export function QuickCustomerForm({ places }: { places: Places }) {
         );
       }}
     >
-      <Input name="name" required placeholder="Customer name" aria-label="Customer name" />
-      <PhoneField kind="customers" name="phone" label="Phone" />
-      <Select name="districtId" required value={district} onChange={(event) => setDistrict(event.target.value)} aria-label="District">
+      <Input name="name" required placeholder={t("customers.quickName")} aria-label={t("customers.quickName")} />
+      <PhoneField kind="customers" name="phone" label={t("customers.quickPhone")} />
+      <Select name="districtId" required value={district} onChange={(event) => setDistrict(event.target.value)} aria-label={t("customers.quickDistrict")}>
         <option value="" disabled>
-          District
+          {t("customers.quickDistrict")}
         </option>
         {places.districts.map((row) => (
           <option key={row.id} value={row.id}>
@@ -411,10 +413,10 @@ export function QuickCustomerForm({ places }: { places: Places }) {
           </option>
         ))}
       </Select>
-      <Input name="creditLimit" placeholder="Credit limit" aria-label="Credit limit" />
+      <Input name="creditLimit" placeholder={t("customers.quickLimit")} aria-label={t("customers.quickLimit")} />
       {message ? <p className="text-sm text-error">{message}</p> : null}
       <Button type="submit" variant="secondary" loading={pending}>
-        Add customer
+        {t("customers.quickAdd")}
       </Button>
     </form>
   );

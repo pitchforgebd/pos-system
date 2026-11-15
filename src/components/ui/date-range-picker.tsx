@@ -6,7 +6,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { formatDisplayDate } from "@/lib/format/date";
+import { useI18n } from "@/lib/i18n/provider";
 
 export type DateRange = {
   from: string | null;
@@ -22,6 +22,7 @@ export function DateRangePicker({
   value: DateRange;
   onChange: (value: DateRange) => void;
 }) {
+  const { t, date } = useI18n();
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1);
@@ -29,10 +30,10 @@ export function DateRangePicker({
 
   const label =
     value.from && value.to
-      ? `${formatDisplayDate(value.from)} – ${formatDisplayDate(value.to)}`
+      ? `${date(value.from)} – ${date(value.to)}`
       : value.from
-        ? `${formatDisplayDate(value.from)} – …`
-        : "All dates";
+        ? `${date(value.from)} – …`
+        : t("common.allDates");
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>

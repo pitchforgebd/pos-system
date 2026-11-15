@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { IconButton } from "@/components/ui/icon-button";
+import { useI18n } from "@/lib/i18n/provider";
 import { cn } from "@/lib/utils";
 
 export function Drawer({
@@ -22,6 +23,7 @@ export function Drawer({
   side?: "left" | "right";
   children: ReactNode;
 }) {
+  const { t } = useI18n();
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -42,7 +44,7 @@ export function Drawer({
               )}
             </div>
             <Dialog.Close asChild>
-              <IconButton label="Close panel">
+              <IconButton label={t("common.closePanel")}>
                 <X className="size-4" aria-hidden="true" />
               </IconButton>
             </Dialog.Close>
