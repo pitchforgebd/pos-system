@@ -63,4 +63,18 @@ jobs:
       - run: npm test
 
       # Production builds with webpack (see docs/CPANEL.md).
-      - run: npm run build:cpanel
+      - name: Production build (webpack)
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run build:cpanel 2>&1 | tee build.log
+
+      # A failed build leaves its last lines as an annotation of the run, which anyone can read without signing in.
+      - name: Show the end of the build log
+        if: failure()
+        shell: bash
+        run: |
+          if [ -f build.log ]; then
+            msg=$(tail -n 40 build.log | tr -d '' | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            echo "::error title=build log (last lines)::${msg}"
+          fi
