@@ -117,3 +117,35 @@ test("a sale at half past midnight in Dhaka belongs to that Dhaka day", () => {
   assert.equal(businessDate(new Date("2026-11-14T18:30:00.000Z")), "2026-11-15");
   assert.equal(businessDate(new Date("2026-11-14T17:59:00.000Z")), "2026-11-14");
 });
+
+test("the monthly and other reports run over the golden day: every identity is green and the main figures agree with the daily ones", async () => {
+  const { OTHER } = await import("./registry.ts");
+  await withTestOrg(async (t) => {
+    const { day } = await buildAgriDay(t);
+    const ctx: ReportCtx = { organizationId: t.org.id, branchIds: [t.branch.id], from: day, to: day, canProfit: true };
+    const results = new Map<string, ReportResult>();
+    for (const report of OTHER) {
+      const result = await report.run(ctx);
+      results.set(report.key, result);
+      for (const check of result.identities) {
+        assert.ok(check.ok, `${report.key}: ${check.label.en}: ${check.left} vs ${check.right} (difference ${check.difference})`);
+      }
+    }
+    const profit = DAILY.find((row) => row.key === "profit")?.run;
+    assert.ok(profit);
+    // the monthly profit's last month is the day's profit (everything happened this month)
+    assert.equal(summary(results.get("monthly-profit") as ReportResult, "Net profit"), EXPECTED.profit.net);
+    assert.equal(summary(results.get("stock-value") as ReportResult, "Value at average cost"), EXPECTED.stock.value);
+    const margin = results.get("product-margin") as ReportResult;
+    assert.equal(summary(margin, "Sales"), "8700.00", "the lines sold: 2,400 + 2,000 + 700 + 3,600 (a return is its own document)");
+    const book = results.get("balance-sheet") as ReportResult;
+    assert.ok(book.identities.every((check) => check.ok));
+    assert.equal(summary(results.get("trial-balance") as ReportResult, "Debit"), summary(results.get("trial-balance") as ReportResult, "Credit"));
+    const status = results.get("payment-status") as ReportResult;
+    assert.equal(section(status, "invoices")?.rows.find((row) => row.total === "3600.00")?.status, "PARTIAL");
+    const damage = results.get("takeoff-damage") as ReportResult;
+    assert.equal(summary(damage, "Value"), "400.00", "one bottle (300) and two sample packets (100)");
+    assert.ok((section(results.get("transactions") as ReportResult, "lines")?.rows.length ?? 0) > 10);
+    assert.ok((section(results.get("day-book") as ReportResult, "lines")?.rows.length ?? 0) > 20);
+  });
+});

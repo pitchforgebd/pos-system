@@ -5,6 +5,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { getSession } from "@/modules/auth/current-session";
 import { branchName, reportOverview } from "@/modules/reports/reports";
+import { DAILY, OTHER } from "@/modules/reports/registry";
 
 export const metadata = { title: "Reports" };
 
@@ -43,9 +44,35 @@ export default async function ReportsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Reports"
-        description={`Posted figures for ${branch}. The client does not choose the branch. Export is not available on this screen.`}
+        description={`Posted figures for ${branch}, every one from the books, each with its check against the ledger. Print, CSV and Excel are on every report.`}
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Reports" }]}
+        actions={<Link href="/reports/day" className="text-sm font-medium text-primary">All reports of a day</Link>}
       />
+      <section className="space-y-2" aria-label="Daily reports">
+        <h2 className="text-lg font-semibold">Daily reports</h2>
+        <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {DAILY.filter((report) => !report.needs || session.permissions.has(report.needs)).map((report) => (
+            <li key={report.key}>
+              <Link className="text-sm underline" href={`/reports/view?r=${report.key}`}>
+                {report.title.en} / {report.title.bn}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+      <section className="space-y-2" aria-label="Monthly and other reports">
+        <h2 className="text-lg font-semibold">Monthly and other reports</h2>
+        <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {OTHER.filter((report) => !report.needs || session.permissions.has(report.needs)).map((report) => (
+            <li key={report.key}>
+              <Link className="text-sm underline" href={`/reports/view?r=${report.key}`}>
+                {report.title.en} / {report.title.bn}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+      <h2 className="text-lg font-semibold">Other screens</h2>
       <ul className="grid gap-2 sm:grid-cols-2">
         {links.map(([label, href]) => (
           <li key={href}>

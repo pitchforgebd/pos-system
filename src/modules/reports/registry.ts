@@ -1,9 +1,10 @@
-import { businessDate } from "@/core/time/business-date";
+import { businessDate, isIsoDate } from "@/core/time/business-date";
 import { cell, workbook, type Sheet } from "@/lib/export/xlsx";
 import { toCsv } from "@/modules/imports/csv";
 import type { SessionContext } from "@/modules/auth/session";
 import { bankReport, cashReport, paymentReport, receiveReport } from "@/modules/reports/daily-money";
 import { conditionReport, dueReport, expenseDayReport, profitReport, salesDayReport, stockDayReport } from "@/modules/reports/daily-trade";
+import { assetsReport, balanceSheet, cashFlowReport, dayBookReport, districtMonth, expiryReport, monthlyProfit, paymentStatusReport, productMargin, stockValue, takeOffDamage, transactionsReport, trialBalanceReport, vatReport } from "@/modules/reports/more";
 import type { ReportCtx, ReportResult, Text } from "@/modules/reports/kit";
 
 // Every report by its key (P11), in the order the owner reads the day: cash, bank, money in, money out, sales, dues, couriers, expenses, stock,
@@ -24,7 +25,25 @@ export const DAILY: ReportDef[] = [
   { key: "profit", title: { en: "Profit and loss", bn: "লাভ-ক্ষতি" }, daily: true, needs: "reports.profit", run: profitReport },
 ];
 
-const ALL = new Map<string, ReportDef>(DAILY.map((report) => [report.key, report]));
+/** The monthly and other reports (05 table). */
+export const OTHER: ReportDef[] = [
+  { key: "monthly-profit", title: { en: "Profit and loss by month", bn: "মাসিক লাভ-ক্ষতি" }, daily: false, needs: "reports.profit", run: monthlyProfit },
+  { key: "district-month", title: { en: "Districts by month", bn: "জেলা × মাস" }, daily: false, run: districtMonth },
+  { key: "payment-status", title: { en: "Payment status and age", bn: "পেমেন্ট স্ট্যাটাস" }, daily: false, run: paymentStatusReport },
+  { key: "product-margin", title: { en: "Sales and margin by product", bn: "পণ্যভিত্তিক মার্জিন" }, daily: false, needs: "reports.profit", run: productMargin },
+  { key: "stock-value", title: { en: "Stock value on a day", bn: "স্টক ভ্যালুয়েশন" }, daily: false, needs: "reports.profit", run: stockValue },
+  { key: "expiry", title: { en: "Lots and expiry", bn: "মেয়াদ ও লট" }, daily: false, run: expiryReport },
+  { key: "takeoff-damage", title: { en: "Take-off and damage", bn: "Take-off ও ড্যামেজ" }, daily: false, run: takeOffDamage },
+  { key: "vat", title: { en: "VAT", bn: "VAT" }, daily: false, run: vatReport },
+  { key: "assets", title: { en: "Fixed assets", bn: "সম্পদ রেজিস্টার" }, daily: false, run: assetsReport },
+  { key: "trial-balance", title: { en: "Trial balance", bn: "ট্রায়াল ব্যালান্স" }, daily: false, needs: "reports.profit", run: trialBalanceReport },
+  { key: "balance-sheet", title: { en: "Balance sheet", bn: "ব্যালান্স শিট" }, daily: false, needs: "reports.profit", run: balanceSheet },
+  { key: "cash-flow", title: { en: "Cash flow", bn: "ক্যাশ ফ্লো" }, daily: false, run: cashFlowReport },
+  { key: "day-book", title: { en: "Day book", bn: "ডে-বুক" }, daily: false, run: dayBookReport },
+  { key: "transactions", title: { en: "Every transaction", bn: "সব লেনদেন" }, daily: false, run: transactionsReport },
+];
+
+const ALL = new Map<string, ReportDef>([...DAILY, ...OTHER].map((report) => [report.key, report]));
 
 /** Other reports register here (monthly and the rest). */
 export function registerReport(report: ReportDef) {
@@ -34,7 +53,7 @@ export function registerReport(report: ReportDef) {
 export const findReport = (key: string) => ALL.get(key) ?? null;
 export const allReports = () => [...ALL.values()];
 
-const iso = /^\d{4}-\d{2}-\d{2}$/;
+const iso = { test: (value: string) => isIsoDate(value) };
 
 /**
  * The report's window and branches from the request (B10): one day (today in Dhaka) unless a range is asked; the session's branch, another branch
