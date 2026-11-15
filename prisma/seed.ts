@@ -3,6 +3,7 @@ import { hashPassword } from "../src/modules/auth/password.ts";
 import { passwordProblem } from "../src/modules/auth/password-policy.ts";
 import { permissionCodes } from "../src/lib/permissions/codes.ts";
 import { ensureChart } from "../src/core/ledger/chart.ts";
+import { ensureStandardRoles } from "../src/modules/access/standard-roles.ts";
 import { seedDemoContent } from "./demo.ts";
 
 async function main() {
@@ -23,6 +24,8 @@ async function main() {
 
   // The chart of accounts v2 and its roles; also brings an organization that has the older chart up to date.
   await ensureChart(prisma, organization.id);
+  // Manager, Cashier, Store keeper and Accountant (filled only when empty; the owner role is made below)
+  await ensureStandardRoles(prisma, organization.id);
 
   const ownerEmail = process.env.SEED_OWNER_EMAIL?.trim().toLowerCase();
   const ownerPassword = process.env.SEED_OWNER_PASSWORD;
