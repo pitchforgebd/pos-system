@@ -1,5 +1,10 @@
 import nodemailer from "nodemailer";
 
+/** The link in the reset mail. The token is in the fragment (after #): a browser never sends it to the server or to another site in a Referer header (S7). */
+export function resetLink(appUrl: string, token: string) {
+  return `${appUrl.replace(/\/$/, "")}/reset-password#token=${encodeURIComponent(token)}`;
+}
+
 export async function sendResetLink(email: string, token: string) {
   const host = process.env.SMTP_HOST?.trim();
   const from = process.env.SMTP_FROM?.trim();
@@ -9,9 +14,7 @@ export async function sendResetLink(email: string, token: string) {
   const port = Number(process.env.SMTP_PORT || "587");
   const user = process.env.SMTP_USER?.trim();
   const pass = process.env.SMTP_PASSWORD ?? "";
-  const appUrl = (process.env.APP_URL ?? "").replace(/\/$/, "");
-  // The token is in the fragment (after #): a browser never sends it to the server or to another site in a Referer header (S7)
-  const link = `${appUrl}/reset-password#token=${encodeURIComponent(token)}`;
+  const link = resetLink(process.env.APP_URL ?? "", token);
   const transport = nodemailer.createTransport({
     host,
     port,

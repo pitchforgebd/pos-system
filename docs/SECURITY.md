@@ -8,10 +8,13 @@
 
 - Passwords are hashed with bcrypt (cost 12). Plaintext passwords are never stored or logged. `bcryptjs` is used so the hash does not need a native build on cPanel.
 - Sessions are server-side rows. The cookie `meridian_session` stores a random token. The database stores only an HMAC of that token, keyed with `AUTH_SECRET`. The cookie is `HttpOnly`, `Secure` in production, and `SameSite=Strict`.
-- A session expires 12 hours after it is created. Activity does not extend it. Logout and password reset revoke it.
+- A session expires 12 hours after it is created. Activity does not extend it. A session that nobody uses for the shop's idle time (30 minutes by default, 5 to 720 in Settings > Security) is ended as well. Logout, a password reset and a password change revoke it (a password change keeps only the session that made it).
 - Password reset tokens are single-use, stored only as a hash, and expire.
-- Login and password reset are rate-limited. The limit key does not use a client-chosen `X-Forwarded-For` address. That header is read only when `TRUST_PROXY=1`, and then only its last hop.
-- Failed and successful logins are audited.
+- Login and password reset are rate-limited, and the counters are kept in the database (`rate_limits`; the key is stored as a hash), so a restart or a second process does not forget them. Sign-in: 5 failures for one address with one email and 20 for one address over any email, in 15 minutes; a request with no known address shares one separate, much higher bucket and is logged. Reset: 5 requests for one email and 20 for one address, and 10 wrong tokens for one address, in an hour. Each failure after the second makes the next answer wait a little longer. The limit key does not use a client-chosen `X-Forwarded-For` address, and the same-site check does not trust `X-Forwarded-Host`: both headers are read only when `TRUST_PROXY=1` (for the address, only the last hop).
+- An unknown email costs a password hash like a wrong password does, so the time taken says nothing about whether the email exists.
+- Failed and successful logins are audited; the audit log keeps at most 10 failed sign-ins an hour for one address (the limit still counts all of them), so it cannot be filled from outside.
+- A new password has at least 10 characters, is not among the several hundred most common passwords (with the usual letter-for-symbol swaps and trailing digits undone), is not a keyboard or number run, and does not contain the person's name or email. It is checked on a reset, a change, a new user and the first owner. Changing one's own password needs the old one. The reset token travels after the `#` of the link, never in a query string, and the sign-in, forgot and reset pages are sent with `Referrer-Policy: no-referrer` and `Cache-Control: no-store`.
+- One installation serves one organization. An email address is looked up across the installation at sign-in; an address that more than one account holds cannot sign in.
 - Disabled users cannot authenticate.
 - Account status is checked on each authenticated request, not only at login.
 
@@ -38,7 +41,7 @@ Permission codes are `docs/PERMISSIONS.md`.
 Set on every response from `src/lib/security/headers.ts`:
 
 ```text
-Content-Security-Policy
+Content-Security-Policy (made for each request, with a nonce)
 X-Content-Type-Options: nosniff
 Referrer-Policy
 Permissions-Policy
@@ -126,7 +129,7 @@ Secret leakage
 
 CSRF control chosen in Phase 04: `SameSite=Strict` session cookie, plus a same-origin check on mutating `/api` requests. The `Origin` host must match the request host. A missing or foreign origin is rejected. Login and password reset are limited to 5 attempts per 15 minutes (login) or per hour (reset) for each IP and email. Password reset tokens expire after 30 minutes, are stored only as an HMAC, and are single-use. The reset response does not reveal whether the email exists. Mail is not sent unless SMTP is configured later; the token itself is never returned by the API.
 
-Phase 16 probes, in `src/modules/auth/security.test.ts`: a missing or foreign origin is rejected; the sixth login failure is rate-limited; a spoofed forwarding header does not choose the limit address; the session cookie is `HttpOnly` and `SameSite=Strict`; a failed login audit does not store the password; a search string is not executed as SQL; another organization's product is not returned; a sale on another branch is not returned; an unbalanced journal is rejected before it is saved; the health response does not include a connection string; an import name with a path or an executable extension is rejected. CSV text is parsed and is not written under the original filename. `Content-Security-Policy` still allows inline framework scripts. `Strict-Transport-Security` is sent when `APP_URL` is HTTPS. Rate-limit counters stay in memory. SMTP is still not wired.
+Phase 16 probes, in `src/modules/auth/security.test.ts`: a missing or foreign origin is rejected; the sixth login failure is rate-limited; a spoofed forwarding header does not choose the limit address; the session cookie is `HttpOnly` and `SameSite=Strict`; a failed login audit does not store the password; a search string is not executed as SQL; another organization's product is not returned; a sale on another branch is not returned; an unbalanced journal is rejected before it is saved; the health response does not include a connection string; an import name with a path or an executable extension is rejected. CSV text is parsed and is not written under the original filename. `Content-Security-Policy` is made for each request by `src/proxy.ts` with a nonce and `'strict-dynamic'`: no inline script and no eval run in production, and every page is rendered per request (a page made at build time has no nonce). Styles may stay inline. `Strict-Transport-Security` is sent when `APP_URL` is HTTPS. Rate-limit counters are kept in the database. SMTP is still not wired.
 
 ## 9. Abuse cases that must fail closed
 

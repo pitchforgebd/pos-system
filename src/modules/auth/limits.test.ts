@@ -8,6 +8,7 @@ import { prisma } from "../../lib/db/client.ts";
 import { clientIp, rejectCrossSite } from "../../lib/api/http.ts";
 import { FAILED_LOGIN_AUDIT_PER_HOUR, LOGIN_IP_LIMIT, RESET_DONE_IP_LIMIT, RESET_IP_LIMIT } from "./constants.ts";
 import { login, loginRules } from "./login.ts";
+import { resetLink } from "./mail.ts";
 import { hashPassword } from "./password.ts";
 import { requestPasswordReset, resetPassword } from "./password-reset.ts";
 import { clearLimit, countOf, isLimited, purgeRateLimits, recordFailure } from "./rate-limit.ts";
@@ -178,4 +179,10 @@ test("an unknown email costs a hash, like a wrong password (the time tells nothi
     process.env.BCRYPT_COST = "4";
     await prisma.auditLog.deleteMany({ where: { action: "failed_login", ip } });
   }
+});
+
+test("the reset link carries the token after the #, never in the query", () => {
+  const link = resetLink("https://shop.example/", "abc DEF/+=");
+  assert.equal(link, "https://shop.example/reset-password#token=abc%20DEF%2F%2B%3D");
+  assert.equal(link.includes("?"), false, "nothing in the query string, which is what a server log and a Referer header carry");
 });
