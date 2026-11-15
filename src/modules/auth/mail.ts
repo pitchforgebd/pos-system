@@ -10,7 +10,8 @@ export async function sendResetLink(email: string, token: string) {
   const user = process.env.SMTP_USER?.trim();
   const pass = process.env.SMTP_PASSWORD ?? "";
   const appUrl = (process.env.APP_URL ?? "").replace(/\/$/, "");
-  const link = `${appUrl}/reset-password?token=${encodeURIComponent(token)}`;
+  // The token is in the fragment (after #): a browser never sends it to the server or to another site in a Referer header (S7)
+  const link = `${appUrl}/reset-password#token=${encodeURIComponent(token)}`;
   const transport = nodemailer.createTransport({
     host,
     port,

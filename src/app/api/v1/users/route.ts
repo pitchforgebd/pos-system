@@ -4,11 +4,12 @@ import { defineRoute } from "@/core/http/define-route";
 import { clientIp, jsonError, jsonOk } from "@/lib/api/http";
 import { requirePermission } from "@/modules/access/guard";
 import { createUser, listUsers } from "@/modules/access/users";
+import { PASSWORD_MAX, PASSWORD_MIN } from "@/modules/auth/password-policy";
 
 const createSchema = z.object({
   name: z.string().trim().min(1).max(191),
   email: z.string().trim().email(),
-  password: z.string().min(8).max(128),
+  password: z.string().min(PASSWORD_MIN).max(PASSWORD_MAX),
   roleIds: z.array(z.string().uuid()).default([]),
   branchIds: z.array(z.string().uuid()).default([]),
 });
@@ -46,7 +47,7 @@ export const POST = defineRoute({
       userAgent: request.headers.get("user-agent"),
     });
     if (!result.ok) {
-      const code = result.status === 409 ? "CONFLICT" : result.status === 403 ? "AUTHORIZATION_ERROR" : "NOT_FOUND";
+      const code = result.status === 409 ? "CONFLICT" : result.status === 403 ? "AUTHORIZATION_ERROR" : result.status === 422 ? "VALIDATION_ERROR" : "NOT_FOUND";
       return jsonError(code, result.message, result.status);
     }
     return jsonOk(result.user, "Operation completed", 201);

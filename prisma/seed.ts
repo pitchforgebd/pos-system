@@ -1,5 +1,6 @@
 import { prisma } from "../src/lib/db/client.ts";
 import { hashPassword } from "../src/modules/auth/password.ts";
+import { passwordProblem } from "../src/modules/auth/password-policy.ts";
 import { permissionCodes } from "../src/lib/permissions/codes.ts";
 import { ensureChart } from "../src/core/ledger/chart.ts";
 import { seedDemoContent } from "./demo.ts";
@@ -25,6 +26,14 @@ async function main() {
 
   const ownerEmail = process.env.SEED_OWNER_EMAIL?.trim().toLowerCase();
   const ownerPassword = process.env.SEED_OWNER_PASSWORD;
+  // The first owner's password follows the same rules as any new password (S10). On a real (https) site a weak one stops the seed; locally it is a warning.
+  const weakOwner = ownerEmail && ownerPassword ? passwordProblem(ownerPassword, { email: ownerEmail }) : null;
+  if (weakOwner) {
+    if ((process.env.APP_URL ?? "").startsWith("https://")) {
+      throw new Error(`SEED_OWNER_PASSWORD is not acceptable: ${weakOwner}`);
+    }
+    console.warn(`SEED_OWNER_PASSWORD is weak: ${weakOwner} (allowed locally, refused when APP_URL is https)`);
+  }
   if (ownerEmail && ownerPassword && ownerPassword.length >= 8) {
     const existingBranch = await prisma.branch.findFirst({ where: { organizationId: organization.id, name: "Main" } });
     const branch = existingBranch ?? (await prisma.branch.create({ data: { organizationId: organization.id, name: "Main" } }));

@@ -10,7 +10,17 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   ...(Number.isInteger(buildCpus) && buildCpus > 0 ? { experimental: { cpus: buildCpus } } : {}),
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders(process.env.APP_URL) }];
+    return [
+      { source: "/:path*", headers: securityHeaders(process.env.APP_URL) },
+      // Sign-in, forgot and reset pages: never cached, and no Referer is sent from them (a reset link carries a token) (S7, LV-6)
+      ...["/login", "/forgot-password", "/reset-password"].map((source) => ({
+        source,
+        headers: [
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "Cache-Control", value: "no-store, max-age=0" },
+        ],
+      })),
+    ];
   },
 };
 

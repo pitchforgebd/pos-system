@@ -3,6 +3,9 @@ import Link from "next/link";
 
 import { APP_NAME } from "@/constants/app";
 
+// Sign-in pages are made for each request: a content security policy with a nonce needs it, and nothing here may be kept by a cache (LV-6).
+export const dynamic = "force-dynamic";
+
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">

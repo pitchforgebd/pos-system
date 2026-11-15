@@ -8,11 +8,17 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { describedBy, FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
+import { passwordProblem } from "@/modules/auth/password-policy";
 
 const schema = z
   .object({
-    password: z.string().min(8, "Use at least 8 characters."),
-    confirm: z.string().min(8, "Use at least 8 characters."),
+    password: z.string().superRefine((value, context) => {
+      const problem = passwordProblem(value);
+      if (problem) {
+        context.addIssue({ code: "custom", message: problem });
+      }
+    }),
+    confirm: z.string().min(1, "Enter the password again."),
   })
   .refine((value) => value.password === value.confirm, {
     path: ["confirm"],
@@ -45,7 +51,9 @@ export default function ResetPasswordPage() {
           setErrors(next);
           return;
         }
-        const token = new URLSearchParams(window.location.search).get("token") ?? "";
+        // the link carries the token after the #; an older link carried it in the address (?token=) and is still read
+        const fromHash = new URLSearchParams(window.location.hash.replace("#", "")).get("token");
+        const token = fromHash ?? new URLSearchParams(window.location.search).get("token") ?? "";
         setPending(true);
         void fetch("/api/v1/auth/reset-password", {
           method: "POST",

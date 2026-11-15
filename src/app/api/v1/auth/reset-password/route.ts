@@ -2,11 +2,12 @@ import { z } from "zod";
 import { defineRoute } from "@/core/http/define-route";
 
 import { clientIp, jsonError, jsonOk } from "@/lib/api/http";
+import { PASSWORD_MAX, PASSWORD_MIN } from "@/modules/auth/password-policy";
 import { resetPassword } from "@/modules/auth/password-reset";
 
 const bodySchema = z.object({
   token: z.string().min(20),
-  password: z.string().min(8).max(128),
+  password: z.string().min(PASSWORD_MIN).max(PASSWORD_MAX),
 });
 
 export const POST = defineRoute({

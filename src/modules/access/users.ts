@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db/client";
 import { runTx } from "@/core/tx/run";
 import { writeAudit } from "@/modules/auth/audit";
 import { hashPassword } from "@/modules/auth/password";
+import { passwordProblem } from "@/modules/auth/password-policy";
 import { revokeUserSessions } from "@/modules/auth/session";
 
 const userSelect = {
@@ -121,6 +122,10 @@ export async function createUser(input: {
   userAgent: string | null;
 }) {
   const email = input.email.trim().toLowerCase();
+  const problem = passwordProblem(input.password, { email, name: input.name });
+  if (problem) {
+    return { ok: false as const, status: 422 as const, message: problem };
+  }
   const existing = await prisma.user.findUnique({
     where: { organizationId_email: { organizationId: input.organizationId, email } },
     select: { id: true },

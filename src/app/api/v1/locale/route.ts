@@ -12,7 +12,9 @@ export const POST = defineRoute({
       return jsonError("VALIDATION_ERROR", "Choose English or Bangla.", 400);
     }
     const response = jsonOk({ lang: parsed.data.lang });
-    response.headers.append("set-cookie", `meridian_lang=${parsed.data.lang}; Path=/; SameSite=Lax`);
+    // only the server reads the language (L9), so the page script cannot
+    const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+    response.headers.append("set-cookie", `meridian_lang=${parsed.data.lang}; Path=/; SameSite=Lax; HttpOnly${secure}`);
     return response;
   },
 });

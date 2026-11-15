@@ -9,6 +9,7 @@ import {
   RESET_WINDOW_MS,
 } from "@/modules/auth/constants";
 import { hashPassword } from "@/modules/auth/password";
+import { passwordProblem } from "@/modules/auth/password-policy";
 import { isLimited, recordFailure, type LimitRule } from "@/modules/auth/rate-limit";
 import { revokeUserSessions } from "@/modules/auth/session";
 import { sendResetLink } from "@/modules/auth/mail";
@@ -73,6 +74,12 @@ export async function resetPassword(input: { token: string; password: string; ip
   if (!row || row.usedAt || row.expiresAt <= new Date()) {
     await recordFailure(rules.done);
     return { ok: false as const, status: 400 as const, message: "This reset link is invalid or expired." };
+  }
+  const owner = await prisma.user.findUnique({ where: { id: row.userId }, select: { email: true, name: true } });
+  const problem = passwordProblem(input.password, { email: owner?.email, name: owner?.name });
+  if (problem) {
+    // the link stays valid: the person only has to choose another password
+    return { ok: false as const, status: 400 as const, message: problem };
   }
   const passwordHash = await hashPassword(input.password);
   await runTx(async (tx) => {
