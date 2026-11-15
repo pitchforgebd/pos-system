@@ -169,6 +169,8 @@ export const referenceNavigation: ReferenceEntry[] = [
       { label: "Direct/Indirect Incomes", href: "/accounting/income" },
       { label: "Vouchers", href: "/accounting/vouchers" },
       { label: "Assets", href: "/accounting/assets" },
+      { label: "Depreciation", href: "/accounting/depreciation" },
+      { label: "Company Worth", href: "/accounting/worth" },
       { label: "Liabilities", href: "/accounting/liabilities" },
       { label: "Loan", href: "/accounting/loans" },
       { label: "Capital", href: "/accounting/capital" },

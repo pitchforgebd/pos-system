@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import { businessDate } from "@/core/time/business-date";
 
+import Link from "next/link";
+
 import { DashboardView } from "@/components/dashboard/dashboard-view";
+import { depreciationReminder } from "@/modules/assets/assets";
+import { companyWorth } from "@/modules/assets/worth";
 import { getSession } from "@/modules/auth/current-session";
 import { wingSummary, type WingSummary } from "@/modules/reports/wing-summary";
 
@@ -64,14 +68,41 @@ export default async function DashboardPage({
         )
       : emptySummary;
 
+  // The company's worth and the month-end depreciation reminder (P09), for those who see the books.
+  const books = session && view === "ready" && session.permissions.has("accounting.view");
+  const [worth, reminder] = books ? await Promise.all([companyWorth(session.organizationId), depreciationReminder(session.organizationId)]) : [null, null];
+
   return (
-    <DashboardView
-      view={view}
-      day={day}
-      scope={scope}
-      branches={session?.branches ?? []}
-      branchId={session?.branchId ?? null}
-      summary={summary}
-    />
+    <>
+      {worth || reminder ? (
+        <div className="mb-4 grid gap-3 sm:grid-cols-2">
+          {worth ? (
+            <Link href="/accounting/worth" className="rounded-xl bg-[#0f8f78] px-4 py-3 text-white">
+              <span className="text-xs font-semibold tracking-wide">COMPANY WORTH</span>
+              <span className="mt-1 block text-2xl font-semibold">{worth.net}</span>
+              <span className="text-xs">
+                Owns {worth.assets} · owes {worth.liabilities}
+              </span>
+            </Link>
+          ) : null}
+          {reminder ? (
+            <Link href={`/accounting/depreciation?month=${reminder.month}`} className="rounded-xl border border-warning/40 bg-warning-subtle px-4 py-3 text-sm">
+              <span className="font-semibold">Depreciation for {reminder.month} is not posted</span>
+              <span className="mt-1 block">
+                {reminder.assets} asset{reminder.assets === 1 ? "" : "s"}, {reminder.total}. Post it now.
+              </span>
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
+      <DashboardView
+        view={view}
+        day={day}
+        scope={scope}
+        branches={session?.branches ?? []}
+        branchId={session?.branchId ?? null}
+        summary={summary}
+      />
+    </>
   );
 }

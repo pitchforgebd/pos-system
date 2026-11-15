@@ -576,3 +576,9 @@ export async function getAsset(organizationId: string, id: string) {
     lines: lines.map((line) => ({ id: line.id, date: dateOnly(line.businessDate), account: line.account.name, debit: text(line.debit), credit: text(line.credit), journalId: line.journal.id, reference: line.journal.number ?? line.journal.description ?? "" })),
   };
 }
+
+/** The vendors an asset can be owed to (active ones). */
+export async function vendorOptions(organizationId: string) {
+  const rows = await prisma.supplier.findMany({ where: { organizationId, status: "ACTIVE" }, orderBy: { name: "asc" }, select: { id: true, name: true }, take: 500 });
+  return rows.map((row) => ({ id: row.id, label: row.name }));
+}
