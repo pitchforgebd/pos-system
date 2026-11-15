@@ -12,6 +12,9 @@ for (const line of readFileSync(new URL("../../../.env", import.meta.url), "utf8
 }
 process.env.AUTH_SECRET ??= "test-secret-phase-16-value";
 process.env.BCRYPT_COST = "4";
+process.env.LOGIN_DELAY_STEP_MS = "0";
+// a different address each run: the address limit counts across runs for 15 minutes
+const attackerIp = `203.0.113.${1 + (Date.now() % 250)}`;
 
 test("phase 16 rejects cross-site, cross-branch, injection, and secret leakage", async () => {
   const { prisma } = await import("../../lib/db/client.ts");
@@ -23,7 +26,6 @@ test("phase 16 rejects cross-site, cross-branch, injection, and secret leakage",
   const { postBalancedJournal, PostingError } = await import("../accounting/post.ts");
   const { hashPassword } = await import("./password.ts");
   const { login } = await import("./login.ts");
-  const { resetRateLimits } = await import("./rate-limit.ts");
   const { getSale } = await import("../sales/sales.ts");
   const { listProducts, getProduct } = await import("../catalog/products.ts");
 
@@ -136,21 +138,19 @@ test("phase 16 rejects cross-site, cross-branch, injection, and secret leakage",
   });
 
   try {
-    resetRateLimits();
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const failed = await login({ email: `missing-${stamp}@example.com`, password, ip: "203.0.113.8", userAgent: "test" });
+      const failed = await login({ email: `missing-${stamp}@example.com`, password, ip: attackerIp, userAgent: "test" });
       assert.equal(failed.ok, false);
       if (!failed.ok) {
         assert.equal(failed.status, 401);
       }
     }
-    const limited = await login({ email: `missing-${stamp}@example.com`, password, ip: "203.0.113.8", userAgent: "test" });
+    const limited = await login({ email: `missing-${stamp}@example.com`, password, ip: attackerIp, userAgent: "test" });
     assert.equal(limited.ok, false);
     if (!limited.ok) {
       assert.equal(limited.status, 429);
     }
 
-    resetRateLimits();
     const signed = await loginRoute(
       new Request("http://127.0.0.1/api/v1/auth/login", {
         method: "POST",
@@ -175,7 +175,7 @@ test("phase 16 rejects cross-site, cross-branch, injection, and secret leakage",
     assert.equal(await getSale(org.id, elsewhere.id, sale.id), null);
     assert.ok(await getSale(org.id, branch.id, sale.id));
   } finally {
-    await prisma.auditLog.deleteMany({ where: { action: "failed_login", ip: "203.0.113.8", userAgent: "test" } });
+    await prisma.auditLog.deleteMany({ where: { action: "failed_login", ip: attackerIp, userAgent: "test" } });
     const { cleanupOrg } = await import("../../tests/helpers/cleanup.ts");
     for (const id of [org.id, other.id]) {
       await cleanupOrg(id);

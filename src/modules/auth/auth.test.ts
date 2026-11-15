@@ -10,6 +10,7 @@ for (const line of readFileSync(new URL("../../../.env", import.meta.url), "utf8
 }
 process.env.AUTH_SECRET ??= "test-secret-phase-04-value";
 process.env.BCRYPT_COST = "4";
+process.env.LOGIN_DELAY_STEP_MS = "0";
 
 function originRequest(url: string, init: RequestInit & { cookie?: string } = {}) {
   const headers = new Headers(init.headers);
@@ -23,7 +24,6 @@ function originRequest(url: string, init: RequestInit & { cookie?: string } = {}
 test("phase 04 access controls", async () => {
   const { prisma } = await import("../../lib/db/client.ts");
   const { hashPassword } = await import("./password.ts");
-  const { resetRateLimits } = await import("./rate-limit.ts");
   const { decidePageAccess } = await import("../access/route-access.ts");
   const { POST: login } = await import("../../app/api/v1/auth/login/route.ts");
   const { GET: listUsers, POST: createUsers } = await import("../../app/api/v1/users/route.ts");
@@ -82,7 +82,6 @@ test("phase 04 access controls", async () => {
   });
 
   async function signIn(email: string) {
-    resetRateLimits();
     const response = await login(
       originRequest("http://localhost/api/v1/auth/login", {
         method: "POST",
@@ -95,7 +94,6 @@ test("phase 04 access controls", async () => {
   }
 
   try {
-    resetRateLimits();
     const wrong = await login(
       originRequest("http://localhost/api/v1/auth/login", {
         method: "POST",

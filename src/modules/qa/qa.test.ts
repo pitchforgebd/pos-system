@@ -13,13 +13,13 @@ for (const line of readFileSync(new URL("../../../.env", import.meta.url), "utf8
 }
 process.env.AUTH_SECRET ??= "test-secret-phase-18-value";
 process.env.BCRYPT_COST = "4";
+process.env.LOGIN_DELAY_STEP_MS = "0";
 
 test("phase 18 checks money, numbers, permissions, and the sale path", async () => {
   const { prisma } = await import("../../lib/db/client.ts");
   const { decidePageAccess } = await import("../access/route-access.ts");
   const { hashPassword } = await import("../auth/password.ts");
   const { login } = await import("../auth/login.ts");
-  const { resetRateLimits } = await import("../auth/rate-limit.ts");
   const { postCustomerPayment } = await import("../customers/dues.ts");
   const { outstandingReceivable } = await import("../customers/customers.ts");
   const { allocateNumber } = await import("../documents/numbers.ts");
@@ -117,7 +117,6 @@ test("phase 18 checks money, numbers, permissions, and the sale path", async () 
     });
     assert.equal(vat.ok, false);
 
-    resetRateLimits();
     const signedIn = await login({ email: user.email, password: "correct-password", ip: actor.ip, userAgent: actor.userAgent });
     assert.equal(signedIn.ok, true);
 

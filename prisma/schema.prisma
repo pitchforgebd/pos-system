@@ -384,6 +384,8 @@ model Organization {
   loyaltyEarn          Boolean      @default(false)
   /// A user may not take or pay cash without an active shift (D17). Off until the shop turns it on in Settings (the go-live checklist, P14).
   requireShift         Boolean      @default(false)
+  /// A signed-in user who does nothing for this many minutes is signed out (N20). The 12-hour absolute limit stays.
+  idleTimeoutMinutes   Int          @default(30)
   status               RecordStatus @default(ACTIVE)
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
@@ -759,6 +761,8 @@ model Session {
   branchId       String?   @db.Char(36)
   ip             String?   @db.VarChar(45)
   userAgent      String?   @db.VarChar(255)
+  /// The last request this session made (idle timeout, N20). Written at most once a minute.
+  lastSeenAt     DateTime  @default(now())
   createdAt      DateTime  @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
@@ -3468,4 +3472,19 @@ model DailySnapshot {
   @@unique([organizationId, branchId, businessDate])
   @@index([organizationId, stale])
   @@map("daily_snapshots")
+}
+
+/// Counters of the login and password-reset limits (H15, S6). One row for each scope, key and time window, kept in the database so a restart or a second
+/// server process does not forget them. The key is a hash, so an email address is not stored here. Old windows are deleted.
+model RateLimit {
+  id          String   @id @default(uuid()) @db.Char(36)
+  scope       String   @db.VarChar(32)
+  keyHash     String   @db.Char(64)
+  windowStart DateTime
+  count       Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  @@unique([scope, keyHash, windowStart])
+  @@index([windowStart])
+  @@map("rate_limits")
 }

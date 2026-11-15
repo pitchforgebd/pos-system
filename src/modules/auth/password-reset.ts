@@ -1,20 +1,35 @@
 import { prisma } from "@/lib/db/client";
 import { runTx } from "@/core/tx/run";
 import { writeAudit } from "@/modules/auth/audit";
-import { RESET_LIMIT, RESET_TOKEN_SECONDS, RESET_WINDOW_MS } from "@/modules/auth/constants";
+import {
+  RESET_DONE_IP_LIMIT,
+  RESET_IP_LIMIT,
+  RESET_LIMIT,
+  RESET_TOKEN_SECONDS,
+  RESET_WINDOW_MS,
+} from "@/modules/auth/constants";
 import { hashPassword } from "@/modules/auth/password";
-import { isLimited, recordFailure } from "@/modules/auth/rate-limit";
+import { isLimited, recordFailure, type LimitRule } from "@/modules/auth/rate-limit";
 import { revokeUserSessions } from "@/modules/auth/session";
 import { sendResetLink } from "@/modules/auth/mail";
 import { hashToken, newToken } from "@/modules/auth/tokens";
 
+/** Asking for a reset: one email from one address, and any email from one address. Finishing with a token: failures from one address (S6). */
+export function resetRules(ip: string, email: string) {
+  const ask: LimitRule = { scope: "reset", key: `${ip}|${email}`, limit: RESET_LIMIT, windowMs: RESET_WINDOW_MS };
+  const askAddress: LimitRule = { scope: "reset-ip", key: ip, limit: RESET_IP_LIMIT, windowMs: RESET_WINDOW_MS };
+  const done: LimitRule = { scope: "reset-done", key: ip, limit: RESET_DONE_IP_LIMIT, windowMs: RESET_WINDOW_MS };
+  return { ask, askAddress, done };
+}
+
 export async function requestPasswordReset(input: { email: string; ip: string; userAgent: string | null }) {
   const email = input.email.trim().toLowerCase();
-  const key = `reset:${input.ip}:${email}`;
-  if (isLimited(key, RESET_LIMIT, RESET_WINDOW_MS)) {
+  const rules = resetRules(input.ip, email);
+  if ((await isLimited(rules.ask)) || (await isLimited(rules.askAddress))) {
     return { ok: false as const, status: 429 as const };
   }
-  recordFailure(key, RESET_WINDOW_MS);
+  await recordFailure(rules.ask);
+  await recordFailure(rules.askAddress);
 
   const matches = await prisma.user.findMany({
     where: { email, status: "ACTIVE" },
@@ -50,9 +65,14 @@ export async function requestPasswordReset(input: { email: string; ip: string; u
 }
 
 export async function resetPassword(input: { token: string; password: string; ip: string; userAgent: string | null }) {
+  const rules = resetRules(input.ip, "");
+  if (await isLimited(rules.done)) {
+    return { ok: false as const, status: 429 as const, message: "Too many attempts. Try again later." };
+  }
   const row = await prisma.passwordReset.findUnique({ where: { tokenHash: hashToken(input.token) } });
   if (!row || row.usedAt || row.expiresAt <= new Date()) {
-    return { ok: false as const, message: "This reset link is invalid or expired." };
+    await recordFailure(rules.done);
+    return { ok: false as const, status: 400 as const, message: "This reset link is invalid or expired." };
   }
   const passwordHash = await hashPassword(input.password);
   await runTx(async (tx) => {

@@ -24,7 +24,7 @@ export const POST = defineRoute({
       userAgent: request.headers.get("user-agent"),
     });
     if (!result.ok) {
-      return jsonError("VALIDATION_ERROR", result.message, 400);
+      return jsonError(result.status === 429 ? "RATE_LIMITED" : "VALIDATION_ERROR", result.message, result.status);
     }
     return jsonOk({ reset: true }, "Password was changed.");
   },

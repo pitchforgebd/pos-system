@@ -15,3 +15,4 @@ try {
 }
 process.env.AUTH_SECRET ??= "test-secret-harness-value-0123456789";
 process.env.BCRYPT_COST = "4";
+process.env.LOGIN_DELAY_STEP_MS = "0";

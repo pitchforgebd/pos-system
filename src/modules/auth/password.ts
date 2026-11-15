@@ -18,3 +18,16 @@ export async function hashPassword(password: string) {
 export async function verifyPassword(password: string, passwordHash: string) {
   return bcrypt.compare(password, passwordHash);
 }
+
+const dummies = new Map<number, Promise<string>>();
+
+/** A hash of a password nobody has, at the same cost as a real one, to check against when the email is unknown so the time taken tells nothing (S9). */
+export function dummyHash() {
+  const at = cost();
+  let hash = dummies.get(at);
+  if (!hash) {
+    hash = hashPassword(`no-one-has-this-${Math.random()}-${Date.now()}`);
+    dummies.set(at, hash);
+  }
+  return hash;
+}
