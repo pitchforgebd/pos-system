@@ -410,15 +410,22 @@ export async function cashFlowReport(ctx: ReportCtx): Promise<ReportResult> {
   const money_ = accounts.filter(isMoney);
   const opening = netOf(before, money_, () => true);
   const closing = netOf(upTo, money_, () => true);
+  // A transfer between own accounts moves money, it brings none in and takes none out: only what it costs (the bank or mobile charge, the difference
+  // of its lines) is a real outflow, so that is all the report takes from it.
   const external = lines.filter((line) => line.docType !== "CONTRA");
+  const transfers = lines.filter((line) => line.docType === "CONTRA");
   const byKind = new Map<string, { in: Prisma.Decimal; out: Prisma.Decimal }>();
   for (const line of external) {
     const kind = kindOf(line);
     const have = byKind.get(kind) ?? { in: ZERO, out: ZERO };
     byKind.set(kind, { in: have.in.plus(line.debit), out: have.out.plus(line.credit) });
   }
-  const totalIn = sumOf(external, (line) => line.debit);
-  const totalOut = sumOf(external, (line) => line.credit);
+  const cost = sumOf(transfers, (line) => line.credit).minus(sumOf(transfers, (line) => line.debit));
+  if (!cost.isZero()) {
+    byKind.set("Transfer charges", { in: cost.isNeg() ? cost.neg() : ZERO, out: cost.isNeg() ? ZERO : cost });
+  }
+  const totalIn = sumOf(external, (line) => line.debit).plus(cost.isNeg() ? cost.neg() : ZERO);
+  const totalOut = sumOf(external, (line) => line.credit).plus(cost.isNeg() ? ZERO : cost);
   return {
     key: "cash-flow",
     title: t("Cash flow", "ক্যাশ ফ্লো"),

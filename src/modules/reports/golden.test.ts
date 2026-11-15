@@ -10,7 +10,8 @@ import { prisma } from "../../lib/db/client.ts";
 import { buildAgriDay, EXPECTED } from "../../tests/golden/agri-day.ts";
 import { withTestOrg } from "../../tests/helpers/index.ts";
 import type { ReportCtx, ReportResult } from "./kit.ts";
-import { DAILY } from "./registry.ts";
+import { DAILY, OTHER } from "./registry.ts";
+import { postContraTransfer } from "../../modules/treasury/contra.ts";
 
 // P11 (06 §4): the golden day. Each of the ten daily reports is run over it and compared with the figures worked out by hand (tests/golden), and
 // every identity under every report must be green.
@@ -166,5 +167,20 @@ test("a stock row with no recorded cost (an old adjustment) is valued at the pro
     assert.ok(stock);
     assert.ok(stock.identities.every((check) => check.ok), JSON.stringify(stock.identities));
     assert.equal(summary(stock, "Stock value at cost"), "149104.00", "144,084 + 5 bags at 1,004");
+  });
+});
+
+test("the cash flow takes the charge of a transfer between own accounts as money gone, and its identity stays green", async () => {
+  await withTestOrg(async (t) => {
+    const { day, ids } = await buildAgriDay(t);
+    // the bank sends 100 to the cash drawer and takes 12 for it: the transfer moves money, the 12 is gone
+    const moved = await postContraTransfer({ ...t.actor, idempotencyKey: randomUUID(), businessDate: day, fromAccountId: ids.bank, toAccountId: ids.cash, amount: "100.00", charge: "12.00" });
+    assert.equal(moved.ok, true, JSON.stringify(moved));
+    const ctx: ReportCtx = { organizationId: t.org.id, branchIds: [t.branch.id], from: day, to: day, canProfit: true };
+    const flow = (await OTHER.find((row) => row.key === "cash-flow")?.run(ctx)) as ReportResult;
+    for (const check of flow.identities) {
+      assert.ok(check.ok, `cash flow: ${check.label.en}: ${check.left} vs ${check.right} (difference ${check.difference})`);
+    }
+    assert.equal(section(flow, "kinds")?.rows.find((row) => row.kind === "Transfer charges")?.out, "12.00", "the charge");
   });
 });
