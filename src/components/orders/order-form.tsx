@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSubmit } from "@/lib/client/use-submit";
+import { useI18n } from "@/lib/i18n/provider";
 
 // The order form (P06): who, how it reaches them, and the lines. Prices come from the server (the customer's price level and the quantity):
 // the form shows what the search found, the order page shows what was worked out. A quotation is the same form with a valid-until date.
@@ -35,6 +36,7 @@ export type OrderFormValues = {
 };
 
 export function OrderForm({ today, quotation, levels, canChooseLevel, initial }: { today: string; quotation: boolean; levels: string[]; canChooseLevel: boolean; initial?: OrderFormValues }) {
+  const { t, taka } = useI18n();
   const { submit, pending, message } = useSubmit();
   const [customer, setCustomer] = useState<Customer | null>(initial?.customer ?? null);
   const [customerQuery, setCustomerQuery] = useState("");
@@ -119,10 +121,10 @@ export function OrderForm({ today, quotation, levels, canChooseLevel, initial }:
       ? { url: `/api/v1/orders/${initial.id}`, method: "PATCH" as const, body: payload() }
       : { url: quotation ? "/api/v1/quotations" : "/api/v1/orders", body: payload() };
     void submit<{ id: string }>(request, {
-      successMessage: quotation ? "কোটেশন সংরক্ষিত হয়েছে। (Quotation saved.)" : "অর্ডার সংরক্ষিত হয়েছে। (Order saved.)",
+      successMessage: quotation ? t("orders.savedQuotation") : t("orders.savedOrder"),
       onSuccess: async (data) => {
         if (thenConfirm) {
-          await submit({ url: `/api/v1/orders/${data.id}/confirm`, body: {} }, { successMessage: "অর্ডার নিশ্চিত হয়েছে। (Order confirmed.)", refresh: false });
+          await submit({ url: `/api/v1/orders/${data.id}/confirm`, body: {} }, { successMessage: t("orders.confirmed"), refresh: false });
         }
       },
       goTo: (data) => `/orders/${data.id}`,
@@ -135,23 +137,35 @@ export function OrderForm({ today, quotation, levels, canChooseLevel, initial }:
     <form className="grid gap-5" onSubmit={(event) => event.preventDefault()}>
       <section className="grid gap-2">
         <label className="grid gap-1 text-sm">
-          Customer (name or phone)
-          <Input value={customer ? customer.name : customerQuery} onChange={(event) => { setCustomer(null); setCustomerQuery(event.target.value); }} placeholder="Search customers" autoComplete="off" />
+          {t("orders.customerLabel")}
+          <Input
+            value={customer ? customer.name : customerQuery}
+            onChange={(event) => {
+              setCustomer(null);
+              setCustomerQuery(event.target.value);
+            }}
+            placeholder={t("orders.customerSearch")}
+            autoComplete="off"
+          />
         </label>
-        {customer ? (
-          <p className="text-sm text-muted">
-            {customer.phone ?? ""} · owes {customer.outstanding} · advance {customer.advance}
-          </p>
-        ) : null}
+        {customer ? <p className="text-sm text-muted">{t("orders.customerLine", { phone: customer.phone ?? "", owes: taka(customer.outstanding), advance: taka(customer.advance) })}</p> : null}
         {shownCustomers.length > 0 && !customer ? (
-          <ul className="max-h-56 overflow-auto rounded-md border border-border bg-surface text-sm" role="listbox" aria-label="Customers found">
+          <ul className="max-h-56 overflow-auto rounded-md border border-border bg-surface text-sm" role="listbox" aria-label={t("orders.customersFound")}>
             {shownCustomers.map((row) => (
               <li key={row.id}>
-                <button type="button" className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-surface-muted" onClick={() => { setCustomer(row); setCustomerQuery(""); setCustomers([]); }}>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-surface-muted"
+                  onClick={() => {
+                    setCustomer(row);
+                    setCustomerQuery("");
+                    setCustomers([]);
+                  }}
+                >
                   <span>
                     {row.name} {row.phone ? `· ${row.phone}` : ""}
                   </span>
-                  <span className="text-muted">owes {row.outstanding}</span>
+                  <span className="text-muted">{t("orders.owes", { amount: taka(row.outstanding) })}</span>
                 </button>
               </li>
             ))}
@@ -161,50 +175,50 @@ export function OrderForm({ today, quotation, levels, canChooseLevel, initial }:
 
       <div className="grid gap-3 md:grid-cols-4">
         <label className="grid gap-1 text-sm">
-          Date
+          {t("orders.date")}
           <Input type="date" value={values.businessDate} onChange={(event) => set("businessDate", event.target.value)} required />
         </label>
         <label className="grid gap-1 text-sm">
-          Channel
+          {t("orders.channel")}
           <select value={values.channel} onChange={(event) => set("channel", event.target.value)} className={select}>
-            {["PHONE", "FACEBOOK", "WEBSITE", "POS", "OTHER"].map((channel) => (
+            {(["PHONE", "FACEBOOK", "WEBSITE", "POS", "OTHER"] as const).map((channel) => (
               <option key={channel} value={channel}>
-                {channel.charAt(0) + channel.slice(1).toLowerCase()}
+                {t(`orders.channel.${channel}` as const)}
               </option>
             ))}
           </select>
         </label>
         <label className="grid gap-1 text-sm">
-          Delivery
+          {t("orders.delivery")}
           <select value={values.deliveryMethod} onChange={(event) => set("deliveryMethod", event.target.value)} className={select}>
-            <option value="PICKUP">Customer picks up</option>
-            <option value="OWN_VEHICLE">Own vehicle</option>
-            <option value="COURIER">Courier</option>
+            <option value="PICKUP">{t("orders.delivery.PICKUP")}</option>
+            <option value="OWN_VEHICLE">{t("orders.delivery.OWN_VEHICLE")}</option>
+            <option value="COURIER">{t("orders.delivery.COURIER")}</option>
           </select>
         </label>
         <label className="grid gap-1 text-sm">
-          Order ref. (Facebook, website…)
+          {t("orders.externalRef")}
           <Input value={values.externalRef} onChange={(event) => set("externalRef", event.target.value)} maxLength={64} />
         </label>
         <label className="grid gap-1 text-sm md:col-span-2">
-          Delivery address
+          {t("orders.address")}
           <Input value={values.shippingAddress} onChange={(event) => set("shippingAddress", event.target.value)} maxLength={255} />
         </label>
         <label className="grid gap-1 text-sm">
-          Expected on
+          {t("orders.expectedOn")}
           <Input type="date" value={values.expectedDate} onChange={(event) => set("expectedDate", event.target.value)} />
         </label>
         {quotation ? (
           <label className="grid gap-1 text-sm">
-            Valid until
+            {t("orders.validUntil")}
             <Input type="date" value={values.validUntil} onChange={(event) => set("validUntil", event.target.value)} />
           </label>
         ) : null}
         {canChooseLevel ? (
           <label className="grid gap-1 text-sm">
-            Price level
+            {t("orders.priceLevel")}
             <select value={values.level} onChange={(event) => set("level", event.target.value)} className={select}>
-              <option value="">The customer&apos;s own</option>
+              <option value="">{t("orders.ownLevel")}</option>
               {levels.map((level) => (
                 <option key={level} value={level}>
                   {level}
@@ -217,11 +231,11 @@ export function OrderForm({ today, quotation, levels, canChooseLevel, initial }:
 
       <section className="grid gap-2">
         <label className="grid gap-1 text-sm">
-          Add a product (name, SKU or barcode)
-          <Input value={productQuery} onChange={(event) => setProductQuery(event.target.value)} placeholder="Search products" autoComplete="off" />
+          {t("orders.addProduct")}
+          <Input value={productQuery} onChange={(event) => setProductQuery(event.target.value)} placeholder={t("orders.productSearch")} autoComplete="off" />
         </label>
         {shownHits.length > 0 ? (
-          <ul className="max-h-64 overflow-auto rounded-md border border-border bg-surface text-sm" role="listbox" aria-label="Products found">
+          <ul className="max-h-64 overflow-auto rounded-md border border-border bg-surface text-sm" role="listbox" aria-label={t("orders.productsFound")}>
             {shownHits.map((hit) => (
               <li key={hit.id}>
                 <button type="button" className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-surface-muted" onClick={() => addProduct(hit)}>
@@ -229,7 +243,7 @@ export function OrderForm({ today, quotation, levels, canChooseLevel, initial }:
                     {hit.sku} · {hit.name}
                   </span>
                   <span className="text-muted">
-                    {hit.price} ({hit.levelName}){hit.available !== null ? ` · ${hit.available} available` : ""}
+                    {taka(hit.price)} ({hit.levelName}){hit.available !== null ? ` · ${t("orders.availableShort", { n: hit.available })}` : ""}
                   </span>
                 </button>
               </li>
@@ -241,13 +255,13 @@ export function OrderForm({ today, quotation, levels, canChooseLevel, initial }:
       {lines.length > 0 ? (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[40rem] text-sm">
-            <caption className="sr-only">Order lines</caption>
+            <caption className="sr-only">{t("orders.linesCaption")}</caption>
             <thead className="text-left text-muted">
               <tr>
-                <th className="p-1">Product</th>
-                <th className="p-1">Price</th>
-                <th className="p-1">Quantity</th>
-                <th className="p-1">Discount</th>
+                <th className="p-1">{t("orders.product")}</th>
+                <th className="p-1">{t("orders.price")}</th>
+                <th className="p-1">{t("orders.quantity")}</th>
+                <th className="p-1">{t("orders.discount")}</th>
                 <th className="p-1" />
               </tr>
             </thead>
@@ -256,18 +270,18 @@ export function OrderForm({ today, quotation, levels, canChooseLevel, initial }:
                 <tr key={line.key}>
                   <td className="p-1">
                     {line.label}
-                    {line.available !== null ? <span className="ml-2 text-muted">({line.available} available)</span> : null}
+                    {line.available !== null ? <span className="ml-2 text-muted">({t("orders.availableShort", { n: line.available })})</span> : null}
                   </td>
-                  <td className="p-1 tabular-nums">{line.price}</td>
+                  <td className="p-1 tabular-nums">{taka(line.price)}</td>
                   <td className="p-1">
-                    <input className={`${cell} w-24`} inputMode="decimal" aria-label="Quantity" value={line.quantity} onChange={(event) => setLines((current) => current.map((row) => (row.key === line.key ? { ...row, quantity: event.target.value } : row)))} />
-                  </td>
-                  <td className="p-1">
-                    <input className={`${cell} w-24`} inputMode="decimal" aria-label="Line discount" value={line.discount} onChange={(event) => setLines((current) => current.map((row) => (row.key === line.key ? { ...row, discount: event.target.value } : row)))} />
+                    <input className={`${cell} w-24`} inputMode="decimal" aria-label={t("orders.quantity")} value={line.quantity} onChange={(event) => setLines((current) => current.map((row) => (row.key === line.key ? { ...row, quantity: event.target.value } : row)))} />
                   </td>
                   <td className="p-1">
-                    <Button variant="ghost" size="sm" onClick={() => setLines((current) => current.filter((row) => row.key !== line.key))} aria-label={`Remove ${line.label}`}>
-                      Remove
+                    <input className={`${cell} w-24`} inputMode="decimal" aria-label={t("orders.lineDiscount")} value={line.discount} onChange={(event) => setLines((current) => current.map((row) => (row.key === line.key ? { ...row, discount: event.target.value } : row)))} />
+                  </td>
+                  <td className="p-1">
+                    <Button variant="ghost" size="sm" onClick={() => setLines((current) => current.filter((row) => row.key !== line.key))} aria-label={t("orders.removeLine", { item: line.label })}>
+                      {t("orders.remove")}
                     </Button>
                   </td>
                 </tr>
@@ -276,32 +290,36 @@ export function OrderForm({ today, quotation, levels, canChooseLevel, initial }:
           </table>
         </div>
       ) : (
-        <p className="text-sm text-muted">Search for a product to add the first line.</p>
+        <p className="text-sm text-muted">{t("orders.firstLine")}</p>
       )}
 
       <div className="grid gap-3 md:grid-cols-3">
         <label className="grid gap-1 text-sm">
-          Discount on the whole order
+          {t("orders.wholeDiscount")}
           <Input inputMode="decimal" value={values.headerDiscount} onChange={(event) => set("headerDiscount", event.target.value)} />
         </label>
         <label className="grid gap-1 text-sm">
-          Delivery and other charges
+          {t("orders.charges")}
           <Input inputMode="decimal" value={values.chargesTotal} onChange={(event) => set("chargesTotal", event.target.value)} />
         </label>
         <label className="grid gap-1 text-sm">
-          Note
+          {t("orders.note")}
           <Input value={values.note} onChange={(event) => set("note", event.target.value)} maxLength={500} />
         </label>
       </div>
 
-      {message ? <p className="text-sm text-error" role="alert">{message}</p> : null}
+      {message ? (
+        <p className="text-sm text-error" role="alert">
+          {message}
+        </p>
+      ) : null}
       <div className="flex flex-wrap gap-2">
         <Button variant="secondary" loading={pending} disabled={!ready} onClick={() => save(false)}>
-          {initial?.id ? "Save changes" : quotation ? "Save quotation" : "Save as draft"}
+          {initial?.id ? t("orders.saveChanges") : quotation ? t("orders.saveQuotation") : t("orders.saveDraft")}
         </Button>
         {!quotation && !initial?.id ? (
           <Button loading={pending} disabled={!ready} onClick={() => save(true)}>
-            Save and confirm (reserve the stock)
+            {t("orders.saveConfirm")}
           </Button>
         ) : null}
       </div>

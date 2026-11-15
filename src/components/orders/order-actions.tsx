@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { useSubmit } from "@/lib/client/use-submit";
+import { useI18n } from "@/lib/i18n/provider";
 
 type Status = "DRAFT" | "CONFIRMED" | "PACKED" | "DISPATCHED" | "DELIVERED" | "CANCELLED" | "RETURNED";
 
@@ -25,12 +26,14 @@ export function OrderActions({
   id: string;
   status: Status;
   today: string;
+  /** The customer's advance, already written as taka. */
   advance: string;
   can: { create: boolean; manage: boolean };
   deliveryMethod: "PICKUP" | "OWN_VEHICLE" | "COURIER";
   couriers: Courier[];
   shipment: { id: string; number: string | null; status: string; method: string } | null;
 }) {
+  const { t, taka } = useI18n();
   const { submit, pending, message } = useSubmit();
   const [dispatching, setDispatching] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -47,6 +50,7 @@ export function OrderActions({
   const [driverPhone, setDriverPhone] = useState("");
   const courier = couriers.find((row) => row.id === courierId);
   const step = (action: string, success: string) => void submit({ url: `/api/v1/orders/${id}/${action}`, body: {} }, { successMessage: success });
+  const field = "h-10 rounded-md border border-border bg-surface px-2";
 
   function dispatch() {
     const wallet = fromAdvance.trim() !== "" && Number(fromAdvance) > 0;
@@ -64,39 +68,69 @@ export function OrderActions({
                 : undefined,
         },
       },
-      { successMessage: "অর্ডার পাঠানো হয়েছে, ইনভয়েস তৈরি। (Dispatched, invoice made.)", onSuccess: () => setDispatching(false) },
+      { successMessage: t("orders.dispatched"), onSuccess: () => setDispatching(false) },
     );
   }
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
-        {status === "DRAFT" && can.manage ? <Button loading={pending} onClick={() => step("confirm", "অর্ডার নিশ্চিত হয়েছে। (Confirmed: the stock is held.)")}>Confirm (reserve the stock)</Button> : null}
-        {status === "DRAFT" && can.create ? <Button variant="secondary" href={`/orders/${id}/edit`}>Change</Button> : null}
-        {status === "CONFIRMED" && can.manage ? <Button variant="secondary" loading={pending} onClick={() => step("pack", "প্যাক করা হয়েছে। (Packed.)")}>Mark packed</Button> : null}
-        {(status === "CONFIRMED" || status === "PACKED") && can.manage ? <Button onClick={() => setDispatching((open) => !open)}>Dispatch (make the invoice)</Button> : null}
-        {status === "DISPATCHED" && can.manage && shipment?.method === "COURIER" ? <Button variant="secondary" href={`/shipments/${shipment.id}`}>Parcel {shipment.number} ({shipment.status.toLowerCase().replace("_", " ")})</Button> : null}
-        {status === "DISPATCHED" && can.manage && shipment?.method !== "COURIER" ? <Button loading={pending} onClick={() => step("deliver", "ডেলিভারি হয়েছে। (Delivered.)")}>Mark delivered</Button> : null}
-        {(status === "DRAFT" || status === "CONFIRMED" || status === "PACKED") && can.manage ? <Button variant="danger" onClick={() => setCancelling(true)}>Cancel order</Button> : null}
-        {status === "DISPATCHED" || status === "DELIVERED" ? <Button variant="secondary" href="/sales/returns">Return goods</Button> : null}
-        <Button variant="ghost" href={`/orders/${id}/print`}>Print</Button>
+        {status === "DRAFT" && can.manage ? (
+          <Button loading={pending} onClick={() => step("confirm", t("orders.confirmed"))}>
+            {t("orders.confirm")}
+          </Button>
+        ) : null}
+        {status === "DRAFT" && can.create ? (
+          <Button variant="secondary" href={`/orders/${id}/edit`}>
+            {t("orders.change")}
+          </Button>
+        ) : null}
+        {status === "CONFIRMED" && can.manage ? (
+          <Button variant="secondary" loading={pending} onClick={() => step("pack", t("orders.packed"))}>
+            {t("orders.pack")}
+          </Button>
+        ) : null}
+        {(status === "CONFIRMED" || status === "PACKED") && can.manage ? <Button onClick={() => setDispatching((open) => !open)}>{t("orders.dispatch")}</Button> : null}
+        {status === "DISPATCHED" && can.manage && shipment?.method === "COURIER" ? (
+          <Button variant="secondary" href={`/shipments/${shipment.id}`}>
+            {t("orders.parcel", { number: shipment.number ?? "", status: shipment.status.toLowerCase().replace("_", " ") })}
+          </Button>
+        ) : null}
+        {status === "DISPATCHED" && can.manage && shipment?.method !== "COURIER" ? (
+          <Button loading={pending} onClick={() => step("deliver", t("orders.delivered"))}>
+            {t("orders.deliver")}
+          </Button>
+        ) : null}
+        {(status === "DRAFT" || status === "CONFIRMED" || status === "PACKED") && can.manage ? (
+          <Button variant="danger" onClick={() => setCancelling(true)}>
+            {t("orders.cancel")}
+          </Button>
+        ) : null}
+        {status === "DISPATCHED" || status === "DELIVERED" ? (
+          <Button variant="secondary" href="/sales/returns">
+            {t("orders.returnGoods")}
+          </Button>
+        ) : null}
+        <Button variant="ghost" href={`/orders/${id}/print`}>
+          {t("orders.print")}
+        </Button>
       </div>
       {dispatching ? (
         <fieldset className="grid gap-3 rounded-md border border-border p-3 md:grid-cols-3">
-          <legend className="px-1 text-sm font-medium">Dispatch: the invoice posts and the stock goes out</legend>
+          <legend className="px-1 text-sm font-medium">{t("orders.dispatchLegend")}</legend>
           <label className="grid gap-1 text-sm">
-            Dispatched on
+            {t("orders.dispatchedOn")}
             <Input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
           </label>
           <label className="grid gap-1 text-sm">
-            Paid now from the customer&apos;s advance (they hold {advance})
+            {t("orders.fromAdvance", { advance })}
             <Input inputMode="decimal" value={fromAdvance} onChange={(event) => setFromAdvance(event.target.value)} placeholder="0.00" />
           </label>
           {deliveryMethod === "COURIER" ? (
             <>
               <label className="grid gap-1 text-sm">
-                Courier
-                <select value={courierId} onChange={(event) => setCourierId(event.target.value)} className="h-10 rounded-md border border-border bg-surface px-2">
+                {t("orders.courier")}
+                <select value={courierId} onChange={(event) => setCourierId(event.target.value)} className={field}>
                   {couriers.map((row) => (
                     <option key={row.id} value={row.id}>
                       {row.name}
@@ -105,75 +139,79 @@ export function OrderActions({
                 </select>
               </label>
               <label className="grid gap-1 text-sm">
-                Tracking code
+                {t("orders.tracking")}
                 <Input value={tracking} onChange={(event) => setTracking(event.target.value)} maxLength={64} />
               </label>
               <label className="flex items-end gap-2 pb-2 text-sm">
                 <input type="checkbox" checked={outside} onChange={(event) => setOutside(event.target.checked)} />
-                Outside Dhaka
+                {t("orders.outsideDhaka")}
               </label>
               <label className="grid gap-1 text-sm">
-                Delivery charge (default {courier ? (outside ? courier.outsideDeliveryCharge : courier.defaultDeliveryCharge) : "-"})
-                <Input inputMode="decimal" value={deliveryCharge} onChange={(event) => setDeliveryCharge(event.target.value)} placeholder="the courier's" />
+                {t("orders.deliveryCharge", { default: courier ? taka(outside ? courier.outsideDeliveryCharge : courier.defaultDeliveryCharge) : "-" })}
+                <Input inputMode="decimal" value={deliveryCharge} onChange={(event) => setDeliveryCharge(event.target.value)} placeholder={t("orders.theCouriers")} />
               </label>
               <label className="grid gap-1 text-sm">
-                Condition % (default {courier?.defaultConditionPercent ?? "-"})
-                <Input inputMode="decimal" value={conditionPercent} onChange={(event) => setConditionPercent(event.target.value)} placeholder="the courier's" />
+                {t("orders.conditionPercent", { default: courier?.defaultConditionPercent ?? "-" })}
+                <Input inputMode="decimal" value={conditionPercent} onChange={(event) => setConditionPercent(event.target.value)} placeholder={t("orders.theCouriers")} />
               </label>
               <label className="grid gap-1 text-sm">
-                The delivery charge is
-                <select value={paidWith} onChange={(event) => setPaidWith(event.target.value as "DEDUCT" | "CASH" | "BANK")} className="h-10 rounded-md border border-border bg-surface px-2">
-                  <option value="DEDUCT">Kept out of the settlement</option>
-                  <option value="CASH">Paid now in cash</option>
-                  <option value="BANK">Paid now by bank</option>
+                {t("orders.chargeIs")}
+                <select value={paidWith} onChange={(event) => setPaidWith(event.target.value as "DEDUCT" | "CASH" | "BANK")} className={field}>
+                  <option value="DEDUCT">{t("orders.deduct")}</option>
+                  <option value="CASH">{t("orders.paidCash")}</option>
+                  <option value="BANK">{t("orders.paidBank")}</option>
                 </select>
               </label>
-              <p className="text-sm text-muted md:col-span-3">The courier collects what the customer still owes on the invoice and owes it to the shop until it settles.</p>
+              <p className="text-sm text-muted md:col-span-3">{t("orders.courierNote")}</p>
             </>
           ) : null}
           {deliveryMethod === "OWN_VEHICLE" ? (
             <>
               <label className="grid gap-1 text-sm">
-                Vehicle no.
+                {t("orders.vehicleNo")}
                 <Input value={vehicleNo} onChange={(event) => setVehicleNo(event.target.value)} maxLength={32} />
               </label>
               <label className="grid gap-1 text-sm">
-                Driver
+                {t("orders.driver")}
                 <Input value={driverName} onChange={(event) => setDriverName(event.target.value)} maxLength={191} />
               </label>
               <label className="grid gap-1 text-sm">
-                Driver&apos;s phone
+                {t("orders.driverPhone")}
                 <Input value={driverPhone} onChange={(event) => setDriverPhone(event.target.value)} maxLength={32} />
               </label>
               <label className="grid gap-1 text-sm">
-                Fare
+                {t("orders.fare")}
                 <Input inputMode="decimal" value={deliveryCharge} onChange={(event) => setDeliveryCharge(event.target.value)} placeholder="0.00" />
               </label>
               <label className="grid gap-1 text-sm">
-                Paid
-                <select value={paidWith === "BANK" ? "BANK" : "CASH"} onChange={(event) => setPaidWith(event.target.value as "CASH" | "BANK")} className="h-10 rounded-md border border-border bg-surface px-2">
-                  <option value="CASH">In cash</option>
-                  <option value="BANK">By bank</option>
+                {t("orders.paid")}
+                <select value={paidWith === "BANK" ? "BANK" : "CASH"} onChange={(event) => setPaidWith(event.target.value as "CASH" | "BANK")} className={field}>
+                  <option value="CASH">{t("orders.inCash")}</option>
+                  <option value="BANK">{t("orders.byBank")}</option>
                 </select>
               </label>
             </>
           ) : null}
           <div className="flex items-end">
             <Button loading={pending} onClick={dispatch}>
-              Dispatch
+              {t("orders.dispatchNow")}
             </Button>
           </div>
         </fieldset>
       ) : null}
-      {message ? <p className="text-sm text-error" role="alert">{message}</p> : null}
+      {message ? (
+        <p className="text-sm text-error" role="alert">
+          {message}
+        </p>
+      ) : null}
       <ConfirmDialog
         open={cancelling}
         onOpenChange={setCancelling}
-        title="Cancel this order?"
-        description="What it was holding in stock is released. After a dispatch an order can only be undone by a return."
-        confirmLabel="Cancel order"
+        title={t("orders.cancelTitle")}
+        description={t("orders.cancelBody")}
+        confirmLabel={t("orders.cancel")}
         tone="danger"
-        onConfirm={() => step("cancel", "অর্ডার বাতিল। (Order cancelled.)")}
+        onConfirm={() => step("cancel", t("orders.cancelled"))}
       />
     </div>
   );

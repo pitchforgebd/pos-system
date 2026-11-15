@@ -23,6 +23,7 @@ const LISTED = [
   "components/layout/shell.tsx",
   "components/layout/language-switch.tsx",
   "components/ui/pagination.tsx",
+  "components/ui/confirm-dialog.tsx",
   "components/ui/modal.tsx",
   "components/ui/drawer.tsx",
   "components/ui/quantity-input.tsx",
@@ -40,6 +41,14 @@ const LISTED = [
   "components/sales/sales-table.tsx",
   "components/sales/ticket-list.tsx",
   "components/returns/return-form.tsx",
+  "app/(dashboard)/orders/page.tsx",
+  "app/(dashboard)/orders/new/page.tsx",
+  "app/(dashboard)/orders/[id]/page.tsx",
+  "app/(dashboard)/orders/[id]/edit/page.tsx",
+  "app/(dashboard)/orders/[id]/print/page.tsx",
+  "app/(dashboard)/quotations/page.tsx",
+  "components/orders/order-actions.tsx",
+  "components/orders/order-form.tsx",
   "components/returns/receiptless-form.tsx",
 ];
 

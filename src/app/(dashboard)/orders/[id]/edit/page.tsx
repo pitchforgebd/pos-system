@@ -3,11 +3,13 @@ import { notFound, redirect } from "next/navigation";
 import { OrderForm, type OrderFormValues } from "@/components/orders/order-form";
 import { PageHeader } from "@/components/ui/page-header";
 import { businessDate } from "@/core/time/business-date";
+import { titled } from "@/lib/i18n/metadata";
+import { getI18n, I18nBoundary } from "@/lib/i18n/server";
 import { getSession } from "@/modules/auth/current-session";
 import { getOrder } from "@/modules/orders/orders";
 import { listPriceLevels } from "@/modules/pricing/admin";
 
-export const metadata = { title: "Change order" };
+export const generateMetadata = titled("orders", "orders.crumbChange");
 
 export default async function EditOrderPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -22,6 +24,7 @@ export default async function EditOrderPage({ params }: { params: Promise<{ id: 
   if (order.status !== "DRAFT") {
     redirect(`/orders/${id}`);
   }
+  const { t } = await getI18n("orders");
   const levels = await listPriceLevels(session.organizationId);
   const blank = (value: string) => (value === "0.00" ? "" : value);
   const initial: OrderFormValues = {
@@ -40,11 +43,18 @@ export default async function EditOrderPage({ params }: { params: Promise<{ id: 
     level: "",
     lines: order.items.map((item) => ({ productId: item.productId, label: `${item.sku} · ${item.name}`, price: item.unitPrice, available: null, quantity: item.quantity, discount: blank(item.discountAmount) })),
   };
+  const name = order.number ?? order.quotationNumber ?? t("orders.draftOrder");
 
   return (
-    <div className="space-y-6">
-      <PageHeader title={`Change ${order.number ?? order.quotationNumber ?? "draft order"}`} description="Nothing is held or posted for a draft, so its lines can change; they are priced again." breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Orders", href: "/orders" }, { label: order.number ?? order.quotationNumber ?? "Draft", href: `/orders/${id}` }, { label: "Change" }]} />
-      <OrderForm today={businessDate()} quotation={order.isQuotation} initial={initial} levels={levels.filter((level) => level.status === "ACTIVE").map((level) => level.name)} canChooseLevel={session.permissions.has("sales.price_level")} />
-    </div>
+    <I18nBoundary areas={["orders"]}>
+      <div className="space-y-6">
+        <PageHeader
+          title={t("orders.changeTitle", { number: name })}
+          description={t("orders.changeDescription")}
+          breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Orders", href: "/orders" }, { label: order.number ?? order.quotationNumber ?? t("orders.draft"), href: `/orders/${id}` }, { label: "Change" }]}
+        />
+        <OrderForm today={businessDate()} quotation={order.isQuotation} initial={initial} levels={levels.filter((level) => level.status === "ACTIVE").map((level) => level.name)} canChooseLevel={session.permissions.has("sales.price_level")} />
+      </div>
+    </I18nBoundary>
   );
 }
