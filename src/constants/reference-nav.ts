@@ -36,6 +36,7 @@ export const referenceNavigation: ReferenceEntry[] = [
       { label: "Price Levels", href: "/settings/price-levels" },
       { label: "Courier Settings", href: "/settings/courier" },
       { label: "Money & Charges", href: "/settings/money" },
+      { label: "Security", href: "/settings/security" },
       { label: "Shipments", href: "/shipments" },
       { label: "Courier Dues", href: "/couriers" },
     ],
@@ -185,6 +186,7 @@ export const referenceNavigation: ReferenceEntry[] = [
   { kind: "link", label: "Dealer Wings", href: "/customers/dealers" },
   { kind: "link", label: "Users", href: "/users" },
   { kind: "link", label: "Audit logs", href: "/audit-logs" },
+  { kind: "link", label: "My profile", href: "/profile" },
 ];
 
 export function referenceHrefs() {

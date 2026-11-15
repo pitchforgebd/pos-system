@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db/client";
-import { SESSION_COOKIE, SESSION_MAX_AGE_SECONDS } from "@/modules/auth/constants";
+import { LAST_SEEN_WRITE_MS, SESSION_COOKIE, SESSION_MAX_AGE_SECONDS } from "@/modules/auth/constants";
 import { hashToken, newToken } from "@/modules/auth/tokens";
 
 export type SessionContext = {
@@ -34,10 +34,21 @@ export async function loadSession(token: string): Promise<SessionContext | null>
     include: {
       user: { select: { id: true, name: true, email: true, status: true, organizationId: true } },
       branch: { select: { id: true, name: true } },
+      organization: { select: { idleTimeoutMinutes: true } },
     },
   });
   if (!session || session.revokedAt || session.expiresAt <= new Date()) {
     return null;
+  }
+  // Idle timeout (N20): a session nobody has used for the shop's idle time is over, however much of its 12 hours is left
+  const now = Date.now();
+  const quiet = now - session.lastSeenAt.getTime();
+  if (quiet > session.organization.idleTimeoutMinutes * 60 * 1000) {
+    await prisma.session.updateMany({ where: { id: session.id, revokedAt: null }, data: { revokedAt: new Date(now) } });
+    return null;
+  }
+  if (quiet > LAST_SEEN_WRITE_MS) {
+    await prisma.session.update({ where: { id: session.id }, data: { lastSeenAt: new Date(now) } });
   }
   if (session.user.status === "DISABLED") {
     await prisma.session.update({ where: { id: session.id }, data: { revokedAt: new Date() } });

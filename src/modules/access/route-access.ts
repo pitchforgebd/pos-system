@@ -35,7 +35,7 @@ const rules: Rule[] = [
 rules.sort((left, right) => right.prefix.length - left.prefix.length);
 
 export function pagePermission(pathname: string): PermissionCode | "closed" | "session" {
-  if (pathname === "/missing") {
+  if (pathname === "/missing" || pathname === "/profile") {
     return "session";
   }
   const match = rules.find((rule) => pathname === rule.prefix || pathname.startsWith(`${rule.prefix}/`));

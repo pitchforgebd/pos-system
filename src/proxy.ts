@@ -9,6 +9,7 @@ import { loadSession } from "@/modules/auth/session";
 const knownSections = new Set<string>([
   "dashboard",
   "missing",
+  "profile",
   "login",
   "forgot-password",
   "reset-password",
