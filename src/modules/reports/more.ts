@@ -217,7 +217,7 @@ export async function stockValue(ctx: ReportCtx): Promise<ReportResult> {
   const rows = await prisma.$queryRaw<Array<{ product: string; sku: string; category: string | null; quantity: Prisma.Decimal | null; value: Prisma.Decimal | null }>>`
     SELECT p.name AS product, p.sku AS sku, c.name AS category,
            SUM(CASE WHEN s.direction = 'IN' THEN s.quantity ELSE -s.quantity END) AS quantity,
-           SUM(CASE WHEN s.direction = 'IN' THEN 1 ELSE -1 END * COALESCE(s.totalCost, ROUND(s.quantity * s.unitCost, 2), 0)) AS value
+           SUM(CASE WHEN s.direction = 'IN' THEN 1 ELSE -1 END * COALESCE(s.totalCost, ROUND(s.quantity * s.unitCost, 2), ROUND(s.quantity * (SELECT AVG(b.averageCost) FROM stock_balances b WHERE b.productId = s.productId AND b.branchId = s.branchId), 2), 0)) AS value
     FROM stock_ledgers s
     JOIN products p ON p.id = s.productId
     LEFT JOIN categories c ON c.id = p.categoryId

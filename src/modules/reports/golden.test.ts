@@ -1,6 +1,7 @@
 import "../../tests/helpers/env.ts";
 
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import test from "node:test";
 
 import { assertBooksReconcile } from "../../core/reconcile/index.ts";
@@ -147,5 +148,23 @@ test("the monthly and other reports run over the golden day: every identity is g
     assert.equal(summary(damage, "Value"), "400.00", "one bottle (300) and two sample packets (100)");
     assert.ok((section(results.get("transactions") as ReportResult, "lines")?.rows.length ?? 0) > 10);
     assert.ok((section(results.get("day-book") as ReportResult, "lines")?.rows.length ?? 0) > 20);
+  });
+});
+
+test("a stock row with no recorded cost (an old adjustment) is valued at the product's average cost, as its journal did: the stock identity stays green", async () => {
+  const { post } = await import("../../core/posting/journal.ts");
+  const { runTx } = await import("../../core/tx/run.ts");
+  const { Prisma } = await import("@prisma/client");
+  await withTestOrg(async (t) => {
+    const { day, ids } = await buildAgriDay(t);
+    // 5 more bags found, written the old way: the stock row has no cost, the journal values them at the average (1,004 a bag)
+    await prisma.stockLedger.create({ data: { organizationId: t.org.id, productId: ids.urea, branchId: t.branch.id, warehouseId: t.warehouse.id, quantity: "5", direction: "IN", movementType: "ADJUSTMENT", referenceType: "stock_adjustment", referenceId: ids.urea, userId: t.owner.id, businessDate: new Date(`${day}T00:00:00.000Z`) } });
+    await prisma.stockBalance.updateMany({ where: { organizationId: t.org.id, productId: ids.urea, branchId: t.branch.id }, data: { quantity: { increment: "5" } } });
+    await runTx((tx) => post(tx, { organizationId: t.org.id, branchId: t.branch.id, businessDate: new Date(`${day}T00:00:00.000Z`), description: "Old adjustment", createdById: t.owner.id, doc: { type: "JOURNAL", id: randomUUID() }, lines: [{ role: "INVENTORY", debit: new Prisma.Decimal("5020.00"), credit: new Prisma.Decimal(0) }, { role: "INVENTORY_GAIN", debit: new Prisma.Decimal(0), credit: new Prisma.Decimal("5020.00") }] }));
+    const ctx: ReportCtx = { organizationId: t.org.id, branchIds: [t.branch.id], from: day, to: day, canProfit: true };
+    const stock = await DAILY.find((row) => row.key === "stock")?.run(ctx);
+    assert.ok(stock);
+    assert.ok(stock.identities.every((check) => check.ok), JSON.stringify(stock.identities));
+    assert.equal(summary(stock, "Stock value at cost"), "149104.00", "144,084 + 5 bags at 1,004");
   });
 });

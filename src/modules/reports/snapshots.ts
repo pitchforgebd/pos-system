@@ -31,7 +31,7 @@ export async function figuresAt(organizationId: string, branchId: string, date: 
       GROUP BY r.role
     `,
     prisma.$queryRaw<Array<{ value: Prisma.Decimal | null }>>`
-      SELECT SUM(CASE WHEN s.direction = 'IN' THEN 1 ELSE -1 END * COALESCE(s.totalCost, ROUND(s.quantity * s.unitCost, 2), 0)) AS value
+      SELECT SUM(CASE WHEN s.direction = 'IN' THEN 1 ELSE -1 END * COALESCE(s.totalCost, ROUND(s.quantity * s.unitCost, 2), ROUND(s.quantity * (SELECT AVG(b.averageCost) FROM stock_balances b WHERE b.productId = s.productId AND b.branchId = s.branchId), 2), 0)) AS value
       FROM stock_ledgers s
       WHERE s.organizationId = ${organizationId} AND s.branchId = ${branchId} AND s.businessDate <= ${date}
     `,

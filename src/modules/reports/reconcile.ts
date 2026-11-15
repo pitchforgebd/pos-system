@@ -22,14 +22,21 @@ export async function reconciliation(organizationId: string, date: string = busi
   const [books, snapshots] = await Promise.all([reconcileBooks(prisma, organizationId), snapshotDifferences(organizationId)]);
   const ctx = { organizationId, branchIds: null, from: date, to: date, canProfit: true };
   const reports: Reconciliation["reports"] = [];
-  for (const report of allReports()) {
+  const run = async (report: ReturnType<typeof allReports>[number]) => {
     try {
       const result = await report.run(ctx);
-      if (result.identities.length > 0) {
-        reports.push({ key: result.key, title: result.title, checks: result.identities });
-      }
+      return result.identities.length > 0 ? { key: result.key, title: result.title, checks: result.identities } : null;
     } catch (error) {
-      reports.push({ key: report.key, title: report.title, checks: [{ label: { en: `The report did not run: ${error instanceof Error ? error.message : "error"}`, bn: "রিপোর্ট চলেনি" }, left: "", right: "", ok: false, difference: "" }] });
+      return { key: report.key, title: report.title, checks: [{ label: { en: `The report did not run: ${error instanceof Error ? error.message : "error"}`, bn: "রিপোর্ট চলেনি" }, left: "", right: "", ok: false, difference: "" }] };
+    }
+  };
+  // four at a time: quick, and well inside the connection pool
+  const all = allReports();
+  for (let at = 0; at < all.length; at += 4) {
+    for (const row of await Promise.all(all.slice(at, at + 4).map(run))) {
+      if (row) {
+        reports.push(row);
+      }
     }
   }
   const red = books.findings.length + reports.reduce((sum, row) => sum + row.checks.filter((check) => !check.ok).length, 0) + snapshots.differences.length;

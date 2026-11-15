@@ -193,15 +193,18 @@ async function roleBalance(ctx: ReportCtx, role: string, upTo: string) {
 /** The oldest invoice (or bill) of each party that still has something owed on it. */
 async function oldestOpen(ctx: ReportCtx, kind: "CUSTOMER" | "VENDOR", partyIds: string[]) {
   const result = new Map<string, string>();
-  for (const partyId of partyIds) {
+  const BATCH = 400;
+  for (let at = 0; at < partyIds.length; at += BATCH) {
+    const ids = partyIds.slice(at, at + BATCH);
     const docs =
       kind === "CUSTOMER"
-        ? await prisma.sale.findMany({ where: { organizationId: ctx.organizationId, customerId: partyId, status: "POSTED", businessDate: { lte: day(ctx.to) } }, orderBy: [{ businessDate: "asc" }, { createdAt: "asc" }], select: { id: true, total: true, businessDate: true } })
-        : await prisma.purchase.findMany({ where: { organizationId: ctx.organizationId, supplierId: partyId, status: "RECEIVED", businessDate: { lte: day(ctx.to) } }, orderBy: [{ businessDate: "asc" }, { createdAt: "asc" }], select: { id: true, total: true, businessDate: true } });
+        ? (await prisma.sale.findMany({ where: { organizationId: ctx.organizationId, customerId: { in: ids }, status: "POSTED", businessDate: { lte: day(ctx.to) } }, orderBy: [{ businessDate: "asc" }, { createdAt: "asc" }], select: { id: true, total: true, businessDate: true, customerId: true } })).map((row) => ({ id: row.id, total: row.total, businessDate: row.businessDate, partyId: row.customerId as string }))
+        : (await prisma.purchase.findMany({ where: { organizationId: ctx.organizationId, supplierId: { in: ids }, status: "RECEIVED", businessDate: { lte: day(ctx.to) } }, orderBy: [{ businessDate: "asc" }, { createdAt: "asc" }], select: { id: true, total: true, businessDate: true, supplierId: true } })).map((row) => ({ id: row.id, total: row.total, businessDate: row.businessDate, partyId: row.supplierId }));
     const status = await paymentStatuses(prisma, ctx.organizationId, kind, docs);
-    const first = docs.find((doc) => status.get(doc.id)?.owed.gt(0));
-    if (first) {
-      result.set(partyId, dateOnly(first.businessDate));
+    for (const doc of docs) {
+      if (!result.has(doc.partyId) && status.get(doc.id)?.owed.gt(0)) {
+        result.set(doc.partyId, dateOnly(doc.businessDate));
+      }
     }
   }
   return result;
@@ -454,7 +457,7 @@ type Move = { productId: string; branchId: string; movementType: string; directi
 
 async function stockMoves(ctx: ReportCtx, from: string | null, to: string) {
   const rows = await prisma.$queryRaw<Move[]>`
-    SELECT s.productId AS productId, s.branchId AS branchId, s.movementType AS movementType, s.direction AS direction, SUM(s.quantity) AS quantity, SUM(COALESCE(s.totalCost, ROUND(s.quantity * s.unitCost, 2), 0)) AS value
+    SELECT s.productId AS productId, s.branchId AS branchId, s.movementType AS movementType, s.direction AS direction, SUM(s.quantity) AS quantity, SUM(COALESCE(s.totalCost, ROUND(s.quantity * s.unitCost, 2), ROUND(s.quantity * (SELECT AVG(b.averageCost) FROM stock_balances b WHERE b.productId = s.productId AND b.branchId = s.branchId), 2), 0)) AS value
     FROM stock_ledgers s
     WHERE s.organizationId = ${ctx.organizationId} ${lineBranches(ctx, "s")} AND s.businessDate <= ${to} ${from ? Prisma.sql`AND s.businessDate >= ${from}` : Prisma.empty}
     GROUP BY s.productId, s.branchId, s.movementType, s.direction
