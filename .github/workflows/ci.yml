@@ -75,6 +75,6 @@ jobs:
         shell: bash
         run: |
           if [ -f build.log ]; then
-            msg=$(tail -n 40 build.log | tr -d '' | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            msg=$(tail -n 40 build.log | tr -d '\015' | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
             echo "::error title=build log (last lines)::${msg}"
           fi
