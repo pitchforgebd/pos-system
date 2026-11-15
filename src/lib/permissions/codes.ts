@@ -63,6 +63,7 @@ export const permissionCodes = [
   "reports.export",
   "reports.profit",
   "reports.all_branches",
+  "period.close",
   "users.view",
   "users.create",
   "users.edit",

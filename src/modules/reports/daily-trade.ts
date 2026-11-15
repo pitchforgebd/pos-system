@@ -337,7 +337,7 @@ export async function conditionReport(ctx: ReportCtx): Promise<ReportResult> {
 
 /** Profit and loss for the window, from the ledger (05 #7). Needs reports.profit. */
 export async function profitReport(ctx: ReportCtx): Promise<ReportResult> {
-  const [accounts, totals] = await Promise.all([chart(ctx.organizationId), accountTotals(ctx, ctx.from, ctx.to)]);
+  const [accounts, totals] = await Promise.all([chart(ctx.organizationId), accountTotals(ctx, ctx.from, ctx.to, { excludeClose: true })]);
   const credit = (test: (account: (typeof accounts)[number]) => boolean) => netOf(totals, accounts, test).neg();
   const debit = (test: (account: (typeof accounts)[number]) => boolean) => netOf(totals, accounts, test);
   const named = new Set(["SALES", "CHARGE_INCOME", "COGS", "INVENTORY_LOSS", "INVENTORY_GAIN", "OTHER_INCOME", "PPV"]);
@@ -396,7 +396,7 @@ export async function expenseDayReport(ctx: ReportCtx): Promise<ReportResult> {
   const lines = await prisma.$queryRaw<Array<{ id: string; journalId: string; accountId: string; amount: Prisma.Decimal | null; businessDate: Date; docType: string | null; docId: string | null; number: string | null; description: string | null }>>`
     SELECT l.id AS id, l.journalId AS journalId, l.accountId AS accountId, (l.debit - l.credit) AS amount, l.businessDate AS businessDate, j.docType AS docType, j.docId AS docId, j.number AS number, j.description AS description
     FROM journal_lines l
-    JOIN journals j ON j.id = l.journalId AND j.status = 'POSTED'
+    JOIN journals j ON j.id = l.journalId AND j.status = 'POSTED' AND (j.docType IS NULL OR j.docType <> 'YEAR_CLOSE')
     JOIN accounts a ON a.id = l.accountId
     JOIN account_groups g ON g.id = a.groupId AND g.code = ${GROUP.EXPENSE}
     WHERE l.organizationId = ${ctx.organizationId} ${lineBranches(ctx)} AND l.businessDate BETWEEN ${ctx.from} AND ${ctx.to}
@@ -417,7 +417,7 @@ export async function expenseDayReport(ctx: ReportCtx): Promise<ReportResult> {
     const account = name.get(row.line.accountId) ?? "";
     byAccount.set(account, (byAccount.get(account) ?? ZERO).plus(row.amount));
   }
-  const totals = await accountTotals(ctx, ctx.from, ctx.to);
+  const totals = await accountTotals(ctx, ctx.from, ctx.to, { excludeClose: true });
   const group = netOf(totals, accounts, (account) => account.group === GROUP.EXPENSE);
   const total = sumOf(rows, (row) => row.amount);
   const voucherLines = sumOf(rows.filter((row) => row.line.docType === "EXPENSE" && row.own), (row) => row.amount);

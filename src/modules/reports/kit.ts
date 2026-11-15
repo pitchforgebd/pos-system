@@ -71,11 +71,11 @@ export function docBranches(ctx: Pick<ReportCtx, "branchIds">) {
 export const day = (text: string) => new Date(`${text}T00:00:00.000Z`);
 
 /** Debit and credit of every account in the window (or up to and including a day when `from` is null), posted journals only. */
-export async function accountTotals(ctx: Pick<ReportCtx, "organizationId" | "branchIds">, from: string | null, to: string) {
+export async function accountTotals(ctx: Pick<ReportCtx, "organizationId" | "branchIds">, from: string | null, to: string, options: { excludeClose?: boolean } = {}) {
   const rows = await prisma.$queryRaw<Array<{ accountId: string; debit: Prisma.Decimal | null; credit: Prisma.Decimal | null }>>`
     SELECT l.accountId AS accountId, SUM(l.debit) AS debit, SUM(l.credit) AS credit
     FROM journal_lines l
-    JOIN journals j ON j.id = l.journalId AND j.status = 'POSTED'
+    JOIN journals j ON j.id = l.journalId AND j.status = 'POSTED' ${options.excludeClose ? Prisma.sql`AND (j.docType IS NULL OR j.docType <> 'YEAR_CLOSE')` : Prisma.empty}
     WHERE l.organizationId = ${ctx.organizationId} ${lineBranches(ctx)}
       AND l.businessDate <= ${to} ${from ? Prisma.sql`AND l.businessDate >= ${from}` : Prisma.empty}
     GROUP BY l.accountId

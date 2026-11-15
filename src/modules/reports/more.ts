@@ -33,7 +33,7 @@ async function monthlyTotals(ctx: ReportCtx, first: string, last: string) {
   const rows = await prisma.$queryRaw<Array<{ month: string; accountId: string; debit: Prisma.Decimal | null; credit: Prisma.Decimal | null }>>`
     SELECT DATE_FORMAT(l.businessDate, '%Y-%m') AS month, l.accountId AS accountId, SUM(l.debit) AS debit, SUM(l.credit) AS credit
     FROM journal_lines l
-    JOIN journals j ON j.id = l.journalId AND j.status = 'POSTED'
+    JOIN journals j ON j.id = l.journalId AND j.status = 'POSTED' AND (j.docType IS NULL OR j.docType <> 'YEAR_CLOSE')
     WHERE l.organizationId = ${ctx.organizationId} ${lineBranches(ctx)} AND l.businessDate BETWEEN ${`${first}-01`} AND ${monthEnd(last)}
     GROUP BY month, l.accountId
   `;
@@ -77,7 +77,7 @@ export async function monthlyProfit(ctx: ReportCtx): Promise<ReportResult> {
     ...PL_LINES.map((line) => ({ line: `${line.en} / ${line.bn}`, ...Object.fromEntries(list.map((month) => [month, money(line.value(accounts, now.get(month) ?? empty))])), total: money(line.value(accounts, all)), lastYear: money(line.value(accounts, before)) })),
     { line: "= Net profit / নিট লাভ", ...Object.fromEntries(list.map((month) => [month, money(netProfit(accounts, now.get(month) ?? empty))])), total: money(netProfit(accounts, all)), lastYear: money(netProfit(accounts, before)) },
   ];
-  const window = await accountTotals(ctx, `${list[0]}-01`, monthEnd(list[list.length - 1]));
+  const window = await accountTotals(ctx, `${list[0]}-01`, monthEnd(list[list.length - 1]), { excludeClose: true });
   return {
     key: "monthly-profit",
     title: t("Profit and loss by month", "মাসিক লাভ-ক্ষতি"),
