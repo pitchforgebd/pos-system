@@ -32,6 +32,15 @@ const LISTED = [
   "app/(dashboard)/sales/[id]/page.tsx",
   "app/(dashboard)/products/page.tsx",
   "components/catalog/product-photo.tsx",
+  "app/(dashboard)/sales/page.tsx",
+  "app/(dashboard)/sales/invoices/page.tsx",
+  "app/(dashboard)/sales/due-dates/page.tsx",
+  "app/(dashboard)/sales/returns/page.tsx",
+  "app/(dashboard)/pos/open-tickets/page.tsx",
+  "components/sales/sales-table.tsx",
+  "components/sales/ticket-list.tsx",
+  "components/returns/return-form.tsx",
+  "components/returns/receiptless-form.tsx",
 ];
 
 // words that are the same in both languages, brand names and technical terms

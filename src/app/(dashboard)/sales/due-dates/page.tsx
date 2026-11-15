@@ -1,33 +1,24 @@
 import Link from "next/link";
-import { dateOnly } from "@/core/time/business-date";
 import { redirect } from "next/navigation";
 
 import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/states";
+import { addDays, businessDate } from "@/core/time/business-date";
+import { titled } from "@/lib/i18n/metadata";
+import { getI18n } from "@/lib/i18n/server";
 import { getSession } from "@/modules/auth/current-session";
 import { dueSaleReport } from "@/modules/reports/reports";
 
-export const metadata = { title: "Due date invoices" };
+export const generateMetadata = titled("sales", "sales.dueTitle");
 
-const buckets = [
-  { id: "today", label: "Today" },
-  { id: "week", label: "This week" },
-  { id: "month", label: "This month" },
-  { id: "year", label: "This year" },
-] as const;
+const buckets = ["today", "week", "month", "year"] as const;
 
-function iso(date: Date) {
-  return dateOnly(date);
-}
-
+/** The days a bucket covers, counted in the shop's own (Dhaka) day. */
 function windowFor(bucket: string) {
-  const now = new Date();
-  const end = iso(now);
+  const end = businessDate();
   if (bucket === "week") {
-    const start = new Date(now);
-    start.setUTCDate(start.getUTCDate() - 6);
-    return { from: iso(start), to: end };
+    return { from: addDays(end, -6), to: end };
   }
   if (bucket === "month") {
     return { from: `${end.slice(0, 8)}01`, to: end };
@@ -43,8 +34,9 @@ export default async function DueDateInvoicesPage({ searchParams }: { searchPara
   if (!session?.branchId) {
     redirect("/login");
   }
+  const { t, taka, date } = await getI18n("sales");
   const query = await searchParams;
-  const bucket = buckets.some((item) => item.id === query.bucket) ? query.bucket! : "today";
+  const bucket = buckets.find((item) => item === query.bucket) ?? "today";
   const range = windowFor(bucket);
   const report = await dueSaleReport({
     organizationId: session.organizationId,
@@ -52,38 +44,39 @@ export default async function DueDateInvoicesPage({ searchParams }: { searchPara
     from: range.from,
     to: range.to,
   });
+  const label = { today: t("sales.dueToday"), week: t("sales.dueWeek"), month: t("sales.dueMonth"), year: t("sales.dueYear") } as const;
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Due Date Invoice"
-        description="Open dues on this branch. The date is the invoice date. A separate promise date is not stored. The latest 100 posted sales in the range are checked."
+        title={t("sales.dueTitle")}
+        description={t("sales.dueDescription")}
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Due Date Invoice" }]}
       />
       <div className="flex flex-wrap gap-2">
         {buckets.map((item) => (
           <Link
-            key={item.id}
-            href={`/sales/due-dates?bucket=${item.id}`}
-            className={`inline-flex h-9 items-center rounded-md px-3 text-sm ${item.id === bucket ? "bg-primary text-primary-foreground" : "border border-border"}`}
+            key={item}
+            href={`/sales/due-dates?bucket=${item}`}
+            className={`inline-flex h-9 items-center rounded-md px-3 text-sm ${item === bucket ? "bg-primary text-primary-foreground" : "border border-border"}`}
           >
-            {item.label}
+            {label[item]}
           </Link>
         ))}
       </div>
       <DataTable
-        caption="Open invoice dues"
+        caption={t("sales.dueCaption")}
         columns={[
-          { key: "date", header: "Invoice date", cell: (row) => row.businessDate },
-          { key: "number", header: "Invoice", cell: (row) => row.number },
-          { key: "party", header: "Customer", cell: (row) => row.party },
-          { key: "total", header: "Total", cell: (row) => row.total },
-          { key: "paid", header: "Paid", cell: (row) => row.cash },
-          { key: "due", header: "Due", cell: (row) => row.due },
+          { key: "date", header: t("sales.dueColDate"), cell: (row) => date(row.businessDate) },
+          { key: "number", header: t("sales.colInvoice"), cell: (row) => row.number },
+          { key: "party", header: t("sales.colCustomer"), cell: (row) => row.party },
+          { key: "total", header: t("sales.colTotal"), cell: (row) => taka(row.total) },
+          { key: "paid", header: t("sales.dueColPaid"), cell: (row) => taka(row.cash) },
+          { key: "due", header: t("sales.dueColDue"), cell: (row) => taka(row.due) },
         ]}
         rows={report.rows}
         getRowKey={(row) => row.id}
-        empty={<EmptyState title="No due invoices" description="A posted sale with an unpaid balance in this range appears here." />}
+        empty={<EmptyState title={t("sales.dueEmptyTitle")} description={t("sales.dueEmptyBody")} />}
       />
     </div>
   );

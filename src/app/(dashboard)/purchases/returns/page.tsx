@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { ReturnForm } from "@/components/returns/return-form";
+import { I18nBoundary } from "@/lib/i18n/server";
 import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/states";
@@ -27,7 +28,9 @@ export default async function PurchaseReturnsPage() {
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Purchases", href: "/purchases" }, { label: "Returns" }]}
       />
       {session.permissions.has("purchase.return") ? (
-        <ReturnForm lines={lines.map((line) => ({ documentId: line.purchaseId, itemId: line.itemId, label: line.label }))} kind="purchase" />
+        <I18nBoundary areas={["returns"]}>
+          <ReturnForm lines={lines.map((line) => ({ documentId: line.purchaseId, itemId: line.itemId, label: line.label }))} kind="purchase" />
+        </I18nBoundary>
       ) : null}
       <DataTable
         caption="Purchase returns"

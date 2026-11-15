@@ -7,12 +7,13 @@ import { errors } from "@/lib/i18n/messages/errors";
 import { pos } from "@/lib/i18n/messages/pos";
 import { products } from "@/lib/i18n/messages/products";
 import type { Area } from "@/lib/i18n/messages/define";
+import { returns } from "@/lib/i18n/messages/returns";
 import { sales } from "@/lib/i18n/messages/sales";
 import { shell } from "@/lib/i18n/messages/shell";
 
 // Every area of text. A new area is added here and nowhere else; the keys of all areas together are the type of `t`.
 
-export const areas = { common, shell, auth, errors, dashboard, pos, customers, sales, products } as const;
+export const areas = { common, shell, auth, errors, dashboard, pos, customers, sales, returns, products } as const;
 export type AreaName = keyof typeof areas;
 type KeysOf<A> = A extends Area<infer E> ? keyof E & string : never;
 export type MessageKey = KeysOf<(typeof areas)[AreaName]>;

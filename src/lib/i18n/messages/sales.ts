@@ -1,6 +1,7 @@
 import { area } from "@/lib/i18n/messages/define";
 
-// The sale page (the invoice and the receipt are printed from it; their own words are on the page, in both languages).
+// Sales: the list, the invoices, the due-date list, the sale page (the invoice and the receipt are printed from it; their own words are on the page,
+// in both languages), the held tickets.
 
 export const sales = area(
   {
@@ -22,6 +23,47 @@ export const sales = area(
     "sales.PAID": "Paid",
     "sales.PARTIAL": "Part paid",
     "sales.UNPAID": "Unpaid",
+
+    "sales.listTitle": "Sales",
+    "sales.listDescription": "Each posted sale decreases stock and writes the invoice and journal together.",
+    "sales.tableCaption": "Sales",
+    "sales.colInvoice": "Invoice",
+    "sales.colDate": "Date",
+    "sales.colCustomer": "Customer",
+    "sales.colTotal": "Total",
+    "sales.colStatus": "Status",
+    "sales.emptyTitle": "No sales",
+    "sales.emptyBody": "Post a sale from the register. The server recalculates the total.",
+    "sales.DRAFT": "Draft",
+    "sales.POSTED": "Posted",
+    "sales.CANCELLED": "Cancelled",
+
+    "sales.invoicesTitle": "Sold invoices",
+    "sales.invoicesDescription": "Invoice numbers allocated when the sale is posted.",
+    "sales.crumbInvoices": "Invoices",
+
+    "sales.dueTitle": "Due-date invoices",
+    "sales.dueDescription": "Open dues on this branch. The date is the invoice date. A separate promise date is not stored. The latest 100 posted sales in the range are checked.",
+    "sales.dueToday": "Today",
+    "sales.dueWeek": "This week",
+    "sales.dueMonth": "This month",
+    "sales.dueYear": "This year",
+    "sales.dueCaption": "Open invoice dues",
+    "sales.dueColDate": "Invoice date",
+    "sales.dueColPaid": "Paid",
+    "sales.dueColDue": "Due",
+    "sales.dueEmptyTitle": "No due invoices",
+    "sales.dueEmptyBody": "A posted sale with an unpaid balance in this range appears here.",
+
+    "sales.ticketsTitle": "Open tickets",
+    "sales.ticketsDescription": "A held ticket does not reserve stock and does not post a journal.",
+    "sales.ticketsBack": "Back to register",
+    "sales.ticketsEmptyTitle": "No open tickets",
+    "sales.ticketsEmptyBody": "Hold a cart on the register when the customer is not ready to pay.",
+    "sales.ticketLine": "{date} · {customer} · {lines} lines · preview {total}",
+    "sales.ticketResume": "Resume",
+    "sales.ticketDiscard": "Discard",
+    "sales.ticketDiscarded": "Ticket discarded.",
   },
   {
     "sales.fallback": "বিক্রি",
@@ -42,5 +84,46 @@ export const sales = area(
     "sales.PAID": "পরিশোধিত",
     "sales.PARTIAL": "আংশিক পরিশোধ",
     "sales.UNPAID": "অপরিশোধিত",
+
+    "sales.listTitle": "বিক্রি",
+    "sales.listDescription": "প্রতিটি পোস্ট করা বিক্রি স্টক কমায় এবং ইনভয়েস ও জার্নাল একসাথে লেখে।",
+    "sales.tableCaption": "বিক্রি",
+    "sales.colInvoice": "ইনভয়েস",
+    "sales.colDate": "তারিখ",
+    "sales.colCustomer": "কাস্টমার",
+    "sales.colTotal": "মোট",
+    "sales.colStatus": "অবস্থা",
+    "sales.emptyTitle": "কোনো বিক্রি নেই",
+    "sales.emptyBody": "রেজিস্টার থেকে বিক্রি করুন। মোট সার্ভার নিজে হিসাব করে।",
+    "sales.DRAFT": "খসড়া",
+    "sales.POSTED": "পোস্ট হয়েছে",
+    "sales.CANCELLED": "বাতিল",
+
+    "sales.invoicesTitle": "বিক্রির ইনভয়েস",
+    "sales.invoicesDescription": "বিক্রি পোস্ট হওয়ার সময় ইনভয়েস নম্বর দেওয়া হয়।",
+    "sales.crumbInvoices": "ইনভয়েস",
+
+    "sales.dueTitle": "বাকির তারিখ অনুযায়ী ইনভয়েস",
+    "sales.dueDescription": "এই শাখার খোলা বাকি। তারিখ মানে ইনভয়েসের তারিখ; আলাদা প্রতিশ্রুত তারিখ রাখা হয় না। সীমার মধ্যে সর্বশেষ ১০০টি পোস্ট করা বিক্রি দেখা হয়।",
+    "sales.dueToday": "আজ",
+    "sales.dueWeek": "এই সপ্তাহ",
+    "sales.dueMonth": "এই মাস",
+    "sales.dueYear": "এই বছর",
+    "sales.dueCaption": "খোলা ইনভয়েসের বাকি",
+    "sales.dueColDate": "ইনভয়েসের তারিখ",
+    "sales.dueColPaid": "পরিশোধ",
+    "sales.dueColDue": "বাকি",
+    "sales.dueEmptyTitle": "কোনো বাকি ইনভয়েস নেই",
+    "sales.dueEmptyBody": "এই সীমার মধ্যে যে পোস্ট করা বিক্রির টাকা বাকি, তা এখানে আসবে।",
+
+    "sales.ticketsTitle": "ওপেন টিকিট",
+    "sales.ticketsDescription": "হোল্ড করা টিকিটে স্টক আটকানো হয় না, জার্নালও পোস্ট হয় না।",
+    "sales.ticketsBack": "রেজিস্টারে ফিরুন",
+    "sales.ticketsEmptyTitle": "কোনো ওপেন টিকিট নেই",
+    "sales.ticketsEmptyBody": "কাস্টমার এখনই টাকা দিতে না পারলে রেজিস্টারে কার্ট হোল্ড করুন।",
+    "sales.ticketLine": "{date} · {customer} · {lines}টি লাইন · আনুমানিক {total}",
+    "sales.ticketResume": "চালিয়ে যান",
+    "sales.ticketDiscard": "বাতিল করুন",
+    "sales.ticketDiscarded": "টিকিট বাতিল হয়েছে।",
   },
 );
