@@ -17,10 +17,12 @@ import { prisma } from "@/lib/db/client";
 //   I8  no invoice or bill is settled for more than it put on the books, no receipt settles more than it was
 //   I16 the stock held for orders (reservedQty) is exactly what the active reservations add up to, and never more than is on hand
 //   I15 the trial balance balances, and assets = liabilities + equity + profit so far
+//   I19 each fixed asset's Fixed Assets lines add up to its cost while it is in use (nothing once it is sold or written off), and what
+//       its Accumulated Depreciation lines wrote off is between nothing and its cost less the value left at the end (P09)
 
 type Db = Prisma.TransactionClient | PrismaClient;
 
-export type Finding = { invariant: "I1" | "I2" | "I4" | "I6" | "I7" | "I8" | "I15" | "I16"; subject: string; message: string };
+export type Finding = { invariant: "I1" | "I2" | "I4" | "I6" | "I7" | "I8" | "I15" | "I16" | "I19"; subject: string; message: string };
 export type ReconcileResult = { findings: Finding[]; warnings: Finding[] };
 
 const dec = (value: unknown) => new Prisma.Decimal(String(value ?? 0));
@@ -221,6 +223,36 @@ async function inventoryAgainstStock(db: Db, organizationId: string): Promise<Fi
 }
 
 /** Everything that is off in an organization's books, as findings (they fail the check) and warnings (they do not). */
+async function fixedAssetsOffTheirLines(db: Db, organizationId: string): Promise<Finding[]> {
+  const rows = await db.$queryRaw<Array<{ code: string; status: string; cost: Prisma.Decimal | string; salvage: Prisma.Decimal | string; booked: Prisma.Decimal | string | null; written: Prisma.Decimal | string | null }>>`
+    SELECT f.code AS code, f.status AS status, f.cost AS cost, f.salvageValue AS salvage,
+      (SELECT SUM(l.debit - l.credit) FROM journal_lines l JOIN journals j ON j.id = l.journalId AND j.status = 'POSTED'
+        JOIN account_roles r ON r.organizationId = l.organizationId AND r.accountId = l.accountId AND r.role = 'FIXED_ASSET'
+        WHERE l.organizationId = f.organizationId AND l.assetId = f.id) AS booked,
+      (SELECT SUM(l.credit - l.debit) FROM journal_lines l JOIN journals j ON j.id = l.journalId AND j.status = 'POSTED'
+        JOIN account_roles r ON r.organizationId = l.organizationId AND r.accountId = l.accountId AND r.role = 'ACCUM_DEPR'
+        WHERE l.organizationId = f.organizationId AND l.assetId = f.id) AS written
+    FROM fixed_assets f
+    WHERE f.organizationId = ${organizationId}
+  `;
+  const found: Finding[] = [];
+  for (const row of rows) {
+    const cost = new Prisma.Decimal(row.cost);
+    const booked = new Prisma.Decimal(row.booked ?? 0);
+    const written = new Prisma.Decimal(row.written ?? 0);
+    const active = row.status === "ACTIVE";
+    const should = active ? cost : new Prisma.Decimal(0);
+    if (!booked.eq(should)) {
+      found.push({ invariant: "I19", subject: `fixed asset ${row.code}`, message: `Fixed Assets holds ${booked.toFixed(2)} for it, it should be ${should.toFixed(2)}` });
+    }
+    const most = active ? cost.minus(new Prisma.Decimal(row.salvage)) : new Prisma.Decimal(0);
+    if (written.isNeg() || written.gt(most)) {
+      found.push({ invariant: "I19", subject: `fixed asset ${row.code}`, message: `Accumulated Depreciation holds ${written.toFixed(2)} for it, it should be between 0.00 and ${most.toFixed(2)}` });
+    }
+  }
+  return found;
+}
+
 export async function reconcileBooks(db: Db, organizationId: string): Promise<ReconcileResult> {
   const findings: Finding[] = [
     ...(await journalsThatDoNotBalance(db, organizationId)),
@@ -230,6 +262,7 @@ export async function reconcileBooks(db: Db, organizationId: string): Promise<Re
     ...(await reservationsOffStock(db, organizationId)),
     ...(await allocationViolations(db, organizationId)).map((row) => ({ invariant: "I8" as const, subject: row.id, message: row.problem })),
     ...(await trialBalanceFindings(db, organizationId)),
+    ...(await fixedAssetsOffTheirLines(db, organizationId)),
   ];
   const warnings = await inventoryAgainstStock(db, organizationId);
   return { findings, warnings };

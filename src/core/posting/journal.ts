@@ -30,6 +30,10 @@ export type DocType =
   | "SHIPMENT"
   | "SHIFT_VARIANCE"
   | "EXPENSE_SETTLEMENT"
+  | "ASSET_PURCHASE"
+  | "ASSET_OPENING"
+  | "DEPRECIATION"
+  | "ASSET_DISPOSAL"
   | "CASH_MOVEMENT"
   | "SHIPMENT_RETURN"
   | "COURIER_SETTLEMENT"
@@ -212,7 +216,7 @@ async function checkInventory(tx: Db, plan: JournalPlan, accountIds: string[]) {
 }
 
 /** Postings that put cash in the books by themselves, with nobody at a till: they belong to no shift. */
-const NO_SHIFT: ReadonlySet<string> = new Set(["CASH_OPENING", "BANK_OPENING", "OPENING_RECLASS", "OPENING_STOCK", "STOCK_BOOKS_ADJUSTMENT", "LEGACY_ADVANCE", "JOURNAL"]);
+const NO_SHIFT: ReadonlySet<string> = new Set(["CASH_OPENING", "BANK_OPENING", "OPENING_RECLASS", "OPENING_STOCK", "STOCK_BOOKS_ADJUSTMENT", "LEGACY_ADVANCE", "JOURNAL", "ASSET_OPENING"]);
 
 /**
  * Which shift each line belongs to (P08, N7, D17). The cash a user takes or pays goes through their drawer: a line on a cash account with no

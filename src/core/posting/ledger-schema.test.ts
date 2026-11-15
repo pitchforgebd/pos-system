@@ -65,7 +65,10 @@ test("a document has one journal and its reversal is another: unique (docType, d
 test("a journal line carries its party, shift, branch, date and asset, and reads back as written", async () => {
   await withTestOrg(async (t) => {
     const partyId = randomUUID();
-    const assetId = randomUUID();
+    // An asset line names a real fixed asset (P09 added the foreign key).
+    const { id: assetId } = await prisma.fixedAsset.create({
+      data: { organizationId: t.org.id, branchId: t.branch.id, code: "FA-TEST", name: "Test asset", purchaseDate: new Date("2026-10-01T00:00:00.000Z"), cost: new Prisma.Decimal("12.50"), usefulLifeMonths: 12, depreciationStartMonth: "2026-10", depreciationMonths: 12, paidWith: "CASH" },
+    });
     const journal = await journalWithLine(t, { debit: "12.50", partyType: "CUSTOMER", partyId, assetId });
     const line = await prisma.journalLine.findFirstOrThrow({ where: { journalId: journal.id } });
     assert.deepEqual([line.partyType, line.partyId, line.assetId, line.branchId, line.shiftId], ["CUSTOMER", partyId, assetId, t.branch.id, null]);

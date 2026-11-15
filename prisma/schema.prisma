@@ -212,6 +212,27 @@ enum DocumentType {
   INC
   CAP
   LON
+  AST
+  DEP
+}
+
+/// What kind of thing a fixed asset is (P09).
+enum FixedAssetCategory {
+  VEHICLE
+  FURNITURE
+  COMPUTER
+  WAREHOUSE_EQUIPMENT
+  OTHER
+}
+
+enum DepreciationMethod {
+  STRAIGHT_LINE
+}
+
+/// ACTIVE: in use and depreciated each month; DISPOSED: sold or written off (#38).
+enum FixedAssetStatus {
+  ACTIVE
+  DISPOSED
 }
 
 enum ExpenseType {
@@ -316,150 +337,152 @@ enum ImportRowStatus {
 }
 
 model Organization {
-  id        String   @id @default(uuid()) @db.Char(36)
-  name      String   @db.VarChar(191)
-  slug      String   @unique @db.VarChar(64)
-  phone     String?  @db.VarChar(32)
-  address   String?  @db.VarChar(255)
-  bin       String?  @db.VarChar(32)
-  tin       String?  @db.VarChar(32)
-  logoUrl   String?  @db.VarChar(255)
-  pointsPerHundred Decimal? @db.Decimal(18, 4)
-  takaPerPoint     Decimal? @db.Decimal(18, 4)
+  id                   String       @id @default(uuid()) @db.Char(36)
+  name                 String       @db.VarChar(191)
+  slug                 String       @unique @db.VarChar(64)
+  phone                String?      @db.VarChar(32)
+  address              String?      @db.VarChar(255)
+  bin                  String?      @db.VarChar(32)
+  tin                  String?      @db.VarChar(32)
+  logoUrl              String?      @db.VarChar(255)
+  pointsPerHundred     Decimal?     @db.Decimal(18, 4)
+  takaPerPoint         Decimal?     @db.Decimal(18, 4)
   /// IANA time zone of the business day (N17). Documents and reports use this zone, never the server one.
-  timezone             String    @default("Asia/Dhaka") @db.VarChar(64)
+  timezone             String       @default("Asia/Dhaka") @db.VarChar(64)
   /// First month of the fiscal year (D9: July).
-  fiscalYearStartMonth Int       @default(7)
+  fiscalYearStartMonth Int          @default(7)
   /// No posting on or before this date (N9, invariant I11). Null means nothing is locked.
-  lockedThrough        DateTime? @db.Date
+  lockedThrough        DateTime?    @db.Date
   /// A posting dated further back than this many days needs the posting.backdate permission (D18).
-  backdateDays         Int       @default(3)
+  backdateDays         Int          @default(3)
   /// The most a sale may be discounted, in percent of what it would sell for (a line or the whole invoice).
-  maxDiscountPercent   Decimal   @default(100) @db.Decimal(5, 2)
+  maxDiscountPercent   Decimal      @default(100) @db.Decimal(5, 2)
   /// Loyalty points are earned on a sale only when this is on (D14: off in v2).
-  loyaltyEarn          Boolean   @default(false)
+  loyaltyEarn          Boolean      @default(false)
   /// A user may not take or pay cash without an active shift (D17). Off until the shop turns it on in Settings (the go-live checklist, P14).
-  requireShift         Boolean   @default(false)
-  status    RecordStatus @default(ACTIVE)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  requireShift         Boolean      @default(false)
+  status               RecordStatus @default(ACTIVE)
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
 
-  branches             Branch[]
-  salesOrders          SalesOrder[]
-  expenseCategories    ExpenseCategory[]
-  recurringExpenses    RecurringExpense[]
-  contraTransfers      ContraTransfer[]
-  paymentMethodCharges PaymentMethodCharge[]
-  shipmentEvents       ShipmentEvent[]
-  courierSettlements   CourierSettlement[]
+  branches               Branch[]
+  salesOrders            SalesOrder[]
+  expenseCategories      ExpenseCategory[]
+  recurringExpenses      RecurringExpense[]
+  contraTransfers        ContraTransfer[]
+  paymentMethodCharges   PaymentMethodCharge[]
+  fixedAssets            FixedAsset[]
+  depreciationRuns       DepreciationRun[]
+  shipmentEvents         ShipmentEvent[]
+  courierSettlements     CourierSettlement[]
   courierSettlementItems CourierSettlementItem[]
-  receiptlessReturns   ReceiptlessReturn[]
+  receiptlessReturns     ReceiptlessReturn[]
   receiptlessReturnItems ReceiptlessReturnItem[]
-  salesOrderItems      SalesOrderItem[]
-  orderEvents          OrderEvent[]
-  warehouses           Warehouse[]
-  racks                Rack[]
-  users                User[]
-  roles                Role[]
-  rolePermissions      RolePermission[]
-  userRoles            UserRole[]
-  userBranchAccess     UserBranchAccess[]
-  sessions             Session[]
-  passwordResets       PasswordReset[]
-  brands               Brand[]
-  categories           Category[]
-  units                Unit[]
-  products             Product[]
-  productVariants      ProductVariant[]
-  productImages        ProductImage[]
-  productBarcodes      ProductBarcode[]
-  productPrices        ProductPrice[]
-  variationHeads       VariationHead[]
-  variationValues      VariationValue[]
-  productVariantValues ProductVariantValue[]
-  stockBalances        StockBalance[]
-  stockLedgers         StockLedger[]
-  stockTransfers       StockTransfer[]
-  stockTransferItems   StockTransferItem[]
-  stockAdjustments     StockAdjustment[]
-  damageRecords        DamageRecord[]
-  expiryBatches        ExpiryBatch[]
-  priceLevels          PriceLevel[]
-  stockDocuments       StockDocument[]
-  stockReservations    StockReservation[]
-  supplierAdvances     SupplierAdvance[]
-  openingStocks        OpeningStock[]
-  ownStockInvoices     OwnStockInvoice[]
-  customers            Customer[]
-  customerTypes        CustomerType[]
-  customerAddresses    CustomerAddress[]
-  customerLedgers      CustomerLedger[]
-  customerPayments     CustomerPayment[]
-  customerAdvances     CustomerAdvance[]
-  installments         Installment[]
-  suppliers            Supplier[]
-  supplierLedgers      SupplierLedger[]
-  supplierPayments     SupplierPayment[]
-  sales                Sale[]
-  saleItems            SaleItem[]
-  salePayments         SalePayment[]
-  saleReturns          SaleReturn[]
-  saleReturnItems      SaleReturnItem[]
-  invoices             Invoice[]
-  heldTickets          HeldTicket[]
-  heldTicketItems      HeldTicketItem[]
-  purchases            Purchase[]
-  purchaseItems        PurchaseItem[]
-  purchasePayments     PurchasePayment[]
-  purchaseReturns      PurchaseReturn[]
-  purchaseReturnItems  PurchaseReturnItem[]
-  loyaltyTiers         LoyaltyTier[]
-  loyaltyCards         LoyaltyCard[]
-  loyaltyTransactions  LoyaltyTransaction[]
-  accountGroups        AccountGroup[]
-  accounts             Account[]
-  journals             Journal[]
-  journalLines         JournalLine[]
-  accountRoles         AccountRole[]
-  paymentAllocations   PaymentAllocation[]
-  vouchers             Voucher[]
-  expenses             Expense[]
-  incomes              Income[]
-  assets               Asset[]
-  liabilities          Liability[]
-  loans                Loan[]
-  capitalTransactions  CapitalTransaction[]
-  cashAccounts         CashAccount[]
-  bankAccounts         BankAccount[]
-  bankTransactions     BankTransaction[]
-  shifts               Shift[]
-  cashMovements        CashMovement[]
-  cashHandovers        CashHandover[]
-  smsTemplates         SmsTemplate[]
-  smsMessages          SmsMessage[]
-  smsLogs              SmsLog[]
-  smsRechargeRequests  SmsRechargeRequest[]
-  crmSegments          CrmSegment[]
-  crmContacts          CrmContact[]
-  crmActivities        CrmActivity[]
-  crmAssignments       CrmAssignment[]
-  settings             Setting[]
-  fileAssets           FileAsset[]
-  imports              Import[]
-  importRows           ImportRow[]
-  auditLogs            AuditLog[]
-  apiLogs              ApiLog[]
-  notificationLogs     NotificationLog[]
-  quotations           Quotation[]
-  requisitions         Requisition[]
-  quotationItems       QuotationItem[]
-  productSerials       ProductSerial[]
-  warrantyClaims       WarrantyClaim[]
-  couriers             Courier[]
-  shipments            Shipment[]
-  directReturns        DirectReturn[]
-  documentSequences    DocumentSequence[]
-  idempotencyKeys      IdempotencyKey[]
+  salesOrderItems        SalesOrderItem[]
+  orderEvents            OrderEvent[]
+  warehouses             Warehouse[]
+  racks                  Rack[]
+  users                  User[]
+  roles                  Role[]
+  rolePermissions        RolePermission[]
+  userRoles              UserRole[]
+  userBranchAccess       UserBranchAccess[]
+  sessions               Session[]
+  passwordResets         PasswordReset[]
+  brands                 Brand[]
+  categories             Category[]
+  units                  Unit[]
+  products               Product[]
+  productVariants        ProductVariant[]
+  productImages          ProductImage[]
+  productBarcodes        ProductBarcode[]
+  productPrices          ProductPrice[]
+  variationHeads         VariationHead[]
+  variationValues        VariationValue[]
+  productVariantValues   ProductVariantValue[]
+  stockBalances          StockBalance[]
+  stockLedgers           StockLedger[]
+  stockTransfers         StockTransfer[]
+  stockTransferItems     StockTransferItem[]
+  stockAdjustments       StockAdjustment[]
+  damageRecords          DamageRecord[]
+  expiryBatches          ExpiryBatch[]
+  priceLevels            PriceLevel[]
+  stockDocuments         StockDocument[]
+  stockReservations      StockReservation[]
+  supplierAdvances       SupplierAdvance[]
+  openingStocks          OpeningStock[]
+  ownStockInvoices       OwnStockInvoice[]
+  customers              Customer[]
+  customerTypes          CustomerType[]
+  customerAddresses      CustomerAddress[]
+  customerLedgers        CustomerLedger[]
+  customerPayments       CustomerPayment[]
+  customerAdvances       CustomerAdvance[]
+  installments           Installment[]
+  suppliers              Supplier[]
+  supplierLedgers        SupplierLedger[]
+  supplierPayments       SupplierPayment[]
+  sales                  Sale[]
+  saleItems              SaleItem[]
+  salePayments           SalePayment[]
+  saleReturns            SaleReturn[]
+  saleReturnItems        SaleReturnItem[]
+  invoices               Invoice[]
+  heldTickets            HeldTicket[]
+  heldTicketItems        HeldTicketItem[]
+  purchases              Purchase[]
+  purchaseItems          PurchaseItem[]
+  purchasePayments       PurchasePayment[]
+  purchaseReturns        PurchaseReturn[]
+  purchaseReturnItems    PurchaseReturnItem[]
+  loyaltyTiers           LoyaltyTier[]
+  loyaltyCards           LoyaltyCard[]
+  loyaltyTransactions    LoyaltyTransaction[]
+  accountGroups          AccountGroup[]
+  accounts               Account[]
+  journals               Journal[]
+  journalLines           JournalLine[]
+  accountRoles           AccountRole[]
+  paymentAllocations     PaymentAllocation[]
+  vouchers               Voucher[]
+  expenses               Expense[]
+  incomes                Income[]
+  assets                 Asset[]
+  liabilities            Liability[]
+  loans                  Loan[]
+  capitalTransactions    CapitalTransaction[]
+  cashAccounts           CashAccount[]
+  bankAccounts           BankAccount[]
+  bankTransactions       BankTransaction[]
+  shifts                 Shift[]
+  cashMovements          CashMovement[]
+  cashHandovers          CashHandover[]
+  smsTemplates           SmsTemplate[]
+  smsMessages            SmsMessage[]
+  smsLogs                SmsLog[]
+  smsRechargeRequests    SmsRechargeRequest[]
+  crmSegments            CrmSegment[]
+  crmContacts            CrmContact[]
+  crmActivities          CrmActivity[]
+  crmAssignments         CrmAssignment[]
+  settings               Setting[]
+  fileAssets             FileAsset[]
+  imports                Import[]
+  importRows             ImportRow[]
+  auditLogs              AuditLog[]
+  apiLogs                ApiLog[]
+  notificationLogs       NotificationLog[]
+  quotations             Quotation[]
+  requisitions           Requisition[]
+  quotationItems         QuotationItem[]
+  productSerials         ProductSerial[]
+  warrantyClaims         WarrantyClaim[]
+  couriers               Courier[]
+  shipments              Shipment[]
+  directReturns          DirectReturn[]
+  documentSequences      DocumentSequence[]
+  idempotencyKeys        IdempotencyKey[]
 
   @@map("organizations")
 }
@@ -474,53 +497,54 @@ model Branch {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  warehouses         Warehouse[]
-  racks              Rack[]
-  userAccess         UserBranchAccess[]
-  sessions           Session[]
-  stockBalances      StockBalance[]
-  salesOrders        SalesOrder[]
-  contraTransfers    ContraTransfer[]
-  courierSettlements CourierSettlement[]
-  receiptlessReturns ReceiptlessReturn[]
-  stockLedgers       StockLedger[]
-  transfersFrom      StockTransfer[]    @relation("TransferFromBranch")
-  transfersTo        StockTransfer[]    @relation("TransferToBranch")
-  stockAdjustments   StockAdjustment[]
-  damageRecords      DamageRecord[]
-  expiryBatches      ExpiryBatch[]
-  stockDocuments     StockDocument[]
-  supplierAdvances   SupplierAdvance[]
-  openingStocks      OpeningStock[]
-  ownStockInvoices   OwnStockInvoice[]
-  sales              Sale[]
-  saleReturns        SaleReturn[]
-  purchases          Purchase[]
-  purchaseReturns    PurchaseReturn[]
-  invoices           Invoice[]
-  heldTickets        HeldTicket[]
-  customerLedgers    CustomerLedger[]
-  customerPayments   CustomerPayment[]
-  customerAdvances   CustomerAdvance[]
-  supplierLedgers    SupplierLedger[]
-  supplierPayments   SupplierPayment[]
-  journals           Journal[]
-  journalLines       JournalLine[]
-  vouchers           Voucher[]
-  expenses           Expense[]
-  incomes            Income[]
+  organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  warehouses          Warehouse[]
+  racks               Rack[]
+  userAccess          UserBranchAccess[]
+  sessions            Session[]
+  stockBalances       StockBalance[]
+  salesOrders         SalesOrder[]
+  contraTransfers     ContraTransfer[]
+  fixedAssets         FixedAsset[]
+  courierSettlements  CourierSettlement[]
+  receiptlessReturns  ReceiptlessReturn[]
+  stockLedgers        StockLedger[]
+  transfersFrom       StockTransfer[]      @relation("TransferFromBranch")
+  transfersTo         StockTransfer[]      @relation("TransferToBranch")
+  stockAdjustments    StockAdjustment[]
+  damageRecords       DamageRecord[]
+  expiryBatches       ExpiryBatch[]
+  stockDocuments      StockDocument[]
+  supplierAdvances    SupplierAdvance[]
+  openingStocks       OpeningStock[]
+  ownStockInvoices    OwnStockInvoice[]
+  sales               Sale[]
+  saleReturns         SaleReturn[]
+  purchases           Purchase[]
+  purchaseReturns     PurchaseReturn[]
+  invoices            Invoice[]
+  heldTickets         HeldTicket[]
+  customerLedgers     CustomerLedger[]
+  customerPayments    CustomerPayment[]
+  customerAdvances    CustomerAdvance[]
+  supplierLedgers     SupplierLedger[]
+  supplierPayments    SupplierPayment[]
+  journals            Journal[]
+  journalLines        JournalLine[]
+  vouchers            Voucher[]
+  expenses            Expense[]
+  incomes             Income[]
   capitalTransactions CapitalTransaction[]
-  cashAccounts       CashAccount[]
-  bankAccounts       BankAccount[]
-  bankTransactions   BankTransaction[]
-  shifts             Shift[]
-  auditLogs          AuditLog[]
-  quotations         Quotation[]
-  requisitions       Requisition[]
-  warrantyClaims     WarrantyClaim[]
-  shipments          Shipment[]
-  directReturns      DirectReturn[]
+  cashAccounts        CashAccount[]
+  bankAccounts        BankAccount[]
+  bankTransactions    BankTransaction[]
+  shifts              Shift[]
+  auditLogs           AuditLog[]
+  quotations          Quotation[]
+  requisitions        Requisition[]
+  warrantyClaims      WarrantyClaim[]
+  shipments           Shipment[]
+  directReturns       DirectReturn[]
 
   @@index([organizationId])
   @@map("branches")
@@ -535,23 +559,23 @@ model Warehouse {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  branch           Branch            @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  racks            Rack[]
-  stockBalances    StockBalance[]
-  stockLedgers     StockLedger[]
-  expiryBatches    ExpiryBatch[]
-  stockDocuments   StockDocument[]
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  branch            Branch             @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  racks             Rack[]
+  stockBalances     StockBalance[]
+  stockLedgers      StockLedger[]
+  expiryBatches     ExpiryBatch[]
+  stockDocuments    StockDocument[]
   stockReservations StockReservation[]
-  serials          ProductSerial[]
-  transfersFrom    StockTransfer[]   @relation("TransferFromWarehouse")
-  transfersTo      StockTransfer[]   @relation("TransferToWarehouse")
-  stockAdjustments StockAdjustment[]
-  openingStocks    OpeningStock[]
-  ownStockInvoices OwnStockInvoice[]
-  sales            Sale[]
-  purchases        Purchase[]
-  directReturns    DirectReturn[]
+  serials           ProductSerial[]
+  transfersFrom     StockTransfer[]    @relation("TransferFromWarehouse")
+  transfersTo       StockTransfer[]    @relation("TransferToWarehouse")
+  stockAdjustments  StockAdjustment[]
+  openingStocks     OpeningStock[]
+  ownStockInvoices  OwnStockInvoice[]
+  sales             Sale[]
+  purchases         Purchase[]
+  directReturns     DirectReturn[]
 
   @@index([organizationId, branchId])
   @@map("warehouses")
@@ -586,37 +610,37 @@ model User {
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
-  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  roles             UserRole[]
-  branchAccess      UserBranchAccess[]
-  sessions          Session[]
-  passwordResets    PasswordReset[]
-  stockLedgers      StockLedger[]
-  damageRecords     DamageRecord[]
-  shifts            Shift[]
-  cashMovements     CashMovement[]
-  handoversFrom     CashHandover[]     @relation("HandoverFrom")
-  handoversTo       CashHandover[]     @relation("HandoverTo")
-  heldTickets       HeldTicket[]
-  auditLogs         AuditLog[]
-  apiLogs           ApiLog[]
-  idempotencyKeys   IdempotencyKey[]
-  crmAssignments    CrmAssignment[]
-  createdProducts   Product[]          @relation("ProductCreatedBy")
-  updatedProducts   Product[]          @relation("ProductUpdatedBy")
-  createdCustomers  Customer[]         @relation("CustomerCreatedBy")
-  updatedCustomers  Customer[]         @relation("CustomerUpdatedBy")
-  createdSuppliers  Supplier[]         @relation("SupplierCreatedBy")
-  updatedSuppliers  Supplier[]         @relation("SupplierUpdatedBy")
-  createdSales      Sale[]             @relation("SaleCreatedBy")
-  createdPurchases  Purchase[]         @relation("PurchaseCreatedBy")
-  createdJournals   Journal[]          @relation("JournalCreatedBy")
-  createdTransfers  StockTransfer[]    @relation("TransferCreatedBy")
-  createdQuotations Quotation[]        @relation("QuotationCreatedBy")
-  requestedRequisitions Requisition[]  @relation("RequisitionRequestedBy")
-  decidedRequisitions Requisition[]    @relation("RequisitionDecidedBy")
-  fileAssets        FileAsset[]
-  imports           Import[]
+  organization          Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  roles                 UserRole[]
+  branchAccess          UserBranchAccess[]
+  sessions              Session[]
+  passwordResets        PasswordReset[]
+  stockLedgers          StockLedger[]
+  damageRecords         DamageRecord[]
+  shifts                Shift[]
+  cashMovements         CashMovement[]
+  handoversFrom         CashHandover[]     @relation("HandoverFrom")
+  handoversTo           CashHandover[]     @relation("HandoverTo")
+  heldTickets           HeldTicket[]
+  auditLogs             AuditLog[]
+  apiLogs               ApiLog[]
+  idempotencyKeys       IdempotencyKey[]
+  crmAssignments        CrmAssignment[]
+  createdProducts       Product[]          @relation("ProductCreatedBy")
+  updatedProducts       Product[]          @relation("ProductUpdatedBy")
+  createdCustomers      Customer[]         @relation("CustomerCreatedBy")
+  updatedCustomers      Customer[]         @relation("CustomerUpdatedBy")
+  createdSuppliers      Supplier[]         @relation("SupplierCreatedBy")
+  updatedSuppliers      Supplier[]         @relation("SupplierUpdatedBy")
+  createdSales          Sale[]             @relation("SaleCreatedBy")
+  createdPurchases      Purchase[]         @relation("PurchaseCreatedBy")
+  createdJournals       Journal[]          @relation("JournalCreatedBy")
+  createdTransfers      StockTransfer[]    @relation("TransferCreatedBy")
+  createdQuotations     Quotation[]        @relation("QuotationCreatedBy")
+  requestedRequisitions Requisition[]      @relation("RequisitionRequestedBy")
+  decidedRequisitions   Requisition[]      @relation("RequisitionDecidedBy")
+  fileAssets            FileAsset[]
+  imports               Import[]
 
   @@unique([organizationId, email])
   @@index([email])
@@ -815,32 +839,32 @@ model Product {
   updatedAt         DateTime     @updatedAt
   deletedAt         DateTime?
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  brand        Brand?        @relation(fields: [brandId], references: [id], onDelete: Restrict)
-  category     Category?     @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  unit         Unit?         @relation(fields: [unitId], references: [id], onDelete: Restrict)
-  createdBy    User?         @relation("ProductCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  updatedBy    User?         @relation("ProductUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
-  variants     ProductVariant[]
-  images       ProductImage[]
-  salesOrderItems SalesOrderItem[]
+  organization           Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  brand                  Brand?                  @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  category               Category?               @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  unit                   Unit?                   @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  createdBy              User?                   @relation("ProductCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy              User?                   @relation("ProductUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  variants               ProductVariant[]
+  images                 ProductImage[]
+  salesOrderItems        SalesOrderItem[]
   receiptlessReturnItems ReceiptlessReturnItem[]
-  barcodes     ProductBarcode[]
-  prices       ProductPrice[]
-  balances     StockBalance[]
-  ledgers         StockLedger[]
-  saleItems       SaleItem[]
-  purchaseItems   PurchaseItem[]
-  heldTicketItems HeldTicketItem[]
-  transferItems   StockTransferItem[]
-  adjustments     StockAdjustment[]
-  damageRecords   DamageRecord[]
-  expiryBatches   ExpiryBatch[]
-  serials         ProductSerial[]
-  stockReservations StockReservation[]
-  quotationItems  QuotationItem[]
-  warrantyClaims  WarrantyClaim[]
-  directReturns   DirectReturn[]
+  barcodes               ProductBarcode[]
+  prices                 ProductPrice[]
+  balances               StockBalance[]
+  ledgers                StockLedger[]
+  saleItems              SaleItem[]
+  purchaseItems          PurchaseItem[]
+  heldTicketItems        HeldTicketItem[]
+  transferItems          StockTransferItem[]
+  adjustments            StockAdjustment[]
+  damageRecords          DamageRecord[]
+  expiryBatches          ExpiryBatch[]
+  serials                ProductSerial[]
+  stockReservations      StockReservation[]
+  quotationItems         QuotationItem[]
+  warrantyClaims         WarrantyClaim[]
+  directReturns          DirectReturn[]
 
   @@unique([organizationId, liveSku])
   @@unique([organizationId, slug])
@@ -858,7 +882,7 @@ model VariationHead {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   values       VariationValue[]
   assignments  ProductVariantValue[]
 
@@ -895,13 +919,13 @@ model ProductVariant {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  product      Product               @relation(fields: [productId], references: [id], onDelete: Restrict)
-  values       ProductVariantValue[]
-  images       ProductImage[]
-  barcodes     ProductBarcode[]
-  prices       ProductPrice[]
-  balances     StockBalance[]
+  organization    Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  product         Product               @relation(fields: [productId], references: [id], onDelete: Restrict)
+  values          ProductVariantValue[]
+  images          ProductImage[]
+  barcodes        ProductBarcode[]
+  prices          ProductPrice[]
+  balances        StockBalance[]
   ledgers         StockLedger[]
   saleItems       SaleItem[]
   purchaseItems   PurchaseItem[]
@@ -940,21 +964,21 @@ model ProductImage {
   fileAssetId    String   @db.Char(36)
   createdAt      DateTime @default(now())
 
-  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  product      Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  product      Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
   variant      ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
-  fileAsset    FileAsset      @relation(fields: [fileAssetId], references: [id], onDelete: Restrict)
+  fileAsset    FileAsset       @relation(fields: [fileAssetId], references: [id], onDelete: Restrict)
 
   @@index([organizationId, productId])
   @@map("product_images")
 }
 
 model ProductBarcode {
-  id             String  @id @default(uuid()) @db.Char(36)
-  organizationId String  @db.Char(36)
-  productId      String  @db.Char(36)
-  variantId      String? @db.Char(36)
-  barcode        String  @db.VarChar(64)
+  id             String   @id @default(uuid()) @db.Char(36)
+  organizationId String   @db.Char(36)
+  productId      String   @db.Char(36)
+  variantId      String?  @db.Char(36)
+  barcode        String   @db.VarChar(64)
   createdAt      DateTime @default(now())
 
   organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
@@ -1013,26 +1037,26 @@ model PriceLevel {
 }
 
 model StockBalance {
-  id             String  @id @default(uuid()) @db.Char(36)
-  organizationId String  @db.Char(36)
-  productId      String  @db.Char(36)
-  variantId      String? @db.Char(36)
+  id             String   @id @default(uuid()) @db.Char(36)
+  organizationId String   @db.Char(36)
+  productId      String   @db.Char(36)
+  variantId      String?  @db.Char(36)
   /// Empty string when there is no variant. MySQL unique indexes do not treat NULL as one value.
-  variantScope   String  @default("") @db.VarChar(36)
-  branchId       String  @db.Char(36)
-  warehouseId    String  @db.Char(36)
-  quantity       Decimal @db.Decimal(18, 4)
+  variantScope   String   @default("") @db.VarChar(36)
+  branchId       String   @db.Char(36)
+  warehouseId    String   @db.Char(36)
+  quantity       Decimal  @db.Decimal(18, 4)
   /// Held for confirmed orders (P06); never more than the quantity.
-  reservedQty    Decimal @default(0) @db.Decimal(18, 4)
+  reservedQty    Decimal  @default(0) @db.Decimal(18, 4)
   /// Moving-average unit cost of the stock on hand. Null until a stock-in with a cost arrives.
   averageCost    Decimal? @db.Decimal(18, 4)
   updatedAt      DateTime @updatedAt
 
-  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  product      Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  product      Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
   variant      ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
-  branch       Branch         @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  warehouse    Warehouse      @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  branch       Branch          @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  warehouse    Warehouse       @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
 
   @@unique([organizationId, productId, variantScope, branchId, warehouseId])
   @@index([organizationId, branchId])
@@ -1132,17 +1156,17 @@ model StockReservation {
 }
 
 model StockTransfer {
-  id               String         @id @default(uuid()) @db.Char(36)
-  organizationId   String         @db.Char(36)
-  number           String?        @db.VarChar(32)
-  fromBranchId     String         @db.Char(36)
-  toBranchId       String         @db.Char(36)
-  fromWarehouseId  String         @db.Char(36)
-  toWarehouseId    String         @db.Char(36)
-  status           TransferStatus @default(DRAFT)
-  createdById      String?        @db.Char(36)
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  id              String         @id @default(uuid()) @db.Char(36)
+  organizationId  String         @db.Char(36)
+  number          String?        @db.VarChar(32)
+  fromBranchId    String         @db.Char(36)
+  toBranchId      String         @db.Char(36)
+  fromWarehouseId String         @db.Char(36)
+  toWarehouseId   String         @db.Char(36)
+  status          TransferStatus @default(DRAFT)
+  createdById     String?        @db.Char(36)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   organization  Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   fromBranch    Branch              @relation("TransferFromBranch", fields: [fromBranchId], references: [id], onDelete: Restrict)
@@ -1165,9 +1189,9 @@ model StockTransferItem {
   variantId      String? @db.Char(36)
   quantity       Decimal @db.Decimal(18, 4)
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  transfer     StockTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
-  product      Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  transfer     StockTransfer   @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  product      Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
   variant      ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
 
   @@index([transferId])
@@ -1175,16 +1199,16 @@ model StockTransferItem {
 }
 
 model StockAdjustment {
-  id             String         @id @default(uuid()) @db.Char(36)
-  organizationId String         @db.Char(36)
-  branchId       String         @db.Char(36)
-  warehouseId    String         @db.Char(36)
-  productId      String         @db.Char(36)
-  variantId      String?        @db.Char(36)
-  quantity       Decimal        @db.Decimal(18, 4)
+  id             String    @id @default(uuid()) @db.Char(36)
+  organizationId String    @db.Char(36)
+  branchId       String    @db.Char(36)
+  warehouseId    String    @db.Char(36)
+  productId      String    @db.Char(36)
+  variantId      String?   @db.Char(36)
+  quantity       Decimal   @db.Decimal(18, 4)
   direction      Direction
-  reason         String         @db.VarChar(255)
-  createdAt      DateTime       @default(now())
+  reason         String    @db.VarChar(255)
+  createdAt      DateTime  @default(now())
 
   organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   branch       Branch          @relation(fields: [branchId], references: [id], onDelete: Restrict)
@@ -1201,7 +1225,7 @@ model DamageRecord {
   organizationId String   @db.Char(36)
   branchId       String   @db.Char(36)
   productId      String   @db.Char(36)
-  businessDate     DateTime @db.Date
+  businessDate   DateTime @db.Date
   place          String   @db.VarChar(191)
   lot            String?  @db.VarChar(64)
   purchasePrice  Decimal  @db.Decimal(18, 2)
@@ -1251,13 +1275,13 @@ model ExpiryBatch {
 }
 
 model OpeningStock {
-  id             String    @id @default(uuid()) @db.Char(36)
-  organizationId String    @db.Char(36)
-  branchId       String    @db.Char(36)
-  warehouseId    String    @db.Char(36)
-  number         String?   @db.VarChar(32)
-  businessDate     DateTime  @db.Date
-  createdAt      DateTime  @default(now())
+  id             String   @id @default(uuid()) @db.Char(36)
+  organizationId String   @db.Char(36)
+  branchId       String   @db.Char(36)
+  warehouseId    String   @db.Char(36)
+  number         String?  @db.VarChar(32)
+  businessDate   DateTime @db.Date
+  createdAt      DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   branch       Branch       @relation(fields: [branchId], references: [id], onDelete: Restrict)
@@ -1274,7 +1298,7 @@ model OwnStockInvoice {
   branchId       String   @db.Char(36)
   warehouseId    String   @db.Char(36)
   number         String?  @db.VarChar(32)
-  businessDate     DateTime @db.Date
+  businessDate   DateTime @db.Date
   createdAt      DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
@@ -1305,42 +1329,42 @@ model CustomerType {
 }
 
 model Customer {
-  id              String       @id @default(uuid()) @db.Char(36)
-  organizationId  String       @db.Char(36)
-  customerTypeId  String?      @db.Char(36)
-  name            String       @db.VarChar(191)
-  phone           String?      @db.VarChar(32)
-  email           String?      @db.VarChar(191)
-  address         String?      @db.VarChar(255)
-  openingBalance  Decimal      @default(0) @db.Decimal(18, 2)
-  creditLimit     Decimal?     @db.Decimal(18, 2)
-  paymentTerms    String?      @db.VarChar(64)
+  id             String       @id @default(uuid()) @db.Char(36)
+  organizationId String       @db.Char(36)
+  customerTypeId String?      @db.Char(36)
+  name           String       @db.VarChar(191)
+  phone          String?      @db.VarChar(32)
+  email          String?      @db.VarChar(191)
+  address        String?      @db.VarChar(255)
+  openingBalance Decimal      @default(0) @db.Decimal(18, 2)
+  creditLimit    Decimal?     @db.Decimal(18, 2)
+  paymentTerms   String?      @db.VarChar(64)
   /// The system customer every cash sale without a named customer is made to (Walk-in): all sales go through a receivable.
-  isSystem        Boolean      @default(false)
-  status          RecordStatus @default(ACTIVE)
-  createdById     String?      @db.Char(36)
-  updatedById     String?      @db.Char(36)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  isSystem       Boolean      @default(false)
+  status         RecordStatus @default(ACTIVE)
+  createdById    String?      @db.Char(36)
+  updatedById    String?      @db.Char(36)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
-  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  customerType CustomerType?     @relation(fields: [customerTypeId], references: [id], onDelete: Restrict)
-  createdBy    User?             @relation("CustomerCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  updatedBy    User?             @relation("CustomerUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
-  addresses    CustomerAddress[]
-  ledgers      CustomerLedger[]
-  payments     CustomerPayment[]
-  advances     CustomerAdvance[]
-  installments Installment[]
-  sales        Sale[]
-  invoices     Invoice[]
-  heldTickets  HeldTicket[]
-  loyaltyCards LoyaltyCard[]
+  organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  customerType        CustomerType?        @relation(fields: [customerTypeId], references: [id], onDelete: Restrict)
+  createdBy           User?                @relation("CustomerCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy           User?                @relation("CustomerUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  addresses           CustomerAddress[]
+  ledgers             CustomerLedger[]
+  payments            CustomerPayment[]
+  advances            CustomerAdvance[]
+  installments        Installment[]
+  sales               Sale[]
+  invoices            Invoice[]
+  heldTickets         HeldTicket[]
+  loyaltyCards        LoyaltyCard[]
   loyaltyTransactions LoyaltyTransaction[]
-  quotations   Quotation[]
-  salesOrders  SalesOrder[]
-  warrantyClaims WarrantyClaim[]
-  shipments    Shipment[]
+  quotations          Quotation[]
+  salesOrders         SalesOrder[]
+  warrantyClaims      WarrantyClaim[]
+  shipments           Shipment[]
 
   @@index([organizationId, name])
   @@index([organizationId, phone])
@@ -1368,7 +1392,7 @@ model CustomerLedger {
   organizationId String             @db.Char(36)
   branchId       String?            @db.Char(36)
   customerId     String             @db.Char(36)
-  businessDate     DateTime           @db.Date
+  businessDate   DateTime           @db.Date
   entryType      CustomerLedgerType
   debit          Decimal            @default(0) @db.Decimal(18, 2)
   credit         Decimal            @default(0) @db.Decimal(18, 2)
@@ -1390,7 +1414,7 @@ model CustomerPayment {
   branchId       String?  @db.Char(36)
   customerId     String   @db.Char(36)
   number         String?  @db.VarChar(32)
-  businessDate     DateTime @db.Date
+  businessDate   DateTime @db.Date
   method         String   @db.VarChar(32)
   amount         Decimal  @db.Decimal(18, 2)
   /// The cash, bank or mobile account the money came into.
@@ -1416,7 +1440,7 @@ model CustomerAdvance {
   organizationId String   @db.Char(36)
   branchId       String?  @db.Char(36)
   customerId     String   @db.Char(36)
-  businessDate     DateTime @db.Date
+  businessDate   DateTime @db.Date
   method         String   @db.VarChar(32)
   amount         Decimal  @db.Decimal(18, 2)
   journalId      String?  @unique @db.Char(36)
@@ -1432,16 +1456,16 @@ model CustomerAdvance {
 }
 
 model Installment {
-  id             String            @id @default(uuid()) @db.Char(36)
-  organizationId String            @db.Char(36)
-  customerId     String            @db.Char(36)
-  invoiceId      String            @db.Char(36)
+  id              String            @id @default(uuid()) @db.Char(36)
+  organizationId  String            @db.Char(36)
+  customerId      String            @db.Char(36)
+  invoiceId       String            @db.Char(36)
   amount          Decimal           @db.Decimal(18, 2)
   interestPercent Decimal?          @db.Decimal(8, 2)
   dueOn           DateTime          @db.Date
-  status         InstallmentStatus @default(OPEN)
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  status          InstallmentStatus @default(OPEN)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   customer     Customer     @relation(fields: [customerId], references: [id], onDelete: Restrict)
@@ -1467,9 +1491,9 @@ model Supplier {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  createdBy    User?            @relation("SupplierCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  updatedBy    User?            @relation("SupplierUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdBy    User?             @relation("SupplierCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy    User?             @relation("SupplierUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
   ledgers      SupplierLedger[]
   payments     SupplierPayment[]
   advances     SupplierAdvance[]
@@ -1484,7 +1508,7 @@ model SupplierLedger {
   organizationId String             @db.Char(36)
   branchId       String?            @db.Char(36)
   supplierId     String             @db.Char(36)
-  businessDate     DateTime           @db.Date
+  businessDate   DateTime           @db.Date
   entryType      SupplierLedgerType
   debit          Decimal            @default(0) @db.Decimal(18, 2)
   credit         Decimal            @default(0) @db.Decimal(18, 2)
@@ -1529,7 +1553,7 @@ model SupplierPayment {
   branchId       String?  @db.Char(36)
   supplierId     String   @db.Char(36)
   number         String?  @db.VarChar(32)
-  businessDate     DateTime @db.Date
+  businessDate   DateTime @db.Date
   method         String   @db.VarChar(32)
   /// The cash, bank or mobile account the money left from.
   accountId      String?  @db.Char(36)
@@ -1597,7 +1621,7 @@ model LoyaltyTransaction {
   cardId         String?          @db.Char(36)
   entryType      LoyaltyEntryType
   points         Decimal          @db.Decimal(18, 4)
-  businessDate     DateTime         @db.Date
+  businessDate   DateTime         @db.Date
   referenceType  String?          @db.VarChar(64)
   referenceId    String?          @db.Char(36)
   createdAt      DateTime         @default(now())
@@ -1629,23 +1653,23 @@ model Sale {
   vatTotal       Decimal        @default(0) @db.Decimal(18, 2)
   chargesTotal   Decimal        @default(0) @db.Decimal(18, 2)
   total          Decimal        @default(0) @db.Decimal(18, 2)
-  businessDate     DateTime       @db.Date
+  businessDate   DateTime       @db.Date
   createdById    String?        @db.Char(36)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  branch       Branch       @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  warehouse    Warehouse?   @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
-  customer     Customer?    @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  journal      Journal?     @relation("SaleJournal", fields: [journalId], references: [id], onDelete: Restrict)
-  createdBy    User?        @relation("SaleCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  branch       Branch              @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  warehouse    Warehouse?          @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  customer     Customer?           @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  journal      Journal?            @relation("SaleJournal", fields: [journalId], references: [id], onDelete: Restrict)
+  createdBy    User?               @relation("SaleCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   items        SaleItem[]
   payments     SalePayment[]
   returns      SaleReturn[]
   invoice      Invoice?
-  shipment     Shipment?     @relation("SaleShipment")
-  order        SalesOrder?   @relation("OrderInvoice", fields: [orderId], references: [id], onDelete: Restrict)
+  shipment     Shipment?           @relation("SaleShipment")
+  order        SalesOrder?         @relation("OrderInvoice", fields: [orderId], references: [id], onDelete: Restrict)
   quotation    Quotation?
   allocations  PaymentAllocation[]
   serials      ProductSerial[]
@@ -1656,13 +1680,13 @@ model Sale {
 }
 
 model SaleItem {
-  id             String  @id @default(uuid()) @db.Char(36)
-  organizationId String  @db.Char(36)
-  saleId         String  @db.Char(36)
-  productId      String  @db.Char(36)
-  variantId      String? @db.Char(36)
-  quantity       Decimal @db.Decimal(18, 4)
-  unitPrice      Decimal @db.Decimal(18, 2)
+  id             String   @id @default(uuid()) @db.Char(36)
+  organizationId String   @db.Char(36)
+  saleId         String   @db.Char(36)
+  productId      String   @db.Char(36)
+  variantId      String?  @db.Char(36)
+  quantity       Decimal  @db.Decimal(18, 4)
+  unitPrice      Decimal  @db.Decimal(18, 2)
   discountAmount Decimal? @db.Decimal(18, 2)
   priceLevelId   String?  @db.Char(36)
   /// What a unit cost when it was sold (the average then, four decimals).
@@ -1670,12 +1694,12 @@ model SaleItem {
   /// For an expiry-tracked product: the lots the sale took the stock from (lot, dates, quantity), so a return puts it back in the same lots.
   lots           Json?
   vatAmount      Decimal? @db.Decimal(18, 2)
-  lineTotal      Decimal @db.Decimal(18, 2)
+  lineTotal      Decimal  @db.Decimal(18, 2)
 
-  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  sale         Sale            @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  product      Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
-  variant      ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  sale         Sale             @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product      Product          @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variant      ProductVariant?  @relation(fields: [variantId], references: [id], onDelete: Restrict)
   returnItems  SaleReturnItem[]
 
   @@index([saleId])
@@ -1701,19 +1725,19 @@ model SalePayment {
 }
 
 model SaleReturn {
-  id             String         @id @default(uuid()) @db.Char(36)
-  organizationId String         @db.Char(36)
-  branchId       String         @db.Char(36)
-  saleId         String         @db.Char(36)
-  number         String?        @db.VarChar(32)
-  status         DocumentStatus @default(DRAFT)
-  businessDate     DateTime       @db.Date
-  total          Decimal        @default(0) @db.Decimal(18, 2)
-  refundMethod   RefundMethod?
-  refundAccountId String?       @db.Char(36)
-  journalId      String?        @unique @db.Char(36)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  id              String         @id @default(uuid()) @db.Char(36)
+  organizationId  String         @db.Char(36)
+  branchId        String         @db.Char(36)
+  saleId          String         @db.Char(36)
+  number          String?        @db.VarChar(32)
+  status          DocumentStatus @default(DRAFT)
+  businessDate    DateTime       @db.Date
+  total           Decimal        @default(0) @db.Decimal(18, 2)
+  refundMethod    RefundMethod?
+  refundAccountId String?        @db.Char(36)
+  journalId       String?        @unique @db.Char(36)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   branch       Branch           @relation(fields: [branchId], references: [id], onDelete: Restrict)
@@ -1769,18 +1793,18 @@ model Quotation {
   customerId     String          @db.Char(36)
   number         String          @db.VarChar(32)
   status         QuotationStatus @default(DRAFT)
-  businessDate     DateTime        @db.Date
+  businessDate   DateTime        @db.Date
   note           String?         @db.VarChar(255)
   saleId         String?         @unique @db.Char(36)
   createdById    String?         @db.Char(36)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  branch       Branch       @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  customer     Customer     @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  createdBy    User?        @relation("QuotationCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  sale         Sale?        @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  branch       Branch          @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  customer     Customer        @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  createdBy    User?           @relation("QuotationCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  sale         Sale?           @relation(fields: [saleId], references: [id], onDelete: Restrict)
   items        QuotationItem[]
 
   @@unique([organizationId, number])
@@ -1794,7 +1818,7 @@ model Requisition {
   branchId       String            @db.Char(36)
   number         String            @db.VarChar(32)
   status         RequisitionStatus @default(REQUESTED)
-  businessDate     DateTime          @db.Date
+  businessDate   DateTime          @db.Date
   note           String            @db.VarChar(255)
   requestedById  String            @db.Char(36)
   decidedById    String?           @db.Char(36)
@@ -1850,47 +1874,47 @@ model HeldTicketItem {
 }
 
 model Purchase {
-  id             String         @id @default(uuid()) @db.Char(36)
-  organizationId String         @db.Char(36)
-  branchId       String         @db.Char(36)
-  warehouseId    String?        @db.Char(36)
-  supplierId     String         @db.Char(36)
+  id                String         @id @default(uuid()) @db.Char(36)
+  organizationId    String         @db.Char(36)
+  branchId          String         @db.Char(36)
+  warehouseId       String?        @db.Char(36)
+  supplierId        String         @db.Char(36)
   /// Given when the purchase leaves DRAFT (ordered, or received at once), so draft work never leaves a gap in the numbers.
-  number         String?        @db.VarChar(32)
+  number            String?        @db.VarChar(32)
   /// The vendor's own invoice number.
-  supplierInvoiceNo String?     @db.VarChar(64)
-  journalId      String?        @unique @db.Char(36)
-  status         PurchaseStatus @default(DRAFT)
+  supplierInvoiceNo String?        @db.VarChar(64)
+  journalId         String?        @unique @db.Char(36)
+  status            PurchaseStatus @default(DRAFT)
   /// Sum of quantity x unit cost, before any discount.
-  subtotal       Decimal        @default(0) @db.Decimal(18, 2)
+  subtotal          Decimal        @default(0) @db.Decimal(18, 2)
   /// Line discounts plus the header discount.
-  discountTotal  Decimal        @default(0) @db.Decimal(18, 2)
-  headerDiscount Decimal        @default(0) @db.Decimal(18, 2)
-  vatTotal       Decimal        @default(0) @db.Decimal(18, 2)
+  discountTotal     Decimal        @default(0) @db.Decimal(18, 2)
+  headerDiscount    Decimal        @default(0) @db.Decimal(18, 2)
+  vatTotal          Decimal        @default(0) @db.Decimal(18, 2)
   /// What the purchase cost to bring in: haulage and labour/other costs (chargesTotal = transportCost + otherCost).
-  chargesTotal   Decimal        @default(0) @db.Decimal(18, 2)
-  transportCost  Decimal        @default(0) @db.Decimal(18, 2)
-  otherCost      Decimal        @default(0) @db.Decimal(18, 2)
+  chargesTotal      Decimal        @default(0) @db.Decimal(18, 2)
+  transportCost     Decimal        @default(0) @db.Decimal(18, 2)
+  otherCost         Decimal        @default(0) @db.Decimal(18, 2)
   /// What the vendor is owed for this bill: the goods less discounts, plus VAT (D2: the VAT is part of the cost). Not the haulage.
-  total          Decimal        @default(0) @db.Decimal(18, 2)
-  businessDate     DateTime       @db.Date
+  total             Decimal        @default(0) @db.Decimal(18, 2)
+  businessDate      DateTime       @db.Date
   /// The day the goods were received (the stock and the journal are dated by it).
-  receivedOn     DateTime?      @db.Date
+  receivedOn        DateTime?      @db.Date
   /// The carrier is a vendor too; the haulage and other costs are paid in cash or bank now (transportPaidWith) or owed to the carrier (CREDIT).
-  transporterId  String?        @db.Char(36)
-  vehicleNo      String?        @db.VarChar(32)
-  transportPaidWith String?     @db.VarChar(16)
-  note           String?        @db.VarChar(500)
-  createdById    String?        @db.Char(36)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  transporterId     String?        @db.Char(36)
+  vehicleNo         String?        @db.VarChar(32)
+  transportPaidWith String?        @db.VarChar(16)
+  note              String?        @db.VarChar(500)
+  createdById       String?        @db.Char(36)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 
-  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  branch       Branch            @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  warehouse    Warehouse?        @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
-  supplier     Supplier          @relation(fields: [supplierId], references: [id], onDelete: Restrict)
-  journal      Journal?          @relation("PurchaseJournal", fields: [journalId], references: [id], onDelete: Restrict)
-  createdBy    User?             @relation("PurchaseCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  branch       Branch              @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  warehouse    Warehouse?          @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  supplier     Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  journal      Journal?            @relation("PurchaseJournal", fields: [journalId], references: [id], onDelete: Restrict)
+  createdBy    User?               @relation("PurchaseCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   items        PurchaseItem[]
   allocations  PaymentAllocation[]
   payments     PurchasePayment[]
@@ -1903,33 +1927,33 @@ model Purchase {
 }
 
 model PurchaseItem {
-  id             String  @id @default(uuid()) @db.Char(36)
-  organizationId String  @db.Char(36)
-  purchaseId     String  @db.Char(36)
+  id             String    @id @default(uuid()) @db.Char(36)
+  organizationId String    @db.Char(36)
+  purchaseId     String    @db.Char(36)
   /// The line's place on the document (a list, a printed order, keeps the order the lines were typed in).
-  position       Int     @default(0)
-  productId      String  @db.Char(36)
-  variantId      String? @db.Char(36)
-  quantity       Decimal @db.Decimal(18, 4)
-  unitCost       Decimal @db.Decimal(18, 4)
+  position       Int       @default(0)
+  productId      String    @db.Char(36)
+  variantId      String?   @db.Char(36)
+  quantity       Decimal   @db.Decimal(18, 4)
+  unitCost       Decimal   @db.Decimal(18, 4)
   /// The line's discount (an amount) and VAT (a rate and the amount).
-  discount       Decimal @default(0) @db.Decimal(18, 2)
-  vatRate        Decimal @default(0) @db.Decimal(5, 2)
-  vatAmount      Decimal @default(0) @db.Decimal(18, 2)
+  discount       Decimal   @default(0) @db.Decimal(18, 2)
+  vatRate        Decimal   @default(0) @db.Decimal(5, 2)
+  vatAmount      Decimal   @default(0) @db.Decimal(18, 2)
   /// quantity x unit cost less the line discount.
-  lineTotal      Decimal @db.Decimal(18, 2)
+  lineTotal      Decimal   @db.Decimal(18, 2)
   /// What one unit cost to bring in: the line, its share of the header discount, its VAT and its share of the haulage (four decimals).
-  landedUnitCost Decimal? @db.Decimal(18, 4)
-  lot            String? @db.VarChar(64)
+  landedUnitCost Decimal?  @db.Decimal(18, 4)
+  lot            String?   @db.VarChar(64)
   manufacturedOn DateTime? @db.Date
   expiresOn      DateTime? @db.Date
   /// IMEIs or serial numbers that come in with the line, until it is received.
   serials        Json?
 
-  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  purchase     Purchase           @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  product      Product            @relation(fields: [productId], references: [id], onDelete: Restrict)
-  variant      ProductVariant?    @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  purchase     Purchase             @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  product      Product              @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variant      ProductVariant?      @relation(fields: [variantId], references: [id], onDelete: Restrict)
   returnItems  PurchaseReturnItem[]
 
   @@index([purchaseId])
@@ -1958,7 +1982,7 @@ model PurchaseReturn {
   purchaseId     String         @db.Char(36)
   number         String?        @db.VarChar(32)
   status         DocumentStatus @default(DRAFT)
-  businessDate     DateTime       @db.Date
+  businessDate   DateTime       @db.Date
   total          Decimal        @default(0) @db.Decimal(18, 2)
   journalId      String?        @unique @db.Char(36)
   createdAt      DateTime       @default(now())
@@ -2021,17 +2045,17 @@ model Account {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  organization     Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  group            AccountGroup         @relation(fields: [groupId], references: [id], onDelete: Restrict)
-  roles            AccountRole[]
-  lines            JournalLine[]
-  expenses         Expense[]
-  incomes          Income[]
-  assets           Asset[]
-  liabilities      Liability[]
-  loans            Loan[]
-  cashAccounts     CashAccount[]
-  bankAccounts     BankAccount[]
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  group        AccountGroup  @relation(fields: [groupId], references: [id], onDelete: Restrict)
+  roles        AccountRole[]
+  lines        JournalLine[]
+  expenses     Expense[]
+  incomes      Income[]
+  assets       Asset[]
+  liabilities  Liability[]
+  loans        Loan[]
+  cashAccounts CashAccount[]
+  bankAccounts BankAccount[]
 
   @@unique([organizationId, code])
   @@index([organizationId, groupId])
@@ -2043,7 +2067,7 @@ model Journal {
   organizationId String        @db.Char(36)
   branchId       String?       @db.Char(36)
   number         String?       @db.VarChar(32)
-  businessDate     DateTime      @db.Date
+  businessDate   DateTime      @db.Date
   status         JournalStatus @default(DRAFT)
   description    String?       @db.VarChar(255)
   postedAt       DateTime?
@@ -2056,28 +2080,28 @@ model Journal {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  branch         Branch?            @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  branch             Branch?             @relation(fields: [branchId], references: [id], onDelete: Restrict)
   paymentAllocations PaymentAllocation[]
-  stockDocument  StockDocument?
-  supplierAdvance SupplierAdvance? @relation("SupplierAdvanceJournal")
-  reversalOf     Journal?           @relation("JournalReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
-  reversals      Journal[]          @relation("JournalReversal")
-  createdBy      User?              @relation("JournalCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  lines          JournalLine[]
-  sale           Sale?              @relation("SaleJournal")
-  saleReturn     SaleReturn?        @relation("SaleReturnJournal")
-  purchase       Purchase?          @relation("PurchaseJournal")
-  purchaseReturn PurchaseReturn?    @relation("PurchaseReturnJournal")
-  customerPayment CustomerPayment?
-  customerAdvance CustomerAdvance?  @relation("AdvanceJournal")
-  supplierPayment SupplierPayment?  @relation("SupplierPaymentJournal")
-  voucher        Voucher?
-  expense        Expense?
-  income         Income?
+  stockDocument      StockDocument?
+  supplierAdvance    SupplierAdvance?    @relation("SupplierAdvanceJournal")
+  reversalOf         Journal?            @relation("JournalReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversals          Journal[]           @relation("JournalReversal")
+  createdBy          User?               @relation("JournalCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  lines              JournalLine[]
+  sale               Sale?               @relation("SaleJournal")
+  saleReturn         SaleReturn?         @relation("SaleReturnJournal")
+  purchase           Purchase?           @relation("PurchaseJournal")
+  purchaseReturn     PurchaseReturn?     @relation("PurchaseReturnJournal")
+  customerPayment    CustomerPayment?
+  customerAdvance    CustomerAdvance?    @relation("AdvanceJournal")
+  supplierPayment    SupplierPayment?    @relation("SupplierPaymentJournal")
+  voucher            Voucher?
+  expense            Expense?
+  income             Income?
   capitalTransaction CapitalTransaction?
-  bankTransaction BankTransaction?
-  directReturn    DirectReturn?
+  bankTransaction    BankTransaction?
+  directReturn       DirectReturn?
 
   @@unique([organizationId, number])
   @@unique([docType, docId, kind])
@@ -2087,35 +2111,37 @@ model Journal {
 }
 
 model JournalLine {
-  id             String   @id @default(uuid()) @db.Char(36)
-  organizationId String   @db.Char(36)
-  journalId      String   @db.Char(36)
-  accountId      String   @db.Char(36)
-  debit          Decimal  @default(0) @db.Decimal(18, 2)
-  credit         Decimal  @default(0) @db.Decimal(18, 2)
-  memo           String?  @db.VarChar(255)
+  id             String     @id @default(uuid()) @db.Char(36)
+  organizationId String     @db.Char(36)
+  journalId      String     @db.Char(36)
+  accountId      String     @db.Char(36)
+  debit          Decimal    @default(0) @db.Decimal(18, 2)
+  credit         Decimal    @default(0) @db.Decimal(18, 2)
+  memo           String?    @db.VarChar(255)
   /// Who the line is about. Receivable, payable, advance and courier lines carry a party; no other line does (I2).
   partyType      PartyType?
-  partyId        String?  @db.Char(36)
-  shiftId        String?  @db.Char(36)
-  branchId       String?  @db.Char(36)
+  partyId        String?    @db.Char(36)
+  shiftId        String?    @db.Char(36)
+  branchId       String?    @db.Char(36)
   /// Copied from the journal so reports can filter and group lines without a join.
-  businessDate   DateTime @db.Date
-  /// Set by the fixed-assets phase (P09); no foreign key until that table exists.
-  assetId        String?  @db.Char(36)
-  createdAt      DateTime @default(now())
+  businessDate   DateTime   @db.Date
+  /// The fixed asset a Fixed Assets, Accumulated Depreciation or Depreciation line is about (P09).
+  assetId        String?    @db.Char(36)
+  createdAt      DateTime   @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   journal      Journal      @relation(fields: [journalId], references: [id], onDelete: Cascade)
   account      Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
   shift        Shift?       @relation(fields: [shiftId], references: [id], onDelete: Restrict)
   branch       Branch?      @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  asset        FixedAsset?  @relation(fields: [assetId], references: [id], onDelete: Restrict)
 
   @@index([journalId])
   @@index([accountId, createdAt])
   @@index([organizationId, accountId, businessDate])
   @@index([organizationId, partyType, partyId, businessDate])
   @@index([shiftId])
+  @@index([assetId])
   @@map("journal_lines")
 }
 
@@ -2126,7 +2152,7 @@ model Voucher {
   number         String?       @db.VarChar(32)
   voucherType    VoucherType
   amount         Decimal       @db.Decimal(18, 2)
-  businessDate     DateTime      @db.Date
+  businessDate   DateTime      @db.Date
   status         JournalStatus @default(DRAFT)
   journalId      String?       @unique @db.Char(36)
   createdAt      DateTime      @default(now())
@@ -2142,39 +2168,39 @@ model Voucher {
 }
 
 model Expense {
-  id             String   @id @default(uuid()) @db.Char(36)
-  organizationId String   @db.Char(36)
-  branchId       String?  @db.Char(36)
-  accountId      String   @db.Char(36)
-  number         String?  @db.VarChar(32)
-  amount         Decimal  @db.Decimal(18, 2)
-  categoryId     String?  @db.Char(36)
-  status         ExpenseStatus @default(PAID)
+  id              String        @id @default(uuid()) @db.Char(36)
+  organizationId  String        @db.Char(36)
+  branchId        String?       @db.Char(36)
+  accountId       String        @db.Char(36)
+  number          String?       @db.VarChar(32)
+  amount          Decimal       @db.Decimal(18, 2)
+  categoryId      String?       @db.Char(36)
+  status          ExpenseStatus @default(PAID)
   /// The cash, bank or mobile account the money went out of.
-  moneyAccountId String?  @db.Char(36)
+  moneyAccountId  String?       @db.Char(36)
   /// What the bank or mobile service took on top (6600 / 6610).
-  charge         Decimal  @default(0) @db.Decimal(18, 2)
+  charge          Decimal       @default(0) @db.Decimal(18, 2)
   /// Which month the expense belongs to (YYYY-MM): October's rent paid in November.
-  periodMonth    String?  @db.VarChar(7)
-  recurringId    String?  @db.Char(36)
-  shiftId        String?  @db.Char(36)
+  periodMonth     String?       @db.VarChar(7)
+  recurringId     String?       @db.Char(36)
+  shiftId         String?       @db.Char(36)
   /// The journal that paid an accrued expense (Dr Accrued Expenses / Cr money).
-  settleJournalId String? @unique @db.Char(36)
-  settledOn      DateTime? @db.Date
-  businessDate     DateTime @db.Date
-  cashAccountId  String?  @db.Char(36)
-  bankAccountId  String?  @db.Char(36)
-  journalId      String?  @unique @db.Char(36)
-  note           String?  @db.VarChar(255)
-  createdAt      DateTime @default(now())
+  settleJournalId String?       @unique @db.Char(36)
+  settledOn       DateTime?     @db.Date
+  businessDate    DateTime      @db.Date
+  cashAccountId   String?       @db.Char(36)
+  bankAccountId   String?       @db.Char(36)
+  journalId       String?       @unique @db.Char(36)
+  note            String?       @db.VarChar(255)
+  createdAt       DateTime      @default(now())
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  branch       Branch?      @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  account      Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  branch       Branch?          @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  account      Account          @relation(fields: [accountId], references: [id], onDelete: Restrict)
   category     ExpenseCategory? @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  cashAccount  CashAccount? @relation(fields: [cashAccountId], references: [id], onDelete: Restrict)
-  bankAccount  BankAccount? @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
-  journal      Journal?     @relation(fields: [journalId], references: [id], onDelete: Restrict)
+  cashAccount  CashAccount?     @relation(fields: [cashAccountId], references: [id], onDelete: Restrict)
+  bankAccount  BankAccount?     @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
+  journal      Journal?         @relation(fields: [journalId], references: [id], onDelete: Restrict)
 
   @@unique([organizationId, number])
   @@unique([recurringId, periodMonth])
@@ -2190,7 +2216,7 @@ model Income {
   accountId      String   @db.Char(36)
   category       String?  @db.VarChar(64)
   amount         Decimal  @db.Decimal(18, 2)
-  businessDate     DateTime @db.Date
+  businessDate   DateTime @db.Date
   cashAccountId  String?  @db.Char(36)
   bankAccountId  String?  @db.Char(36)
   journalId      String?  @unique @db.Char(36)
@@ -2265,7 +2291,7 @@ model CapitalTransaction {
   capitalType    CapitalType
   ownerName      String      @db.VarChar(191)
   amount         Decimal     @db.Decimal(18, 2)
-  businessDate     DateTime    @db.Date
+  businessDate   DateTime    @db.Date
   journalId      String?     @unique @db.Char(36)
   createdAt      DateTime    @default(now())
 
@@ -2287,11 +2313,11 @@ model CashAccount {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  branch           Branch?          @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  account          Account          @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  branch           Branch?           @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  account          Account           @relation(fields: [accountId], references: [id], onDelete: Restrict)
   expenses         Expense[]
-  incomes          Income[]         @relation("IncomeCash")
+  incomes          Income[]          @relation("IncomeCash")
   bankTransactions BankTransaction[] @relation("TxnCash")
 
   @@index([organizationId, branchId])
@@ -2325,7 +2351,7 @@ model BankTransaction {
   branchId        String?                   @db.Char(36)
   transactionType AccountingTransactionType
   amount          Decimal                   @db.Decimal(18, 2)
-  businessDate      DateTime                  @db.Date
+  businessDate    DateTime                  @db.Date
   cashAccountId   String?                   @db.Char(36)
   bankAccountId   String?                   @db.Char(36)
   reference       String?                   @db.VarChar(64)
@@ -2344,29 +2370,29 @@ model BankTransaction {
 }
 
 model Shift {
-  id             String      @id @default(uuid()) @db.Char(36)
-  organizationId String      @db.Char(36)
-  branchId       String      @db.Char(36)
-  userId         String      @db.Char(36)
+  id                String      @id @default(uuid()) @db.Char(36)
+  organizationId    String      @db.Char(36)
+  branchId          String      @db.Char(36)
+  userId            String      @db.Char(36)
   /// The cash account the drawer is counted in (Cash in Hand unless the shop has others).
-  cashAccountId  String?     @db.Char(36)
+  cashAccountId     String?     @db.Char(36)
   /// The notes and coins counted, by value: {"1000": 2, "500": 1, ...}. Optional.
-  denominations  Json?
+  denominations     Json?
   /// The journal that put the short or over cash in the books when the shift was closed (#39).
-  varianceJournalId String?  @unique @db.Char(36)
-  status         ShiftStatus @default(OPEN)
-  openingCash    Decimal?    @db.Decimal(18, 2)
-  cashSales      Decimal?    @db.Decimal(18, 2)
-  cashIn         Decimal?    @db.Decimal(18, 2)
-  cashOut        Decimal?    @db.Decimal(18, 2)
-  refunds        Decimal?    @db.Decimal(18, 2)
-  expectedCash   Decimal?    @db.Decimal(18, 2)
-  actualCash     Decimal?    @db.Decimal(18, 2)
-  difference     Decimal?    @db.Decimal(18, 2)
-  openedAt       DateTime    @default(now())
-  closedAt       DateTime?
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  varianceJournalId String?     @unique @db.Char(36)
+  status            ShiftStatus @default(OPEN)
+  openingCash       Decimal?    @db.Decimal(18, 2)
+  cashSales         Decimal?    @db.Decimal(18, 2)
+  cashIn            Decimal?    @db.Decimal(18, 2)
+  cashOut           Decimal?    @db.Decimal(18, 2)
+  refunds           Decimal?    @db.Decimal(18, 2)
+  expectedCash      Decimal?    @db.Decimal(18, 2)
+  actualCash        Decimal?    @db.Decimal(18, 2)
+  difference        Decimal?    @db.Decimal(18, 2)
+  openedAt          DateTime    @default(now())
+  closedAt          DateTime?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
 
   organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   branch       Branch         @relation(fields: [branchId], references: [id], onDelete: Restrict)
@@ -2380,14 +2406,14 @@ model Shift {
 }
 
 model CashMovement {
-  id             String         @id @default(uuid()) @db.Char(36)
-  organizationId String         @db.Char(36)
-  shiftId        String         @db.Char(36)
+  id             String    @id @default(uuid()) @db.Char(36)
+  organizationId String    @db.Char(36)
+  shiftId        String    @db.Char(36)
   direction      Direction
-  amount         Decimal        @db.Decimal(18, 2)
-  reason         String?        @db.VarChar(255)
-  userId         String         @db.Char(36)
-  createdAt      DateTime       @default(now())
+  amount         Decimal   @db.Decimal(18, 2)
+  reason         String?   @db.VarChar(255)
+  userId         String    @db.Char(36)
+  createdAt      DateTime  @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   shift        Shift        @relation(fields: [shiftId], references: [id], onDelete: Restrict)
@@ -2502,8 +2528,8 @@ model CrmContact {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  segment      CrmSegment?      @relation(fields: [segmentId], references: [id], onDelete: Restrict)
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  segment      CrmSegment?     @relation(fields: [segmentId], references: [id], onDelete: Restrict)
   activities   CrmActivity[]
   assignments  CrmAssignment[]
 
@@ -2515,7 +2541,7 @@ model CrmActivity {
   id             String   @id @default(uuid()) @db.Char(36)
   organizationId String   @db.Char(36)
   contactId      String   @db.Char(36)
-  businessDate     DateTime @db.Date
+  businessDate   DateTime @db.Date
   note           String   @db.VarChar(255)
   createdAt      DateTime @default(now())
 
@@ -2527,10 +2553,10 @@ model CrmActivity {
 }
 
 model CrmAssignment {
-  id             String @id @default(uuid()) @db.Char(36)
-  organizationId String @db.Char(36)
-  contactId      String @db.Char(36)
-  userId         String @db.Char(36)
+  id             String   @id @default(uuid()) @db.Char(36)
+  organizationId String   @db.Char(36)
+  contactId      String   @db.Char(36)
+  userId         String   @db.Char(36)
   createdAt      DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
@@ -2759,18 +2785,18 @@ model QuotationItem {
 }
 
 model ProductSerial {
-  id             String  @id @default(uuid()) @db.Char(36)
-  organizationId String  @db.Char(36)
-  productId      String  @db.Char(36)
-  variantId      String? @db.Char(36)
+  id             String       @id @default(uuid()) @db.Char(36)
+  organizationId String       @db.Char(36)
+  productId      String       @db.Char(36)
+  variantId      String?      @db.Char(36)
   /// Where the unit is (a sale only takes a serial that is in the warehouse it sells from).
-  warehouseId    String? @db.Char(36)
-  serial         String  @db.VarChar(64)
+  warehouseId    String?      @db.Char(36)
+  serial         String       @db.VarChar(64)
   status         SerialStatus @default(IN_STOCK)
-  saleId         String? @db.Char(36)
+  saleId         String?      @db.Char(36)
   /// The stock ledger row that brought the unit in (a purchase or an opening): serials are added on stock-in only.
-  inMovementId   String? @db.Char(36)
-  createdAt      DateTime @default(now())
+  inMovementId   String?      @db.Char(36)
+  createdAt      DateTime     @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   product      Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
@@ -2803,21 +2829,21 @@ model WarrantyClaim {
 }
 
 model Courier {
-  id             String       @id @default(uuid()) @db.Char(36)
-  organizationId String       @db.Char(36)
-  name           String       @db.VarChar(191)
-  phone          String?      @db.VarChar(32)
-  status         RecordStatus @default(ACTIVE)
+  id                      String       @id @default(uuid()) @db.Char(36)
+  organizationId          String       @db.Char(36)
+  name                    String       @db.VarChar(191)
+  phone                   String?      @db.VarChar(32)
+  status                  RecordStatus @default(ACTIVE)
   /// What the courier keeps of the cash it collects (condition charge), in percent; a shipment may change it.
-  defaultConditionPercent Decimal @default(0) @db.Decimal(5, 2)
+  defaultConditionPercent Decimal      @default(0) @db.Decimal(5, 2)
   /// What the courier charges to deliver a parcel, inside Dhaka and outside it.
-  defaultDeliveryCharge   Decimal @default(0) @db.Decimal(18, 2)
-  outsideDeliveryCharge   Decimal @default(0) @db.Decimal(18, 2)
+  defaultDeliveryCharge   Decimal      @default(0) @db.Decimal(18, 2)
+  outsideDeliveryCharge   Decimal      @default(0) @db.Decimal(18, 2)
   /// The courier's own system (Steadfast, ...) when one is connected; empty for entries by hand (D13).
-  apiProvider    String?      @db.VarChar(32)
-  createdAt      DateTime     @default(now())
+  apiProvider             String?      @db.VarChar(32)
+  createdAt               DateTime     @default(now())
 
-  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   shipments    Shipment[]
   settlements  CourierSettlement[]
 
@@ -2828,48 +2854,48 @@ model Courier {
 /// A sale's delivery (P07, feature 7): by the shop's own vehicle or by a courier, which collects the customer's cash on delivery (COD) and
 /// owes it to the shop until it settles. The money is in the books as the courier's receivable (account 1350).
 model Shipment {
-  id             String         @id @default(uuid()) @db.Char(36)
-  organizationId String         @db.Char(36)
-  branchId       String         @db.Char(36)
+  id                String         @id @default(uuid()) @db.Char(36)
+  organizationId    String         @db.Char(36)
+  branchId          String         @db.Char(36)
   /// SHP-..., taken when the shipment is made.
-  number         String?        @db.VarChar(32)
-  saleId         String?        @unique @db.Char(36)
-  orderId        String?        @db.Char(36)
-  method         DeliveryMethod @default(COURIER)
-  courierId      String?        @db.Char(36)
-  customerId     String?        @db.Char(36)
-  reference      String?        @db.VarChar(64)
-  trackingCode   String?        @db.VarChar(64)
-  vehicleNo      String?        @db.VarChar(32)
-  driverName     String?        @db.VarChar(191)
-  driverPhone    String?        @db.VarChar(32)
-  address        String?        @db.VarChar(255)
-  status         ShipmentStatus @default(CREATED)
+  number            String?        @db.VarChar(32)
+  saleId            String?        @unique @db.Char(36)
+  orderId           String?        @db.Char(36)
+  method            DeliveryMethod @default(COURIER)
+  courierId         String?        @db.Char(36)
+  customerId        String?        @db.Char(36)
+  reference         String?        @db.VarChar(64)
+  trackingCode      String?        @db.VarChar(64)
+  vehicleNo         String?        @db.VarChar(32)
+  driverName        String?        @db.VarChar(191)
+  driverPhone       String?        @db.VarChar(32)
+  address           String?        @db.VarChar(255)
+  status            ShipmentStatus @default(CREATED)
   /// The cash the courier collects from the customer: what was still owed on the invoice when it was handed over.
-  codAmount      Decimal        @default(0) @db.Decimal(18, 2)
+  codAmount         Decimal        @default(0) @db.Decimal(18, 2)
   /// What the courier (or the vehicle) charges for the delivery: an expense (6700).
-  deliveryCharge Decimal        @default(0) @db.Decimal(18, 2)
-  conditionPercent Decimal      @default(0) @db.Decimal(5, 2)
+  deliveryCharge    Decimal        @default(0) @db.Decimal(18, 2)
+  conditionPercent  Decimal        @default(0) @db.Decimal(5, 2)
   /// What the courier keeps of the COD (6710).
-  conditionCharge Decimal       @default(0) @db.Decimal(18, 2)
+  conditionCharge   Decimal        @default(0) @db.Decimal(18, 2)
   /// Charged on a parcel that came back (6700).
-  returnCharge   Decimal        @default(0) @db.Decimal(18, 2)
+  returnCharge      Decimal        @default(0) @db.Decimal(18, 2)
   /// How the delivery charge is paid: DEDUCT (kept out of the settlement), CASH or BANK (paid now).
-  deliveryPaidWith String?      @db.VarChar(8)
-  deliveryAccountId String?     @db.Char(36)
-  dispatchedOn   DateTime?      @db.Date
-  deliveredOn    DateTime?      @db.Date
-  returnedOn     DateTime?      @db.Date
-  journalId      String?        @unique @db.Char(36)
-  createdById    String?        @db.Char(36)
-  createdAt      DateTime       @default(now())
+  deliveryPaidWith  String?        @db.VarChar(8)
+  deliveryAccountId String?        @db.Char(36)
+  dispatchedOn      DateTime?      @db.Date
+  deliveredOn       DateTime?      @db.Date
+  returnedOn        DateTime?      @db.Date
+  journalId         String?        @unique @db.Char(36)
+  createdById       String?        @db.Char(36)
+  createdAt         DateTime       @default(now())
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  branch       Branch        @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  courier      Courier?      @relation(fields: [courierId], references: [id], onDelete: Restrict)
-  customer     Customer?     @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  sale         Sale?         @relation("SaleShipment", fields: [saleId], references: [id], onDelete: Restrict)
-  events       ShipmentEvent[]
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  branch         Branch                 @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  courier        Courier?               @relation(fields: [courierId], references: [id], onDelete: Restrict)
+  customer       Customer?              @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  sale           Sale?                  @relation("SaleShipment", fields: [saleId], references: [id], onDelete: Restrict)
+  events         ShipmentEvent[]
   settlementItem CourierSettlementItem?
 
   @@unique([organizationId, number])
@@ -2919,9 +2945,9 @@ model CourierSettlement {
   createdById      String?  @db.Char(36)
   createdAt        DateTime @default(now())
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  branch       Branch       @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  courier      Courier      @relation(fields: [courierId], references: [id], onDelete: Restrict)
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  branch       Branch                  @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  courier      Courier                 @relation(fields: [courierId], references: [id], onDelete: Restrict)
   items        CourierSettlementItem[]
 
   @@unique([organizationId, number])
@@ -2930,16 +2956,16 @@ model CourierSettlement {
 }
 
 model CourierSettlementItem {
-  id             String  @id @default(uuid()) @db.Char(36)
-  organizationId String  @db.Char(36)
-  settlementId   String  @db.Char(36)
+  id              String  @id @default(uuid()) @db.Char(36)
+  organizationId  String  @db.Char(36)
+  settlementId    String  @db.Char(36)
   /// A shipment can be settled once: this is unique.
-  shipmentId     String  @unique @db.Char(36)
-  codAmount      Decimal @default(0) @db.Decimal(18, 2)
-  deliveryCharge Decimal @default(0) @db.Decimal(18, 2)
+  shipmentId      String  @unique @db.Char(36)
+  codAmount       Decimal @default(0) @db.Decimal(18, 2)
+  deliveryCharge  Decimal @default(0) @db.Decimal(18, 2)
   conditionCharge Decimal @default(0) @db.Decimal(18, 2)
   /// What this shipment settles on the courier's account: cod - charges (a returned parcel: minus what is owed back for it).
-  amount         Decimal @default(0) @db.Decimal(18, 2)
+  amount          Decimal @default(0) @db.Decimal(18, 2)
 
   organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   settlement   CourierSettlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
@@ -2960,7 +2986,7 @@ model DirectReturn {
   refundAmount   Decimal  @db.Decimal(18, 2)
   method         String   @db.VarChar(16)
   journalId      String?  @unique @db.Char(36)
-  businessDate     DateTime @db.Date
+  businessDate   DateTime @db.Date
   createdAt      DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
@@ -3084,8 +3110,8 @@ model ReceiptlessReturn {
   journalId       String?      @unique @db.Char(36)
   createdAt       DateTime     @default(now())
 
-  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  branch       Branch                @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  branch       Branch                  @relation(fields: [branchId], references: [id], onDelete: Restrict)
   items        ReceiptlessReturnItem[]
 
   @@unique([organizationId, number])
@@ -3193,4 +3219,69 @@ model PaymentMethodCharge {
 
   @@unique([organizationId, accountId])
   @@map("payment_method_charges")
+}
+
+/// A fixed asset of the shop (P09, feature 5): a vehicle, furniture, a computer ... Its cost sits on Fixed Assets and what has been written off on
+/// Accumulated Depreciation, both on lines that carry the asset's id; the register's figures are read from those lines.
+model FixedAsset {
+  id                     String             @id @default(uuid()) @db.Char(36)
+  organizationId         String             @db.Char(36)
+  branchId               String             @db.Char(36)
+  code                   String             @db.VarChar(32)
+  name                   String             @db.VarChar(191)
+  category               FixedAssetCategory @default(OTHER)
+  purchaseDate           DateTime           @db.Date
+  cost                   Decimal            @db.Decimal(18, 2)
+  salvageValue           Decimal            @default(0) @db.Decimal(18, 2)
+  usefulLifeMonths       Int
+  method                 DepreciationMethod @default(STRAIGHT_LINE)
+  location               String?            @db.VarChar(191)
+  note                   String?            @db.VarChar(255)
+  status                 FixedAssetStatus   @default(ACTIVE)
+  /// An asset the shop already had when it started using the system: its cost and what was written off before go in as an opening entry.
+  isOpening              Boolean            @default(false)
+  /// What was written off before the system (opening assets only).
+  openingDepreciation    Decimal            @default(0) @db.Decimal(18, 2)
+  /// The first month depreciated (YYYY-MM) and over how many months what is left is written off from then.
+  depreciationStartMonth String             @db.VarChar(7)
+  depreciationMonths     Int
+  /// CASH, BANK, MOBILE (the account paid from), CREDIT (owed to the vendor) or OPENING.
+  paidWith               String             @db.VarChar(16)
+  moneyAccountId         String?            @db.Char(36)
+  vendorId               String?            @db.Char(36)
+  journalId              String?            @unique @db.Char(36)
+  disposedOn             DateTime?          @db.Date
+  disposalAmount         Decimal?           @db.Decimal(18, 2)
+  disposalAccountId      String?            @db.Char(36)
+  disposalJournalId      String?            @unique @db.Char(36)
+  disposalNote           String?            @db.VarChar(255)
+  createdById            String?            @db.Char(36)
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  branch       Branch        @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  lines        JournalLine[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, status])
+  @@map("fixed_assets")
+}
+
+/// One month's depreciation (#37, D8): one journal for every active asset. A month is depreciated once.
+model DepreciationRun {
+  id             String   @id @default(uuid()) @db.Char(36)
+  organizationId String   @db.Char(36)
+  /// YYYY-MM
+  month          String   @db.VarChar(7)
+  journalId      String   @unique @db.Char(36)
+  total          Decimal  @db.Decimal(18, 2)
+  assetCount     Int
+  createdById    String?  @db.Char(36)
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, month])
+  @@map("depreciation_runs")
 }
