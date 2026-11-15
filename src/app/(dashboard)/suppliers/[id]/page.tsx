@@ -72,7 +72,7 @@ export default async function SupplierDetailPage({ params, searchParams }: { par
           <dd className="text-lg font-semibold tabular-nums">{supplier.totalPurchases}</dd>
         </div>
       </dl>
-      {supplier.bankDetails ? <p className="text-sm text-muted">Bank: {supplier.bankDetails}</p> : null}
+      {supplier.bankDetails ? <p className="text-sm text-muted">{`Bank: ${supplier.bankDetails}`}</p> : null}
       {editing && places ? (
         <section className="space-y-3" aria-label="Edit vendor">
           <h2 className="text-lg font-semibold">Edit</h2>

@@ -59,7 +59,7 @@ export default async function CustomerDetailPage({ params, searchParams }: { par
         <Figure label="Last bought" value={customer.summary.lastPurchase ?? "Never"} />
         <Figure label="Credit limit" value={customer.creditLimit ?? "None"} />
       </dl>
-      {customer.tags ? <p className="text-sm text-muted">Tags: {customer.tags}</p> : null}
+      {customer.tags ? <p className="text-sm text-muted">{`Tags: ${customer.tags}`}</p> : null}
 
       {editing && places ? (
         <section className="space-y-3" aria-label="Edit customer">
