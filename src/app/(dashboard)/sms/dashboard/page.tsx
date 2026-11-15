@@ -19,7 +19,7 @@ export default async function SmsDashboardPage() {
     <div className="space-y-6">
       <PageHeader
         title="SMS dashboard"
-        description="Sent counts use UTC. This shop does not buy SMS credit inside the app."
+        description="Sent counts use UTC. What is left on the SMS account is what the provider says, when it can say."
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "SMS", href: "/sms" }, { label: "Dashboard" }]}
         actions={<Button href="/sms/send">Send SMS</Button>}
       />

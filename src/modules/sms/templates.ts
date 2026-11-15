@@ -10,6 +10,10 @@ export const smsVariables = [
   "shop_name",
   "paid_amount",
   "due_amount",
+  "district",
+  "offer_text",
+  "order_number",
+  "order_status",
 ] as const;
 
 const allowed = new Set<string>(smsVariables);

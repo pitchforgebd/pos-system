@@ -3,6 +3,7 @@ import type { ZodType } from "zod";
 
 import { RuleError } from "@/core/errors/rule-error";
 import { isKeyRace } from "@/core/idempotency";
+import { scheduleDrain } from "@/core/outbox/drain";
 import { runTx } from "@/core/tx/run";
 import { clientIp, jsonError, rejectCrossSite } from "@/lib/api/http";
 import { requirePermission, requireSession } from "@/modules/access/guard";
@@ -160,7 +161,7 @@ export function defineRoute<TBody = undefined, TParams = Record<string, string>>
       if (transactional) {
         // READ COMMITTED: a repeated request sees the key its twin has just committed, and a scan of a small table
         // takes no gap locks that block another request's insert.
-        return await runTx(
+        const committed = await runTx(
           async () => {
             const response = await config.handler(makeContext());
             if (response.status >= 400) {
@@ -171,8 +172,15 @@ export function defineRoute<TBody = undefined, TParams = Record<string, string>>
           // An idempotency-key race (a twin request committed first) reruns the whole request, which then replays.
           { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, retryIf: isKeyRace },
         );
+        // What the request queued (an SMS) goes out after the commit and after the answer, never inside the transaction.
+        await scheduleDrain();
+        return committed;
       }
-      return await config.handler(makeContext());
+      const answer = await config.handler(makeContext());
+      if (mutating && answer.status < 400) {
+        await scheduleDrain();
+      }
+      return answer;
     } catch (error) {
       if (error instanceof RollbackWith) {
         return error.response;

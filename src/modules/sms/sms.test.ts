@@ -9,9 +9,9 @@ for (const line of readFileSync(new URL("../../../.env", import.meta.url), "utf8
     process.env[match[1]] = match[2].replace(/^"|"$/g, "");
   }
 }
-delete process.env.SMS_PROVIDER_URL;
+delete process.env.SMS_PROVIDER;
 
-test("phase 13 sms substitutes text, fails closed, and does not post a journal", async () => {
+test("sms substitutes text, queues in the outbox (it waits without a provider), and does not post a journal", async () => {
   const { prisma } = await import("../../lib/db/client.ts");
   const { createTemplate, requestRecharge, retrySms, saveSmsSettings, sendSms, smsDashboard } = await import("./sms.ts");
   const { renderTemplate } = await import("./templates.ts");
@@ -72,7 +72,7 @@ test("phase 13 sms substitutes text, fails closed, and does not post a journal",
     if (!sent.ok) {
       return;
     }
-    assert.equal(sent.status, "FAILED");
+    assert.equal(sent.status, "QUEUED", "no provider set up: it waits in the outbox");
     const again = await sendSms({
       ...actor,
       idempotencyKey: key,
@@ -85,22 +85,23 @@ test("phase 13 sms substitutes text, fails closed, and does not post a journal",
       assert.equal(again.replayed, true);
     }
     assert.equal(await prisma.smsMessage.count({ where: { organizationId: org.id } }), 1);
-    assert.equal(await prisma.smsLog.count({ where: { organizationId: org.id } }), 1);
-    assert.equal(await prisma.notificationLog.count({ where: { organizationId: org.id, channel: "SMS" } }), 1);
+    assert.equal(await prisma.smsLog.count({ where: { organizationId: org.id } }), 0, "nothing was tried yet");
     assert.equal(await prisma.journal.count({ where: { organizationId: org.id } }), journalsBefore);
+    assert.equal((await sendSms({ ...actor, idempotencyKey: randomUUID(), recipient: "12345", body: "Hi" })).ok, false, "not a Bangladeshi mobile number");
 
+    await prisma.smsMessage.update({ where: { id: sent.id }, data: { status: "FAILED", attempts: 4 } });
     const retried = await retrySms({ organizationId: org.id, userId: user.id, messageId: sent.id, idempotencyKey: randomUUID() });
     assert.equal(retried.ok, true);
     if (retried.ok) {
-      assert.equal(retried.status, "FAILED");
+      assert.equal(retried.status, "QUEUED", "a failed message goes back to the outbox");
     }
-    assert.equal(await prisma.smsLog.count({ where: { organizationId: org.id } }), 2);
+    assert.equal((await prisma.smsMessage.findUniqueOrThrow({ where: { id: sent.id } })).attempts, 0);
 
     await prisma.smsMessage.update({ where: { id: sent.id }, data: { status: "SENT" } });
     const held = await retrySms({ organizationId: org.id, userId: user.id, messageId: sent.id, idempotencyKey: randomUUID() });
     assert.equal(held.ok, false);
     if (!held.ok) {
-      assert.equal(held.message, "A sent message is not retried.");
+      assert.equal(held.message, "A sent message is not sent again.");
     }
     await prisma.smsMessage.update({ where: { id: sent.id }, data: { status: "FAILED" } });
 
@@ -122,7 +123,7 @@ test("phase 13 sms substitutes text, fails closed, and does not post a journal",
     assert.equal(dashboard.quantity, "10.0000");
     assert.equal(dashboard.totalPurchase, "4.00");
     assert.equal(dashboard.sentTotal, 0);
-    assert.equal(dashboard.balance, "4.00");
+    assert.equal(dashboard.balance, null, "only the provider knows what is left on the account");
   } finally {
     const { cleanupOrg } = await import("../../tests/helpers/cleanup.ts");
     await cleanupOrg(org.id);

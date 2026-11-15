@@ -1,5 +1,6 @@
 import { Prisma, type DeliveryMethod, type OrderChannel, type OrderStatus } from "@prisma/client";
 
+import { queueNotice } from "@/modules/sms/outbox";
 import { RuleError } from "@/core/errors/rule-error";
 import { hashPayload, idempotentTransaction, keyWasUsed, readIdempotency, saveIdempotency } from "@/core/idempotency";
 import { documentSorts, listQuery, pageInfo, type ListQuery, type Paged } from "@/core/list";
@@ -115,8 +116,17 @@ function itemRows(organizationId: string, p: Awaited<ReturnType<typeof pricing>>
   }));
 }
 
+const TOLD: Partial<Record<OrderStatus, string>> = { CONFIRMED: "confirmed", DISPATCHED: "sent", DELIVERED: "delivered", CANCELLED: "cancelled" };
+
 async function addEvent(tx: Tx, actor: Actor, orderId: string, from: OrderStatus | null, to: OrderStatus, note?: string) {
   await tx.orderEvent.create({ data: { organizationId: actor.organizationId, orderId, fromStatus: from, toStatus: to, userId: actor.userId, note: note ?? null } });
+  // The order status SMS (P10) when the order moves on (not a quotation), sent after this commits.
+  if (TOLD[to] && from !== to) {
+    const order = await tx.salesOrder.findUnique({ where: { id: orderId }, select: { customerId: true, number: true, isQuotation: true } });
+    if (order && !(order.isQuotation && to !== "CONFIRMED")) {
+      await queueNotice(tx, { organizationId: actor.organizationId, kind: "ORDER_STATUS", customerId: order.customerId, values: { order_number: order.number ?? "", order_status: TOLD[to] as string } });
+    }
+  }
 }
 
 async function lockOrder(tx: Tx, actor: Actor, id: string) {

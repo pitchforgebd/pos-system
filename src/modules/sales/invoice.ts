@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 
+import { queueNotice } from "@/modules/sms/outbox";
 import { randomUUID } from "node:crypto";
 
 import { hashPayload, idempotentTransaction, readIdempotency, saveIdempotency } from "@/core/idempotency";
@@ -475,6 +476,16 @@ export function postInvoice(input: InvoiceInput) {
           await tx.heldTicket.delete({ where: { id: input.ticketId } });
         }
         await input.inTransaction?.(tx, { id: sale.id, customerId: customer.id });
+        // The bill SMS (P10): queued with the sale, sent after it commits; an order's invoice tells the customer by its status message instead.
+        if (!input.inTransaction && !customer.isSystem) {
+          const balance = await outstandingReceivable(input.organizationId, customer.id, tx);
+          await queueNotice(tx, {
+            organizationId: input.organizationId,
+            kind: "BILL",
+            customerId: customer.id,
+            values: { invoice_number: number ?? "", todays_bill: decimalString(total, 2), total_bill: decimalString(total, 2), todays_paid: decimalString(paidTotal, 2), paid_amount: decimalString(paidTotal, 2), due_amount: decimalString(due, 2), current_balance: decimalString(balance, 2) },
+          });
+        }
         await saveIdempotency(tx, { organizationId: input.organizationId, userId: input.userId, key: input.idempotencyKey, requestHash, entityType: "sale", entityId: sale.id });
         return { id: sale.id, number: number as string | null, replayed: false, total: decimalString(total, 2) as string | null, paid: decimalString(paidTotal, 2) as string | null, due: decimalString(due, 2) as string | null };
       });

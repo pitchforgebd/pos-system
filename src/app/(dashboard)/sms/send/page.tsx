@@ -25,7 +25,7 @@ export default async function SendSmsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Send SMS"
-        description="The provider is called after the message row is saved. A failure stays on that row. The balance is not cash."
+        description="A message is put in the outbox and sent right after; a failure is tried again. Bangla takes more SMS parts than English (70 characters per SMS)."
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "SMS", href: "/sms" }, { label: "Send" }]}
       />
       <SendForm

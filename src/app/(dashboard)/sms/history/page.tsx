@@ -10,7 +10,7 @@ import { listMessages, listNotificationLogs } from "@/modules/sms/sms";
 
 export const metadata = { title: "SMS Histories" };
 
-const messageStatuses = ["PENDING", "SENT", "FAILED"] as const;
+const messageStatuses = ["QUEUED", "SENDING", "SENT", "FAILED"] as const;
 
 export default async function SmsHistoryPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string }> }) {
   const session = await getSession();
@@ -38,7 +38,7 @@ export default async function SmsHistoryPage({ searchParams }: { searchParams: P
     <div className="space-y-6">
       <PageHeader
         title="SMS Histories"
-        description="Each attempt is logged. Retry is available only for a failed message."
+        description="Each try is logged. A message is tried four times; a failed one can be put back in the outbox. A sent one is never sent again."
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "SMS", href: "/sms" }, { label: "History" }]}
       />
       <form className="flex flex-wrap items-end gap-2" action="/sms/history">
@@ -67,7 +67,10 @@ export default async function SmsHistoryPage({ searchParams }: { searchParams: P
           { key: "date", header: "Date", cell: (row) => row.createdAt.slice(0, 10) },
           { key: "to", header: "To", cell: (row) => row.recipient },
           { key: "message", header: "Message", cell: (row) => row.body },
+          { key: "parts", header: "SMS", cell: (row) => row.parts },
           { key: "status", header: "Status", cell: (row) => row.status },
+          { key: "tries", header: "Tries", cell: (row) => row.attempts },
+          { key: "note", header: "Note", cell: (row) => (row.status === "SENT" ? "" : row.result) },
           { key: "retry", header: "Retry", cell: (row) => (row.status === "FAILED" ? <RetryForm messageId={row.id} /> : null) },
         ]}
         rows={rows}

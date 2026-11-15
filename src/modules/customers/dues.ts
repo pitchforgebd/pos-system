@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { queueNotice } from "@/modules/sms/outbox";
 import { RuleError } from "@/core/errors/rule-error";
 import { dateOnly } from "@/core/time/business-date";
 
@@ -117,6 +118,8 @@ export async function postCustomerPayment(
         tender: { method: input.method, accountId: input.accountId, amount, charge },
         named: input.allocations?.map((row) => ({ documentId: row.invoiceId, amount: row.amount })),
       });
+      // The payment SMS (P10), sent after this commits.
+      await queueNotice(tx, { organizationId: input.organizationId, kind: "DUE_COLLECTION", customerId: input.customerId, values: { invoice_number: payment.number ?? "", paid_amount: decimalString(amount, 2), todays_paid: decimalString(amount, 2), previous_due: decimalString(balance, 2), current_balance: decimalString(balance.minus(amount), 2), due_amount: decimalString(balance.minus(amount), 2) } });
       await saveIdempotency(tx, {
         organizationId: input.organizationId,
         userId: input.userId,

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useFormSubmit } from "@/lib/client/use-form-submit";
+import { smsParts } from "@/modules/sms/parts";
 import { smsVariables } from "@/modules/sms/templates";
 
 type Option = { id: string; label: string };
@@ -19,11 +20,14 @@ export function TemplateForm() {
     <form className="grid max-w-xl gap-3" onSubmit={form.onSubmit}>
       <Input name="name" required placeholder="Template name" aria-label="Template name" />
       <select name="kind" aria-label="Kind" className="h-10 rounded-md border border-border bg-surface px-3 text-sm">
-        <option value="BILL">Bill</option>
-        <option value="DUE_COLLECTION">Due collection</option>
+        <option value="BILL">Bill (after a sale)</option>
+        <option value="DUE_COLLECTION">Payment received</option>
+        <option value="DUE_REMINDER">Due reminder</option>
+        <option value="ORDER_STATUS">Order status</option>
+        <option value="OFFER">Offer</option>
       </select>
       <textarea name="body" required aria-label="Message" className="min-h-24 rounded-md border border-border bg-surface px-3 py-2 text-sm" placeholder="Hello {customer_name}" />
-      <p className="text-sm text-muted">Only the named variables in braces are allowed. The text is not executed.</p>
+      <p className="text-sm text-muted">Only these variables in braces are allowed: {smsVariables.map((name) => `{${name}}`).join(" ")}. The newest active template of a kind is used for automatic messages (a sale, a payment, an order).</p>
       {form.message ? <p className="text-sm text-error">{form.message}</p> : null}
       <Button type="submit" loading={form.pending}>
         Save template
@@ -45,7 +49,8 @@ export function SendForm({
 }) {
   const [tab, setTab] = useState<"new" | "customers" | "suppliers">("new");
   const [recipient, setRecipient] = useState("");
-  const [characters, setCharacters] = useState(0);
+  const [text, setText] = useState("");
+  const parts = smsParts(text);
   const form = useFormSubmit("/api/v1/sms/messages", (data) => {
     const variables: Record<string, string> = {};
     for (const name of smsVariables) {
@@ -64,7 +69,7 @@ export function SendForm({
   const parties = tab === "customers" ? customers : suppliers;
   return (
     <form className="grid max-w-xl gap-3" onSubmit={form.onSubmit}>
-      <p className="text-sm">Balance <span className="font-semibold">{balance ?? "not set"}</span></p>
+      <p className="text-sm">Left on the SMS account <span className="font-semibold">{balance ?? "the provider does not say"}</span></p>
       <div className="flex flex-wrap gap-3 text-sm">
         {(
           [
@@ -114,13 +119,15 @@ export function SendForm({
         aria-label="Message"
         className="min-h-24 rounded-md border border-border bg-surface px-3 py-2 text-sm"
         placeholder="Message, if no template is chosen"
-        onChange={(event) => setCharacters(event.target.value.length)}
+        onChange={(event) => setText(event.target.value)}
       />
-      <p className="text-sm text-muted">{characters} characters</p>
+      <p className="text-sm text-muted">
+        {parts.length} characters ({parts.encoding === "UNICODE" ? "Bangla/Unicode: 70 per SMS, 67 per part" : "160 per SMS, 153 per part"}) · {parts.parts} SMS
+      </p>
       {smsVariables.map((name) => (
         <Input key={name} name={name} placeholder={name} aria-label={name} />
       ))}
-      <p className="text-sm text-muted">Without a provider URL, the message is saved as failed and no journal is posted.</p>
+      <p className="text-sm text-muted">The message goes to the outbox and is sent right after. A failure is tried again three times; without a provider set up it waits.</p>
       {form.message ? <p className="text-sm text-error">{form.message}</p> : null}
       <Button type="submit" loading={form.pending}>
         Send SMS
@@ -153,6 +160,23 @@ export function RetryForm({ messageId }: { messageId: string }) {
     <form onSubmit={form.onSubmit}>
       <Button type="submit" variant="secondary" size="sm" loading={form.pending}>
         Retry
+      </Button>
+      {form.message ? <p className="text-sm text-error">{form.message}</p> : null}
+    </form>
+  );
+}
+
+/** Sends what waits in the outbox now (it normally goes by itself right after it is written). */
+export function SendWaitingForm({ waiting, configured }: { waiting: number; configured: boolean }) {
+  const form = useFormSubmit<{ sent: number; retrying: number; failed: number; configured: boolean }>("/api/v1/sms/outbox", () => ({}));
+  if (!configured) {
+    return <p className="text-sm text-warning">{waiting} message(s) wait in the outbox: no SMS provider is set up yet. They go out once one is.</p>;
+  }
+  return (
+    <form className="flex flex-wrap items-center gap-3" onSubmit={form.onSubmit}>
+      <p className="text-sm">{waiting} message(s) wait in the outbox.</p>
+      <Button type="submit" variant="secondary" size="sm" loading={form.pending}>
+        Send them now
       </Button>
       {form.message ? <p className="text-sm text-error">{form.message}</p> : null}
     </form>

@@ -50,6 +50,7 @@ export const permissionCodes = [
   "requisitions.manage",
   "shifts.manage",
   "sms.manage",
+  "sms.campaign",
   "suppliers.view",
   "suppliers.create",
   "suppliers.edit",

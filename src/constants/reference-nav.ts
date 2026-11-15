@@ -98,6 +98,7 @@ export const referenceNavigation: ReferenceEntry[] = [
       { label: "SMS dashboard", href: "/sms/dashboard" },
       { label: "SMS Histories", href: "/sms/history" },
       { label: "Send SMS", href: "/sms/send" },
+      { label: "Offer Campaigns", href: "/sms/campaigns" },
     ],
   },
   { kind: "label", label: "OTHERS" },

@@ -29,10 +29,11 @@ Enter these in the cPanel environment panel. Prisma also reads a `.env` file in 
 | `SEED_OWNER_PASSWORD` | Only for the first empty database. At least 8 characters. |
 | `SEED_DEMO` | Leave unset on production. `1` adds demo products, customers, and posted sales. Local development only. |
 | `NEXT_BUILD_CPUS` | `1` while running `npm run build:cpanel`. Without it Next.js starts one worker per server CPU and the build can stop with `pthread_create: Resource temporarily unavailable`. |
-| `SMS_PROVIDER_URL` | Optional. When empty, SMS is saved as failed. |
 | `BACKUP_DIR` | Optional. Defaults to `../meridian-backups`, which must not be inside `public_html`. |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Optional. When `SMTP_HOST` and `SMTP_FROM` are set, password reset mail is sent. When they are empty no mail is sent. |
-| `SMS_PROVIDER`, `SMS_API_KEY` | Not read. |
+| `SMS_PROVIDER` | Empty: nothing is sent, SMS wait in the outbox. `dry-run`: recorded as sent, not sent. `http`: the shop's provider (below). |
+| `SMS_HTTP_URL`, `SMS_HTTP_METHOD`, `SMS_HTTP_BODY`, `SMS_HTTP_SUCCESS` | The provider's send request with `{to}` `{message}` `{sender}` `{api_key}`. |
+| `SMS_API_KEY`, `SMS_SENDER_ID`, `SMS_NUMBER_FORMAT`, `SMS_BALANCE_URL` | The provider's key and sender id, the number form (880 or 0), its balance URL. Keep the key only in `.env`. |
 | `STORAGE_ENDPOINT`, `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY`, `STORAGE_BUCKET` | Not read. Files are not stored in object storage. |
 
 `.env.example` lists the same names with empty values.

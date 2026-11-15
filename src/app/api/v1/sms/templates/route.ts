@@ -6,7 +6,7 @@ import { createTemplate, listTemplates } from "@/modules/sms/sms";
 
 const bodySchema = z.object({
   name: z.string().trim().min(1).max(191),
-  kind: z.enum(["BILL", "DUE_COLLECTION"]),
+  kind: z.enum(["BILL", "DUE_COLLECTION", "DUE_REMINDER", "ORDER_STATUS", "OFFER"]),
   body: z.string(),
 });
 
