@@ -169,6 +169,8 @@ const frozenPermissions = [
   "accounting.reverse",
   "reports.view",
   "reports.export",
+  "reports.profit",
+  "reports.all_branches",
   "users.view",
   "users.create",
   "users.edit",
