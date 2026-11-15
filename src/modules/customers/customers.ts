@@ -1,3 +1,4 @@
+import { nextPartyCode, paymentDaysOf, phoneOf, placeOf, samePhone, tagsOf } from "@/modules/parties/profile";
 import { Prisma } from "@prisma/client";
 import { runTx } from "@/core/tx/run";
 import { RuleError } from "@/core/errors/rule-error";
@@ -23,6 +24,15 @@ const customerSelect = {
   status: true,
   customerTypeId: true,
   customerType: { select: { name: true } },
+  code: true,
+  businessName: true,
+  altPhone: true,
+  nid: true,
+  districtId: true,
+  upazilaId: true,
+  tags: true,
+  smsOptOut: true,
+  paymentDays: true,
 } as const;
 
 function dateString(value: Date) {
@@ -64,6 +74,15 @@ function present(
     status: "ACTIVE" | "INACTIVE";
     customerTypeId: string | null;
     customerType: { name: string } | null;
+    code: string;
+    businessName: string | null;
+    altPhone: string | null;
+    nid: string | null;
+    districtId: number | null;
+    upazilaId: number | null;
+    tags: string | null;
+    smsOptOut: boolean;
+    paymentDays: number | null;
   },
   outstanding: Prisma.Decimal,
 ) {
@@ -79,6 +98,15 @@ function present(
     status: row.status,
     customerTypeId: row.customerTypeId,
     typeName: row.customerType?.name ?? null,
+    code: row.code,
+    businessName: row.businessName,
+    altPhone: row.altPhone,
+    nid: row.nid,
+    districtId: row.districtId,
+    upazilaId: row.upazilaId,
+    tags: row.tags,
+    smsOptOut: row.smsOptOut,
+    paymentDays: row.paymentDays,
     outstanding: decimalString(outstanding, 2),
   };
 }
@@ -243,6 +271,14 @@ export async function createCustomer(input: {
   openingBalance?: string | null;
   creditLimit?: string | null;
   paymentTerms?: string | null;
+  businessName?: string | null;
+  altPhone?: string | null;
+  nid?: string | null;
+  districtId?: number | null;
+  upazilaId?: number | null;
+  tags?: string | null;
+  smsOptOut?: boolean;
+  paymentDays?: number | null;
   ip: string;
   userAgent: string | null;
 }) {
@@ -262,14 +298,16 @@ export async function createCustomer(input: {
   if (!type.ok) {
     return type;
   }
-  let customer: { id: string; name: string };
+  let customer: { id: string; name: string; code: string; phone: string | null };
   try {
     customer = await runTx(async (tx) => {
+    const details = await detailsOf(tx, input, false);
     const created = await tx.customer.create({
       data: {
         organizationId: input.organizationId,
+        code: await nextPartyCode(tx, input.organizationId, "CUSTOMER"),
         name,
-        phone: input.phone?.trim() || null,
+        ...details,
         email: input.email?.trim().toLowerCase() || null,
         address: input.address?.trim() || null,
         customerTypeId: type.customerTypeId,
@@ -278,7 +316,7 @@ export async function createCustomer(input: {
         paymentTerms: input.paymentTerms?.trim() || null,
         createdById: input.actorId,
       },
-      select: { id: true, name: true },
+      select: { id: true, name: true, code: true, phone: true },
     });
     if (opening.gt(0)) {
       if (input.branchId) {
@@ -311,11 +349,30 @@ export async function createCustomer(input: {
     module: "customers",
     entityType: "customer",
     entityId: customer.id,
-    after: { name: customer.name },
+    after: { name: customer.name, code: customer.code },
     ip: input.ip,
     userAgent: input.userAgent,
   });
-  return { ok: true as const, customer };
+  // The same phone on another customer is a warning for the form, not a refusal.
+  return { ok: true as const, customer, samePhone: await samePhone(input.organizationId, "CUSTOMER", customer.phone, customer.id) };
+}
+
+/** The fields P10 added, checked: a Bangladeshi phone, the district (and upazila of it), tags, payment days. */
+async function detailsOf(db: Prisma.TransactionClient | typeof prisma, input: { phone?: string | null; altPhone?: string | null; businessName?: string | null; nid?: string | null; districtId?: number | null; upazilaId?: number | null; tags?: string | null; smsOptOut?: boolean; paymentDays?: number | null }, required: boolean) {
+  const nid = input.nid?.trim() || null;
+  if (nid && !/^\d{10}(\d{3}|\d{7})?$/.test(nid)) {
+    throw new RuleError("A national ID number has 10, 13 or 17 digits.");
+  }
+  return {
+    phone: phoneOf(input.phone),
+    altPhone: phoneOf(input.altPhone, "other phone number"),
+    businessName: input.businessName?.trim().slice(0, 191) || null,
+    nid,
+    ...(await placeOf(db, input, required)),
+    tags: tagsOf(input.tags),
+    smsOptOut: input.smsOptOut ?? false,
+    paymentDays: paymentDaysOf(input.paymentDays),
+  };
 }
 
 export async function updateCustomer(input: {
@@ -329,6 +386,14 @@ export async function updateCustomer(input: {
   customerTypeId?: string | null;
   creditLimit?: string | null;
   paymentTerms?: string | null;
+  businessName?: string | null;
+  altPhone?: string | null;
+  nid?: string | null;
+  districtId?: number | null;
+  upazilaId?: number | null;
+  tags?: string | null;
+  smsOptOut?: boolean;
+  paymentDays?: number | null;
   status: "ACTIVE" | "INACTIVE";
   ip: string;
   userAgent: string | null;
@@ -358,11 +423,20 @@ export async function updateCustomer(input: {
   if (!type.ok) {
     return type;
   }
+  let details: Awaited<ReturnType<typeof detailsOf>>;
+  try {
+    details = await detailsOf(prisma, input, false);
+  } catch (error) {
+    if (error instanceof RuleError) {
+      return { ok: false as const, status: 422 as const, code: "BUSINESS_RULE" as const, message: error.message };
+    }
+    throw error;
+  }
   const customer = await prisma.customer.update({
     where: { id: current.id },
     data: {
       name,
-      phone: input.phone?.trim() || null,
+      ...details,
       email: input.email?.trim().toLowerCase() || null,
       address: input.address?.trim() || null,
       customerTypeId: type.customerTypeId,
@@ -371,7 +445,7 @@ export async function updateCustomer(input: {
       status: input.status,
       updatedById: input.actorId,
     },
-    select: { id: true, name: true },
+    select: { id: true, name: true, code: true, phone: true },
   });
   await writeAudit({
     organizationId: input.organizationId,
@@ -384,7 +458,7 @@ export async function updateCustomer(input: {
     ip: input.ip,
     userAgent: input.userAgent,
   });
-  return { ok: true as const, customer };
+  return { ok: true as const, customer, samePhone: await samePhone(input.organizationId, "CUSTOMER", customer.phone, customer.id) };
 }
 
 export async function listCustomerInvoices(organizationId: string, branchId: string) {

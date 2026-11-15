@@ -5,6 +5,7 @@ import { partyBalances, recentPartyLines } from "@/core/parties";
 import { paymentStatuses } from "@/core/payments";
 import { dateOnly } from "@/core/time/business-date";
 import { prisma } from "@/lib/db/client";
+import { placeLabel } from "@/modules/parties/profile";
 
 // A vendor's page (P05 task 8): who they are, what the shop owes them, what is held with them as an advance, their bills with how much of
 // each is paid, the payments made, and the ledger. The owed and advance figures are the books' (the payable and advance lines of the journal).
@@ -14,7 +15,7 @@ const ZERO = new Prisma.Decimal(0);
 export async function getVendorProfile(organizationId: string, id: string) {
   const supplier = await prisma.supplier.findFirst({
     where: { id, organizationId },
-    select: { id: true, name: true, phone: true, email: true, address: true, openingPayable: true, creditLimit: true, paymentTerms: true, status: true },
+    select: { id: true, name: true, phone: true, email: true, address: true, openingPayable: true, creditLimit: true, paymentTerms: true, status: true, code: true, contactPerson: true, altPhone: true, districtId: true, upazilaId: true, bankDetails: true, paymentDays: true },
   });
   if (!supplier) {
     return null;
@@ -43,6 +44,11 @@ export async function getVendorProfile(organizationId: string, id: string) {
     };
   });
 
+  const [bought, returns, place] = await Promise.all([
+    prisma.purchase.aggregate({ where: { organizationId, supplierId: id, status: "RECEIVED" }, _sum: { total: true }, _count: { _all: true } }),
+    prisma.purchaseReturn.findMany({ where: { organizationId, status: "POSTED", purchase: { supplierId: id } }, orderBy: [{ businessDate: "desc" }, { createdAt: "desc" }], take: 50, select: { id: true, number: true, businessDate: true, total: true, purchaseId: true } }),
+    placeLabel(supplier.districtId, supplier.upazilaId),
+  ]);
   const [payments, advances, accounts] = await Promise.all([
     prisma.supplierPayment.findMany({
       where: { organizationId, supplierId: id },
@@ -68,6 +74,17 @@ export async function getVendorProfile(organizationId: string, id: string) {
     address: supplier.address,
     paymentTerms: supplier.paymentTerms,
     status: supplier.status,
+    code: supplier.code,
+    contactPerson: supplier.contactPerson,
+    altPhone: supplier.altPhone,
+    districtId: supplier.districtId,
+    upazilaId: supplier.upazilaId,
+    place,
+    bankDetails: supplier.bankDetails,
+    paymentDays: supplier.paymentDays,
+    totalPurchases: decimalString(bought._sum.total ?? ZERO, 2),
+    billCount: bought._count._all,
+    returns: returns.map((row) => ({ id: row.id, number: row.number, businessDate: dateOnly(row.businessDate), total: decimalString(row.total, 2), purchaseId: row.purchaseId })),
     creditLimit: supplier.creditLimit ? decimalString(supplier.creditLimit, 2) : null,
     openingPayable: decimalString(supplier.openingPayable, 2),
     /** What the shop owes the vendor (the payable lines of the journal). */

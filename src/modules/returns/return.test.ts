@@ -66,7 +66,7 @@ test("phase 08 returns cannot exceed the eligible quantity", async () => {
       userId: user.id,
     },
   });
-  const customer = await prisma.customer.create({ data: { organizationId: org.id, name: "City Grocers", createdById: user.id } });
+  const customer = await prisma.customer.create({ data: { organizationId: org.id, code: "CUS-T1", name: "City Grocers", createdById: user.id } });
   const supplier = await createSupplier({
     organizationId: org.id,
     actorId: user.id,

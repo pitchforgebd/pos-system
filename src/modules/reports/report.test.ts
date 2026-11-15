@@ -32,8 +32,8 @@ test("phase 14 reports sum posted rows and keep the trial balance equal", async 
   await ensureChart(prisma, org.id);
   const accounts = await prisma.account.findMany({ where: { organizationId: org.id } });
   const byCode = new Map(accounts.map((account) => [account.code, account.id]));
-  const customer = await prisma.customer.create({ data: { organizationId: org.id, name: "Pantry", openingBalance: "100.00" } });
-  const supplier = await prisma.supplier.create({ data: { organizationId: org.id, name: "Mill", openingPayable: "100.00" } });
+  const customer = await prisma.customer.create({ data: { organizationId: org.id, code: "CUS-T1", name: "Pantry", openingBalance: "100.00" } });
+  const supplier = await prisma.supplier.create({ data: { organizationId: org.id, code: "VEN-T1", name: "Mill", openingPayable: "100.00" } });
   const scope = { organizationId: org.id, branchId: branch.id };
 
   async function post(description: string, lines: [string, string, string][]) {

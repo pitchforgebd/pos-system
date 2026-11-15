@@ -34,6 +34,22 @@ export function Header({
   const searchRef = useRef<HTMLInputElement>(null);
   const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
   const matches = useMemo(() => searchReferenceNav(debouncedQuery), [debouncedQuery]);
+  // Customers by name, phone or code (P10): only shown for the query they were found for, and not at all without customers.view.
+  const [people, setPeople] = useState<{ q: string; rows: Array<{ id: string; code: string; name: string; phone: string | null; outstanding: string }> }>({ q: "", rows: [] });
+  const customers = people.q === debouncedQuery.trim() ? people.rows : [];
+
+  useEffect(() => {
+    const q = debouncedQuery.trim();
+    if (q.length < 2) {
+      return undefined;
+    }
+    const controller = new AbortController();
+    void fetch(`/api/v1/search/customers?q=${encodeURIComponent(q)}`, { signal: controller.signal })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body: { data?: Array<{ id: string; code: string; name: string; phone: string | null; outstanding: string }> } | null) => setPeople({ q, rows: (body?.data ?? []).slice(0, 6) }))
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [debouncedQuery]);
 
   function chooseLanguage(next: UiLang) {
     void submit({ url: "/api/v1/locale", body: { lang: next } }, { quiet: true, refresh: true });
@@ -96,7 +112,7 @@ export function Header({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search anything..."
-          aria-label="Search screens"
+          aria-label="Search screens and customers"
           className="h-9 w-full rounded-full bg-[#7c4dff] pr-16 pl-9 text-sm text-white outline-none placeholder:text-white/80"
         />
         <span className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 rounded bg-white/20 px-1.5 py-0.5 text-[10px] text-white">
@@ -104,8 +120,22 @@ export function Header({
         </span>
         {debouncedQuery.trim().length >= 2 ? (
           <div className="absolute top-11 z-30 w-full rounded-md border border-border bg-surface p-2 text-text shadow-[0_8px_24px_rgba(15,39,68,0.12)]">
+            {customers.length > 0 ? (
+              <ul className="mb-1 border-b border-border pb-1" aria-label="Customers">
+                {customers.map((customer) => (
+                  <li key={customer.id}>
+                    <Link href={`/customers/${customer.id}`} className="flex justify-between gap-2 rounded-md px-2 py-2 text-sm hover:bg-secondary" onClick={() => setQuery("")}>
+                      <span>
+                        {customer.name} <span className="text-xs text-muted">{[customer.code, customer.phone].filter(Boolean).join(" · ")}</span>
+                      </span>
+                      {customer.outstanding !== "0.00" ? <span className="text-xs tabular-nums">{customer.outstanding}</span> : null}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             {matches.length === 0 ? (
-              <p className="px-2 py-2 text-sm text-muted">No matching screen</p>
+              customers.length === 0 ? <p className="px-2 py-2 text-sm text-muted">No matching screen or customer</p> : null
             ) : (
               <ul>
                 {matches.map((item) => (

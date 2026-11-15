@@ -34,7 +34,7 @@ export async function ensureWalkIn(tx: Tx, organizationId: string) {
     return found.id;
   }
   try {
-    return (await tx.customer.create({ data: { organizationId, name: "Walk-in", isSystem: true }, select: { id: true } })).id;
+    return (await tx.customer.create({ data: { organizationId, code: "WALK-IN", name: "Walk-in", isSystem: true }, select: { id: true } })).id;
   } catch (error) {
     // two sales made the first Walk-in at once: the other one's is the one
     const again = await tx.customer.findFirst({ where: { organizationId, isSystem: true }, select: { id: true } });

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { VendorForm } from "@/components/parties/party-forms";
 import { VendorAdvanceForm, VendorApplyAdvanceForm, VendorPayForm } from "@/components/purchasing/vendor-forms";
 import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
@@ -9,13 +10,14 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { businessDate } from "@/core/time/business-date";
 import { getSession } from "@/modules/auth/current-session";
 import { moneyAccountOptions } from "@/modules/purchasing/lookups";
+import { geography } from "@/modules/parties/profile";
 import { getVendorProfile } from "@/modules/purchasing/vendor-profile";
 
 export const metadata = { title: "Supplier" };
 
 const TONE = { PAID: "success", PARTIAL: "warning", UNPAID: "error" } as const;
 
-export default async function SupplierDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function SupplierDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ edit?: string }> }) {
   const session = await getSession();
   if (!session) {
     redirect("/login");
@@ -29,14 +31,28 @@ export default async function SupplierDetailPage({ params }: { params: Promise<{
   const accounts = canPay ? (await moneyAccountOptions(session.organizationId)).map((account) => ({ id: account.id, label: `${account.code} · ${account.name}`, kind: account.kind })) : [];
   const today = businessDate();
   const hasAdvance = supplier.advance !== "0.00";
+  const editing = (await searchParams).edit === "1" && session.permissions.has("suppliers.edit");
+  const places = editing ? await geography() : null;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={supplier.name}
-        description={[supplier.phone, supplier.email, supplier.address, supplier.paymentTerms ? `terms: ${supplier.paymentTerms}` : null].filter(Boolean).join(" · ") || "No contact details"}
+        description={[supplier.code, supplier.contactPerson, supplier.phone, supplier.altPhone, supplier.place, supplier.address, supplier.paymentTerms ? `terms: ${supplier.paymentTerms}` : null].filter(Boolean).join(" · ")}
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Suppliers", href: "/suppliers" }, { label: supplier.name }]}
-        actions={supplier.status === "ACTIVE" ? <StatusBadge tone="success">Active</StatusBadge> : <StatusBadge>Inactive</StatusBadge>}
+        actions={
+          <>
+            {supplier.status === "ACTIVE" ? <StatusBadge tone="success">Active</StatusBadge> : <StatusBadge>Inactive</StatusBadge>}
+            <Link href={`/suppliers/${supplier.id}/statement`} className="text-sm font-medium text-primary">
+              Statement
+            </Link>
+            {session.permissions.has("suppliers.edit") && !editing ? (
+              <Link href={`/suppliers/${supplier.id}?edit=1`} className="text-sm font-medium text-primary">
+                Edit
+              </Link>
+            ) : null}
+          </>
+        }
       />
       <dl className="grid max-w-2xl grid-cols-2 gap-3 text-sm md:grid-cols-4">
         <div>
@@ -52,10 +68,17 @@ export default async function SupplierDetailPage({ params }: { params: Promise<{
           <dd className="text-lg font-semibold tabular-nums">{supplier.creditLimit ?? "None"}</dd>
         </div>
         <div>
-          <dt className="text-muted">Opening payable</dt>
-          <dd className="text-lg font-semibold tabular-nums">{supplier.openingPayable}</dd>
+          <dt className="text-muted">Bought in all</dt>
+          <dd className="text-lg font-semibold tabular-nums">{supplier.totalPurchases}</dd>
         </div>
       </dl>
+      {supplier.bankDetails ? <p className="text-sm text-muted">Bank: {supplier.bankDetails}</p> : null}
+      {editing && places ? (
+        <section className="space-y-3" aria-label="Edit vendor">
+          <h2 className="text-lg font-semibold">Edit</h2>
+          <VendorForm places={places} initial={supplier} />
+        </section>
+      ) : null}
 
       {canPay ? (
         <section className="grid gap-4 lg:grid-cols-2" aria-label="Pay this vendor">
@@ -94,6 +117,19 @@ export default async function SupplierDetailPage({ params }: { params: Promise<{
         getRowKey={(row) => row.id}
         empty={<EmptyState title="No payments" description="Payments to this vendor appear here." />}
       />
+      {supplier.returns.length > 0 ? (
+        <DataTable
+          caption="Returns to the vendor"
+          columns={[
+            { key: "number", header: "Return", cell: (row) => row.number ?? "Return" },
+            { key: "date", header: "Date", cell: (row) => row.businessDate },
+            { key: "purchase", header: "Of purchase", cell: (row) => <Link href={`/purchases/${row.purchaseId}`}>Open</Link> },
+            { key: "total", header: "Total", cell: (row) => row.total },
+          ]}
+          rows={supplier.returns}
+          getRowKey={(row) => row.id}
+        />
+      ) : null}
       {supplier.advances.length > 0 ? (
         <DataTable
           caption="Advances paid"

@@ -1,3 +1,5 @@
+import { RuleError } from "@/core/errors/rule-error";
+import { nextPartyCode, paymentDaysOf, phoneOf, placeOf, samePhone } from "@/modules/parties/profile";
 import { Prisma } from "@prisma/client";
 import { runTx } from "@/core/tx/run";
 import { businessDate } from "@/core/time/business-date";
@@ -19,6 +21,13 @@ const supplierSelect = {
   creditLimit: true,
   paymentTerms: true,
   status: true,
+  code: true,
+  contactPerson: true,
+  altPhone: true,
+  districtId: true,
+  upazilaId: true,
+  bankDetails: true,
+  paymentDays: true,
 } as const;
 
 function present(row: {
@@ -31,6 +40,13 @@ function present(row: {
   creditLimit: Prisma.Decimal | null;
   paymentTerms: string | null;
   status: "ACTIVE" | "INACTIVE";
+  code: string;
+  contactPerson: string | null;
+  altPhone: string | null;
+  districtId: number | null;
+  upazilaId: number | null;
+  bankDetails: string | null;
+  paymentDays: number | null;
 }, outstanding: Prisma.Decimal) {
   return {
     id: row.id,
@@ -42,6 +58,13 @@ function present(row: {
     creditLimit: row.creditLimit ? decimalString(row.creditLimit, 2) : null,
     paymentTerms: row.paymentTerms,
     status: row.status,
+    code: row.code,
+    contactPerson: row.contactPerson,
+    altPhone: row.altPhone,
+    districtId: row.districtId,
+    upazilaId: row.upazilaId,
+    bankDetails: row.bankDetails,
+    paymentDays: row.paymentDays,
     outstanding: decimalString(outstanding, 2),
   };
 }
@@ -83,6 +106,12 @@ export async function createSupplier(input: {
   openingPayable: string;
   creditLimit?: string | null;
   paymentTerms?: string | null;
+  contactPerson?: string | null;
+  altPhone?: string | null;
+  districtId?: number | null;
+  upazilaId?: number | null;
+  bankDetails?: string | null;
+  paymentDays?: number | null;
   ip: string;
   userAgent: string | null;
 }) {
@@ -94,12 +123,16 @@ export async function createSupplier(input: {
   if (opening.gt(0) && !input.branchId) {
     return { ok: false as const, status: 422 as const, code: "BUSINESS_RULE" as const, message: "Select a branch before entering an opening balance: it is posted to the books." };
   }
-  const supplier = await runTx(async (tx) => {
+  let supplier: Prisma.SupplierGetPayload<{ select: typeof supplierSelect }>;
+  try {
+  supplier = await runTx(async (tx) => {
+    const details = await vendorDetails(tx, input, false);
     const created = await tx.supplier.create({
     data: {
       organizationId: input.organizationId,
+      code: await nextPartyCode(tx, input.organizationId, "VENDOR"),
       name: input.name.trim(),
-      phone: input.phone?.trim() || null,
+      ...details,
       email: input.email?.trim().toLowerCase() || null,
       address: input.address?.trim() || null,
       openingPayable: opening,
@@ -127,6 +160,12 @@ export async function createSupplier(input: {
   }
   return created;
   });
+  } catch (error) {
+    if (error instanceof RuleError) {
+      return { ok: false as const, status: 422 as const, code: "BUSINESS_RULE" as const, message: error.message };
+    }
+    throw error;
+  }
   await writeAudit({
     organizationId: input.organizationId,
     userId: input.actorId,
@@ -138,7 +177,19 @@ export async function createSupplier(input: {
     ip: input.ip,
     userAgent: input.userAgent,
   });
-  return { ok: true as const, supplier: present(supplier, opening) };
+  return { ok: true as const, supplier: present(supplier, opening), samePhone: await samePhone(input.organizationId, "VENDOR", supplier.phone, supplier.id) };
+}
+
+/** The fields P10 added to a vendor, checked. */
+async function vendorDetails(db: Prisma.TransactionClient | typeof prisma, input: { phone?: string | null; altPhone?: string | null; contactPerson?: string | null; districtId?: number | null; upazilaId?: number | null; bankDetails?: string | null; paymentDays?: number | null }, required: boolean) {
+  return {
+    phone: phoneOf(input.phone),
+    altPhone: phoneOf(input.altPhone, "other phone number"),
+    contactPerson: input.contactPerson?.trim().slice(0, 191) || null,
+    ...(await placeOf(db, input, required)),
+    bankDetails: input.bankDetails?.trim().slice(0, 255) || null,
+    paymentDays: paymentDaysOf(input.paymentDays),
+  };
 }
 
 export async function updateSupplier(input: {
@@ -151,6 +202,12 @@ export async function updateSupplier(input: {
   address?: string | null;
   creditLimit?: string | null;
   paymentTerms?: string | null;
+  contactPerson?: string | null;
+  altPhone?: string | null;
+  districtId?: number | null;
+  upazilaId?: number | null;
+  bankDetails?: string | null;
+  paymentDays?: number | null;
   status: "ACTIVE" | "INACTIVE";
   ip: string;
   userAgent: string | null;
@@ -172,11 +229,20 @@ export async function updateSupplier(input: {
       return { ok: false as const, status: 422 as const, code: "BUSINESS_RULE" as const, message: "The credit limit is below the outstanding payable." };
     }
   }
+  let details: Awaited<ReturnType<typeof vendorDetails>>;
+  try {
+    details = await vendorDetails(prisma, input, false);
+  } catch (error) {
+    if (error instanceof RuleError) {
+      return { ok: false as const, status: 422 as const, code: "BUSINESS_RULE" as const, message: error.message };
+    }
+    throw error;
+  }
   const supplier = await prisma.supplier.update({
     where: { id: current.id },
     data: {
       name: input.name.trim(),
-      phone: input.phone?.trim() || null,
+      ...details,
       email: input.email?.trim().toLowerCase() || null,
       address: input.address?.trim() || null,
       creditLimit,

@@ -96,7 +96,7 @@ test("phase 18 checks money, numbers, permissions, and the sale path", async () 
       lines: [{ productId: created.product.id, quantity: "2.0000", unitCost: "10.00" }],
     });
     assert.equal(opened.ok, true);
-    const customer = await prisma.customer.create({ data: { organizationId: org.id, name: "Rina", createdById: user.id } });
+    const customer = await prisma.customer.create({ data: { organizationId: org.id, code: "CUS-T1", name: "Rina", createdById: user.id } });
 
     const discount = await postSale({
       ...actor,

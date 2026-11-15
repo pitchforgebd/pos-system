@@ -102,8 +102,8 @@ test("variants come with their own price and barcodes", async () => {
 
 test("customers are searched by name or phone, 20 at a time, with what they owe", async () => {
   await withTestOrg(async (t) => {
-    await prisma.customer.createMany({ data: Array.from({ length: 60 }, (_, i) => ({ organizationId: t.org.id, name: `Farmer ${String(i + 1).padStart(2, "0")}`, phone: `0171100${String(i + 1).padStart(4, "0")}` })) });
-    await prisma.customer.create({ data: { organizationId: t.org.id, name: "Rahim Store", phone: "01999888777" } });
+    await prisma.customer.createMany({ data: Array.from({ length: 60 }, (_, i) => ({ organizationId: t.org.id, code: `CUS-T${i + 1}`, name: `Farmer ${String(i + 1).padStart(2, "0")}`, phone: `0171100${String(i + 1).padStart(4, "0")}` })) });
+    await prisma.customer.create({ data: { organizationId: t.org.id, code: "CUS-T99", name: "Rahim Store", phone: "01999888777" } });
     assert.equal((await searchCustomers({ organizationId: t.org.id, q: "farmer" })).length, 20);
     assert.deepEqual((await searchCustomers({ organizationId: t.org.id, q: "rahim" })).map((c) => c.name), ["Rahim Store"]);
     const byPhone = await searchCustomers({ organizationId: t.org.id, q: "01999888777" });

@@ -13,6 +13,15 @@ const createSchema = z.object({
   openingBalance: z.string().optional(),
   creditLimit: z.string().nullable().optional(),
   paymentTerms: z.string().trim().max(64).nullable().optional(),
+  businessName: z.string().trim().max(191).nullable().optional(),
+  altPhone: z.string().trim().max(32).nullable().optional(),
+  nid: z.string().trim().max(32).nullable().optional(),
+  /** The district is required (D15); the upazila is optional. */
+  districtId: z.number().int().positive(),
+  upazilaId: z.number().int().positive().nullable().optional(),
+  tags: z.string().trim().max(255).nullable().optional(),
+  smsOptOut: z.boolean().optional(),
+  paymentDays: z.number().int().min(0).max(365).nullable().optional(),
 });
 
 export const GET = defineRoute({
@@ -27,7 +36,7 @@ export const POST = defineRoute({
   handler: async ({ request, session }) => {
     const parsed = createSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
-      return jsonError("VALIDATION_ERROR", "Validation failed", 400);
+      return jsonError("VALIDATION_ERROR", parsed.error.issues.some((issue) => issue.path[0] === "districtId") ? "Choose the district." : "Validation failed", 400);
     }
     const result = await createCustomer({
       organizationId: session.organizationId,
@@ -40,6 +49,6 @@ export const POST = defineRoute({
     if (!result.ok) {
       return jsonError(result.code, result.message, result.status);
     }
-    return jsonOk(result.customer, "Operation completed", 201);
+    return jsonOk({ ...result.customer, samePhone: result.samePhone }, "Operation completed", 201);
   },
 });

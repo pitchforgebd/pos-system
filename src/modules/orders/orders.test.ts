@@ -140,7 +140,7 @@ test("the order needs a named customer; the customer's advance pays at the dispa
   await withTestOrg(async (t) => {
     const product = await stockedProduct(t, { units: 10, cost: "6.00", price: "10.00" });
     const customer = await factories(t).customer();
-    const walkIn = await prisma.customer.create({ data: { organizationId: t.org.id, name: "Walk-in", isSystem: true } });
+    const walkIn = await prisma.customer.create({ data: { organizationId: t.org.id, code: "CUS-T0", name: "Walk-in", isSystem: true } });
     const nobody = await createOrder(actor(t), { customerId: walkIn.id, businessDate: today(), lines: [{ productId: product.id, quantity: "1" }] });
     assert.equal(nobody.ok, false);
 

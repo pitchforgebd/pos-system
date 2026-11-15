@@ -15,7 +15,7 @@ import { runTx } from "./run.ts";
 async function readAfterLockWait(isolationLevel?: Prisma.TransactionIsolationLevel) {
   let seen: string | undefined;
   await withTestOrg(async (t) => {
-    const customer = await prisma.customer.create({ data: { organizationId: t.org.id, name: "Locked", creditLimit: "0.00" } });
+    const customer = await prisma.customer.create({ data: { organizationId: t.org.id, name: "Locked", code: "CUS-T1", creditLimit: "0.00" } });
     const lock = (tx: Prisma.TransactionClient) => tx.$queryRaw`SELECT id FROM customers WHERE id = ${customer.id} FOR UPDATE`;
     const limit = (tx: Prisma.TransactionClient) => tx.customer.findUniqueOrThrow({ where: { id: customer.id }, select: { creditLimit: true } }).then((row) => row.creditLimit?.toFixed(2));
     let release: () => void = () => undefined;

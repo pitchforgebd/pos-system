@@ -8,6 +8,7 @@ const LIMIT = 20;
 
 export type CustomerHit = {
   id: string;
+  code: string;
   name: string;
   phone: string | null;
   customerTypeId: string | null;
@@ -19,22 +20,23 @@ export type CustomerHit = {
   advance: string;
 };
 
-/** Customers by name or phone, 20 at a time, with the balance of those rows only (H8). */
+/** Customers by name, phone, other phone, code or business name, 20 at a time, with the balance of those rows only (H8). */
 export async function searchCustomers(input: { organizationId: string; q: string }): Promise<CustomerHit[]> {
   const q = input.q.trim();
   if (q === "") {
     return [];
   }
   const rows = await prisma.customer.findMany({
-    where: { organizationId: input.organizationId, status: "ACTIVE", OR: [{ name: { contains: q } }, { phone: { contains: q } }] },
+    where: { organizationId: input.organizationId, status: "ACTIVE", OR: [{ name: { contains: q } }, { phone: { contains: q } }, { altPhone: { contains: q } }, { code: { contains: q } }, { businessName: { contains: q } }] },
     orderBy: [{ name: "asc" }, { id: "asc" }],
     take: LIMIT,
-    select: { id: true, name: true, phone: true, customerType: { select: { id: true, name: true, priceLevelId: true } } },
+    select: { id: true, code: true, name: true, phone: true, customerType: { select: { id: true, name: true, priceLevelId: true } } },
   });
   const balances = await partyBalances(prisma, { organizationId: input.organizationId, partyType: "CUSTOMER", partyIds: rows.map((row) => row.id) });
   const zero = new Prisma.Decimal(0);
   return rows.map((row) => ({
     id: row.id,
+    code: row.code,
     name: row.name,
     phone: row.phone,
     customerTypeId: row.customerType?.id ?? null,

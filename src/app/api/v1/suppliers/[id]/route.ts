@@ -11,6 +11,12 @@ const patchSchema = z.object({
   address: z.string().trim().max(255).nullable().optional(),
   creditLimit: z.string().nullable().optional(),
   paymentTerms: z.string().trim().max(64).nullable().optional(),
+  contactPerson: z.string().trim().max(191).nullable().optional(),
+  altPhone: z.string().trim().max(32).nullable().optional(),
+  districtId: z.number().int().positive(),
+  upazilaId: z.number().int().positive().nullable().optional(),
+  bankDetails: z.string().trim().max(255).nullable().optional(),
+  paymentDays: z.number().int().min(0).max(365).nullable().optional(),
   status: z.enum(["ACTIVE", "INACTIVE"]),
 });
 

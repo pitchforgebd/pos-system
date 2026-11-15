@@ -75,7 +75,7 @@ test("phase 07 sales post stock, invoice, and a balanced journal", async () => {
     },
   });
   const customer = await prisma.customer.create({
-    data: { organizationId: org.id, name: "City Grocers", creditLimit: "5.00", createdById: user.id },
+    data: { organizationId: org.id, code: "CUS-T1", name: "City Grocers", creditLimit: "5.00", createdById: user.id },
   });
   const actor = {
     organizationId: org.id,

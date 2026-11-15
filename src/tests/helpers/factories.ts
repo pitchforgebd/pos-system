@@ -1,5 +1,7 @@
 import "./env.ts";
 
+import { randomUUID } from "node:crypto";
+
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "../../lib/db/client.ts";
@@ -41,13 +43,13 @@ export function factories(t: Pick<TestOrg, "org">) {
 
     customer(overrides: Overrides<Prisma.CustomerUncheckedCreateInput> = {}) {
       const n = next();
-      return prisma.customer.create({ data: { organizationId, name: `Customer ${n}`, ...overrides } });
+      return prisma.customer.create({ data: { organizationId, code: `CUS-T${n}-${randomUUID().slice(0, 8)}`, name: `Customer ${n}`, ...overrides } });
     },
 
     /** Today the vendor table is `suppliers`. */
     vendor(overrides: Overrides<Prisma.SupplierUncheckedCreateInput> = {}) {
       const n = next();
-      return prisma.supplier.create({ data: { organizationId, name: `Vendor ${n}`, ...overrides } });
+      return prisma.supplier.create({ data: { organizationId, code: `VEN-T${n}-${randomUUID().slice(0, 8)}`, name: `Vendor ${n}`, ...overrides } });
     },
   };
 }

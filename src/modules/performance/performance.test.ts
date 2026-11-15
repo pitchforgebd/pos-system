@@ -38,8 +38,8 @@ test("phase 17 lists dues in one pass and the new indexes cover the explained fi
 
   const stamp = Date.now().toString();
   const org = await prisma.organization.create({ data: { name: "Fast A", slug: `fast-${stamp}` } });
-  const owed = await prisma.customer.create({ data: { organizationId: org.id, name: "Ada" } });
-  const clear = await prisma.customer.create({ data: { organizationId: org.id, name: "Bea" } });
+  const owed = await prisma.customer.create({ data: { organizationId: org.id, code: "CUS-T1", name: "Ada" } });
+  const clear = await prisma.customer.create({ data: { organizationId: org.id, code: "CUS-T2", name: "Bea" } });
   // A customer's balance comes from the journal lines that name them: owes 8.00, paid 3.00.
   const { Prisma } = await import("@prisma/client");
   const { post } = await import("../../core/posting/journal.ts");

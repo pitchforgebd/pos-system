@@ -312,6 +312,29 @@ enum RequisitionStatus {
 enum SmsTemplateKind {
   BILL
   DUE_COLLECTION
+  DUE_REMINDER
+  ORDER_STATUS
+  OFFER
+}
+
+/// DRAFT: being built; QUEUED: its messages are in the outbox (P10).
+enum SmsCampaignStatus {
+  DRAFT
+  QUEUED
+}
+
+/// What a campaign filter looks at; filters of one field are OR, different fields are AND.
+enum SmsCampaignField {
+  DISTRICT
+  CUSTOMER_TYPE
+  LAST_PURCHASE_BEFORE
+  LAST_PURCHASE_AFTER
+  TOTAL_PURCHASE_MIN
+  TOTAL_PURCHASE_MAX
+  HAS_DUE
+  DUE_OLDER_THAN_DAYS
+  BOUGHT_PRODUCT
+  BOUGHT_CATEGORY
 }
 
 enum InstallmentStatus {
@@ -373,6 +396,8 @@ model Organization {
   paymentMethodCharges   PaymentMethodCharge[]
   fixedAssets            FixedAsset[]
   depreciationRuns       DepreciationRun[]
+  smsCampaigns           SmsCampaign[]
+  smsCampaignFilters     SmsCampaignFilter[]
   shipmentEvents         ShipmentEvent[]
   courierSettlements     CourierSettlement[]
   courierSettlementItems CourierSettlementItem[]
@@ -1333,6 +1358,19 @@ model Customer {
   organizationId String       @db.Char(36)
   customerTypeId String?      @db.Char(36)
   name           String       @db.VarChar(191)
+  /// CUS-00001, made when the customer is created (P10).
+  code           String       @db.VarChar(32)
+  businessName   String?      @db.VarChar(191)
+  altPhone       String?      @db.VarChar(32)
+  nid            String?      @db.VarChar(32)
+  districtId     Int?
+  upazilaId      Int?
+  /// Free tags, comma separated.
+  tags           String?      @db.VarChar(255)
+  /// The customer asked not to get offer or reminder messages.
+  smsOptOut      Boolean      @default(false)
+  /// Days the customer has to pay an invoice (overdue after).
+  paymentDays    Int?
   phone          String?      @db.VarChar(32)
   email          String?      @db.VarChar(191)
   address        String?      @db.VarChar(255)
@@ -1349,6 +1387,9 @@ model Customer {
 
   organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   customerType        CustomerType?        @relation(fields: [customerTypeId], references: [id], onDelete: Restrict)
+  district            District?            @relation(fields: [districtId], references: [id], onDelete: Restrict)
+  upazila             Upazila?             @relation(fields: [upazilaId], references: [id], onDelete: Restrict)
+  smsMessages         SmsMessage[]
   createdBy           User?                @relation("CustomerCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   updatedBy           User?                @relation("CustomerUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
   addresses           CustomerAddress[]
@@ -1366,8 +1407,10 @@ model Customer {
   warrantyClaims      WarrantyClaim[]
   shipments           Shipment[]
 
+  @@unique([organizationId, code])
   @@index([organizationId, name])
   @@index([organizationId, phone])
+  @@index([organizationId, districtId])
   @@map("customers")
 }
 
@@ -1479,6 +1522,15 @@ model Supplier {
   id             String       @id @default(uuid()) @db.Char(36)
   organizationId String       @db.Char(36)
   name           String       @db.VarChar(191)
+  /// VEN-00001, made when the vendor is created (P10).
+  code           String       @db.VarChar(32)
+  contactPerson  String?      @db.VarChar(191)
+  altPhone       String?      @db.VarChar(32)
+  districtId     Int?
+  upazilaId      Int?
+  /// Bank, branch and account number to pay the vendor.
+  bankDetails    String?      @db.VarChar(255)
+  paymentDays    Int?
   phone          String?      @db.VarChar(32)
   email          String?      @db.VarChar(191)
   address        String?      @db.VarChar(255)
@@ -1494,12 +1546,17 @@ model Supplier {
   organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   createdBy    User?             @relation("SupplierCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   updatedBy    User?             @relation("SupplierUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  district     District?         @relation(fields: [districtId], references: [id], onDelete: Restrict)
+  upazila      Upazila?          @relation(fields: [upazilaId], references: [id], onDelete: Restrict)
   ledgers      SupplierLedger[]
   payments     SupplierPayment[]
   advances     SupplierAdvance[]
   purchases    Purchase[]
 
+  @@unique([organizationId, code])
   @@index([organizationId, name])
+  @@index([organizationId, phone])
+  @@index([organizationId, districtId])
   @@map("suppliers")
 }
 
@@ -2451,27 +2508,43 @@ model SmsTemplate {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   messages     SmsMessage[]
+  campaigns    SmsCampaign[]
 
   @@index([organizationId, kind])
   @@map("sms_templates")
 }
 
 model SmsMessage {
-  id             String   @id @default(uuid()) @db.Char(36)
-  organizationId String   @db.Char(36)
-  templateId     String?  @db.Char(36)
-  recipient      String   @db.VarChar(32)
-  body           String   @db.Text
-  status         String   @db.VarChar(32)
-  createdAt      DateTime @default(now())
+  id             String    @id @default(uuid()) @db.Char(36)
+  organizationId String    @db.Char(36)
+  templateId     String?   @db.Char(36)
+  recipient      String    @db.VarChar(32)
+  body           String    @db.Text
+  status         String    @db.VarChar(32)
+  /// The outbox (P10, B13): QUEUED -> SENDING -> SENT, or back to QUEUED for a retry, FAILED after three tries.
+  attempts       Int       @default(0)
+  nextAttemptAt  DateTime?
+  sentAt         DateTime?
+  /// How many SMS parts the body takes (160/153 plain, 70/67 Unicode such as Bangla).
+  segments       Int       @default(1)
+  customerId     String?   @db.Char(36)
+  campaignId     String?   @db.Char(36)
+  providerRef    String?   @db.VarChar(128)
+  lastError      String?   @db.VarChar(255)
+  createdAt      DateTime  @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   template     SmsTemplate? @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  customer     Customer?    @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  campaign     SmsCampaign? @relation(fields: [campaignId], references: [id], onDelete: Restrict)
   logs         SmsLog[]
 
   @@index([organizationId, createdAt])
+  @@index([status, nextAttemptAt])
+  @@index([campaignId])
+  @@index([organizationId, customerId])
   @@map("sms_messages")
 }
 
@@ -3284,4 +3357,86 @@ model DepreciationRun {
 
   @@unique([organizationId, month])
   @@map("depreciation_runs")
+}
+
+/// Bangladesh's 8 divisions (P10, D15). Reference data, the same for every shop; filled by the migration from prisma/bd-geography.ts.
+model Division {
+  id     Int    @id
+  name   String @db.VarChar(100)
+  bnName String @db.VarChar(100)
+
+  districts District[]
+
+  @@map("divisions")
+}
+
+/// The 64 districts. A customer's district is required on the form (D15).
+model District {
+  id         Int    @id
+  divisionId Int
+  name       String @db.VarChar(100)
+  bnName     String @db.VarChar(100)
+
+  division  Division   @relation(fields: [divisionId], references: [id], onDelete: Restrict)
+  upazilas  Upazila[]
+  customers Customer[]
+  suppliers Supplier[]
+
+  @@index([divisionId])
+  @@map("districts")
+}
+
+model Upazila {
+  id         Int    @id
+  districtId Int
+  name       String @db.VarChar(100)
+  bnName     String @db.VarChar(100)
+
+  district  District   @relation(fields: [districtId], references: [id], onDelete: Restrict)
+  customers Customer[]
+  suppliers Supplier[]
+
+  @@index([districtId])
+  @@map("upazilas")
+}
+
+/// An offer or due-reminder message to a segment of customers (P10, features 4 and 15). Its filters are rows, not JSON.
+model SmsCampaign {
+  id             String            @id @default(uuid()) @db.Char(36)
+  organizationId String            @db.Char(36)
+  name           String            @db.VarChar(191)
+  kind           SmsTemplateKind   @default(OFFER)
+  templateId     String?           @db.Char(36)
+  /// The message as written, with its variables ({customer_name}, {offer_text} ...).
+  body           String            @db.Text
+  offerText      String?           @db.VarChar(500)
+  status         SmsCampaignStatus @default(DRAFT)
+  recipientCount Int               @default(0)
+  segmentCount   Int               @default(0)
+  estimatedCost  Decimal?          @db.Decimal(18, 2)
+  createdById    String?           @db.Char(36)
+  queuedAt       DateTime?
+  createdAt      DateTime          @default(now())
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  template     SmsTemplate?        @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  filters      SmsCampaignFilter[]
+  messages     SmsMessage[]
+
+  @@index([organizationId, createdAt])
+  @@map("sms_campaigns")
+}
+
+model SmsCampaignFilter {
+  id             String           @id @default(uuid()) @db.Char(36)
+  organizationId String           @db.Char(36)
+  campaignId     String           @db.Char(36)
+  field          SmsCampaignField
+  value          String           @db.VarChar(64)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  campaign     SmsCampaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@map("sms_campaign_filters")
 }
