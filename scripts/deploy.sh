@@ -37,6 +37,8 @@ log "at $(git log -1 --format='%h %s')"
 # The host caps how many threads a user may run, and node aborts (core dumped) when it cannot start its own: fewer threads for node,
 # no core files (they would eat the disk quota), and npm told to open few connections.
 ulimit -c 0 || true
+# Prisma's migration engine and its helpers are threaded too
+export TOKIO_WORKER_THREADS=1 RAYON_NUM_THREADS=1
 export UV_THREADPOOL_SIZE=2
 export NODE_OPTIONS="--v8-pool-size=1 --max-old-space-size=${NODE_HEAP_MB:-1536}"
 log "threads allowed: $(ulimit -u), running now: $(ps -u "$(id -un)" -L 2>/dev/null | wc -l)"
@@ -64,6 +66,6 @@ if [ -n "${APP_URL:-}" ]; then
   sleep 5
   code=$(curl -s -o /dev/null -w '%{http_code}' "$APP_URL/api/health" || true)
   log "health: HTTP $code"
-  [ "$code" = "200" ] || { log "the site did not answer 200 on /api/health"; exit 3; }
+  [ "$code" = "200" ] || { log "the site did not answer 200 on /api/health: if the Node.js app was stopped for the deploy, press Start App in cPanel (Setup Node.js App)"; exit 3; }
 fi
 log "done"
