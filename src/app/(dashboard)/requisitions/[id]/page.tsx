@@ -25,8 +25,8 @@ export default async function RequisitionDetailPage({ params }: { params: Promis
     <div className="space-y-6">
       <PageHeader
         title={requisition.number}
-        description={`${requisition.requesterName} · ${requisition.businessDate} · ${requisition.status}. Fulfillment does not move stock.`}
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Requisitions", href: "/requisitions" }, { label: requisition.number }]}
+        description={`${requisition.requesterName} · ${requisition.businessDate} · ${ph(requisition.status === "REQUESTED" ? "To approve" : requisition.status.charAt(0) + requisition.status.slice(1).toLowerCase())}. ${ph("Fulfillment does not move stock.")}`}
+        breadcrumbs={[{ label: ph("Home"), href: "/dashboard" }, { label: ph("Requisitions"), href: "/requisitions" }, { label: requisition.number }]}
       />
       <p className="text-sm">{requisition.note}</p>
       <div className="flex gap-2">

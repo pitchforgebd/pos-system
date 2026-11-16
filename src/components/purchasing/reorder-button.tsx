@@ -17,7 +17,7 @@ export function ReorderDraftsButton() {
           void submit<{ ids: string[]; skipped: number }>(
             { url: "/api/v1/purchases/from-reorder", body: {} },
             {
-              successMessage: "ক্রয় খসড়া তৈরি হয়েছে। (Purchase drafts made.)",
+              successMessage: ph("Purchase drafts made."),
               goTo: "/purchases?status=DRAFT",
             },
           )

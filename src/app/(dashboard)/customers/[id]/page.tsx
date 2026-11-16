@@ -59,8 +59,8 @@ export default async function CustomerDetailPage({ params, searchParams }: { par
         <Figure label={ph("Held for them")} value={customer.summary.advance} />
         <Figure label={ph("Bought in all")} value={customer.summary.bought} />
         <Figure label={ph("Invoices")} value={String(customer.summary.invoices)} />
-        <Figure label={ph("Last bought")} value={customer.summary.lastPurchase ?? "Never"} />
-        <Figure label={ph("Credit limit")} value={customer.creditLimit ?? "None"} />
+        <Figure label={ph("Last bought")} value={customer.summary.lastPurchase ?? ph("Never")} />
+        <Figure label={ph("Credit limit")} value={customer.creditLimit ?? ph("None")} />
       </dl>
       {customer.tags ? <p className="text-sm text-muted">{`Tags: ${customer.tags}`}</p> : null}
 
@@ -93,7 +93,7 @@ export default async function CustomerDetailPage({ params, searchParams }: { par
         <DataTable
           caption={ph("Returns")}
           columns={[
-            { key: "number", header: ph("Return"), cell: (row) => row.number ?? "Return" },
+            { key: "number", header: ph("Return"), cell: (row) => row.number ?? ph("Return") },
             { key: "date", header: ph("Date"), cell: (row) => row.businessDate },
             { key: "sale", header: ph("Of invoice"), cell: (row) => <Link href={`/sales/${row.saleId}`}>{ph("Open")}</Link> },
             { key: "total", header: ph("Total"), cell: (row) => row.total },
@@ -108,7 +108,7 @@ export default async function CustomerDetailPage({ params, searchParams }: { par
           columns={[
             { key: "number", header: ph("Order"), cell: (row) => <Link href={`/orders/${row.id}`}>{row.number ?? (row.quotation ? ph("Quotation") : ph("Draft"))}</Link> },
             { key: "date", header: ph("Date"), cell: (row) => row.businessDate },
-            { key: "status", header: ph("Status"), cell: (row) => (row.quotation ? "Quotation" : row.status) },
+            { key: "status", header: ph("Status"), cell: (row) => (row.quotation ? ph("Quotation") : row.status) },
             { key: "total", header: ph("Total"), cell: (row) => row.total },
           ]}
           rows={customer.orders}

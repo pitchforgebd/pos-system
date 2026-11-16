@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useSubmit } from "@/lib/client/use-submit";
 import { useI18n } from "@/lib/i18n/provider";
@@ -92,13 +93,21 @@ export function ProductEditForm({ product, brands, categories, units }: { produc
       }}
     >
       <div className="grid gap-3 sm:grid-cols-2">
-        <Input name="sku" required defaultValue={product.sku} aria-label={ph("SKU")} placeholder={ph("SKU")} />
-        <Input name="name" required defaultValue={product.name} aria-label={ph("Name")} placeholder={ph("Name")} />
-        <Input name="genericName" defaultValue={product.genericName ?? ""} aria-label={ph("Generic name")} placeholder={ph("Generic name")} />
-        <Input name="reorderLevel" defaultValue={product.reorderLevel} aria-label={ph("Reorder level")} placeholder={ph("Reorder level")} />
-        <Select name="brandId" label={ph("Brand")} value={product.brandId} options={brands} none="No brand" />
-        <Select name="categoryId" label={ph("Category")} value={product.categoryId} options={categories} none="No category" />
-        <Select name="unitId" label={ph("Unit")} value={product.unitId} options={units} none="No unit" />
+        <Field label={ph("SKU")}>
+          <Input name="sku" required defaultValue={product.sku} />
+        </Field>
+        <Field label={ph("Name")}>
+          <Input name="name" required defaultValue={product.name} />
+        </Field>
+        <Field label={ph("Generic name")}>
+          <Input name="genericName" defaultValue={product.genericName ?? ""} />
+        </Field>
+        <Field label={ph("Reorder level")}>
+          <Input name="reorderLevel" defaultValue={product.reorderLevel} />
+        </Field>
+        <Select name="brandId" label={ph("Brand")} value={product.brandId} options={brands} none={ph("No brand")} />
+        <Select name="categoryId" label={ph("Category")} value={product.categoryId} options={categories} none={ph("No category")} />
+        <Select name="unitId" label={ph("Unit")} value={product.unitId} options={units} none={ph("No unit")} />
         <label className="grid gap-1 text-sm">
           {ph("VAT")}
           <select name="vatType" defaultValue={product.vatType ?? ""} className="h-10 rounded-md border border-border bg-surface px-2">
@@ -107,17 +116,29 @@ export function ProductEditForm({ product, brands, categories, units }: { produc
             <option value="EXCLUSIVE">{ph("Added to the price")}</option>
           </select>
         </label>
-        <Input name="vatValue" defaultValue={product.vatValue ?? ""} aria-label={ph("VAT rate in percent")} placeholder={ph("VAT rate, %")} />
+        <Field label={ph("VAT rate, %")}>
+          <Input name="vatValue" defaultValue={product.vatValue ?? ""} />
+        </Field>
       </div>
       <label className="grid gap-1 text-sm">
         {ph("Description")}
         <textarea name="description" defaultValue={product.description ?? ""} rows={3} className="rounded-md border border-border bg-surface px-3 py-2" />
       </label>
       <div className="grid gap-3 sm:grid-cols-2">
-        <Input name="sellingPrice" required defaultValue={product.sellingPrice} aria-label={ph("Retail price")} placeholder={ph("Retail price")} />
-        <Input name="wholesalePrice" required defaultValue={product.wholesalePrice} aria-label={ph("Wholesale price")} placeholder={ph("Wholesale price")} />
-        <Input name="minimumPrice" required defaultValue={product.minimumPrice} aria-label={ph("Minimum price")} placeholder={ph("Minimum price")} />
-        {product.purchasePrice !== undefined ? <Input name="purchasePrice" required defaultValue={product.purchasePrice} aria-label={ph("Last purchase price")} placeholder={ph("Last purchase price")} /> : null}
+        <Field label={ph("Retail price")}>
+          <Input name="sellingPrice" required defaultValue={product.sellingPrice} />
+        </Field>
+        <Field label={ph("Wholesale price")}>
+          <Input name="wholesalePrice" required defaultValue={product.wholesalePrice} />
+        </Field>
+        <Field label={ph("Minimum price")}>
+          <Input name="minimumPrice" required defaultValue={product.minimumPrice} />
+        </Field>
+        {product.purchasePrice !== undefined ? (
+          <Field label={ph("Last purchase price")}>
+            <Input name="purchasePrice" required defaultValue={product.purchasePrice} />
+          </Field>
+        ) : null}
       </div>
       <div className="flex flex-wrap gap-4 text-sm">
         {(
@@ -131,7 +152,7 @@ export function ProductEditForm({ product, brands, categories, units }: { produc
         ).map(([name, label, checked]) => (
           <label key={name} className="flex items-center gap-2">
             <input name={name} type="checkbox" defaultChecked={checked} />
-            {label}
+            {ph(label)}
           </label>
         ))}
       </div>

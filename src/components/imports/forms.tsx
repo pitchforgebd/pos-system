@@ -20,7 +20,7 @@ export function ProductImportForm({ canExport }: { canExport: boolean }) {
     // The preview only reads (no toast, no refresh); the confirmed import writes, and this form shows its result.
     const outcome = await submit<PreviewRow[] | { rows?: ResultRow[] }>(
       { url: path, body: { fileName: "products.csv", csv } },
-      confirm ? { successMessage: "ইমপোর্ট সম্পন্ন হয়েছে। (Import finished.)", refresh: false } : { quiet: true },
+      confirm ? { successMessage: ph("Import finished."), refresh: false } : { quiet: true },
     );
     if (!outcome.ok) {
       return;

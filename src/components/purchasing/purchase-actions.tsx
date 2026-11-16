@@ -41,7 +41,7 @@ export function PurchaseActions({
         url: `/api/v1/purchases/${id}/receive`,
         body: { receivedOn, paymentAmount: paying ? paymentAmount : undefined, paymentMethod: paying ? account?.kind : undefined, paymentAccountId: paying ? accountId : undefined },
       },
-      { successMessage: "ক্রয় গ্রহণ করা হয়েছে। (Purchase received.)", onSuccess: () => setReceiving(false) },
+      { successMessage: ph("Purchase received."), onSuccess: () => setReceiving(false) },
     );
   }
 
@@ -49,7 +49,7 @@ export function PurchaseActions({
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
         {status === "DRAFT" && can.create ? (
-          <Button variant="secondary" loading={pending} onClick={() => void submit({ url: `/api/v1/purchases/${id}/order`, body: {} }, { successMessage: "অর্ডার পাঠানো হয়েছে। (Order placed.)" })}>
+          <Button variant="secondary" loading={pending} onClick={() => void submit({ url: `/api/v1/purchases/${id}/order`, body: {} }, { successMessage: ph("Order placed.") })}>
             {ph("Order from the vendor")}
           </Button>
         ) : null}
@@ -99,7 +99,7 @@ export function PurchaseActions({
         description={ph("Nothing was posted for it, so nothing is undone. A cancelled purchase cannot be received.")}
         confirmLabel={ph("Cancel purchase")}
         tone="danger"
-        onConfirm={() => void submit({ url: `/api/v1/purchases/${id}/cancel`, body: {} }, { successMessage: "ক্রয় বাতিল করা হয়েছে। (Purchase cancelled.)" })}
+        onConfirm={() => void submit({ url: `/api/v1/purchases/${id}/cancel`, body: {} }, { successMessage: ph("Purchase cancelled.") })}
       />
     </div>
   );

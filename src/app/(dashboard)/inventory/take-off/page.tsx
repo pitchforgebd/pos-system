@@ -14,10 +14,10 @@ import { getPhrase } from "@/lib/i18n/server";
 export const generateMetadata = phraseTitled("Take-off");
 
 const PURPOSE_LABEL: Record<string, string> = {
-  SAMPLE: "Sample",
+  SAMPLE: "Sample for a customer",
   DEMO: "Demonstration",
   FIELD_TRIAL: "Field trial",
-  OWN_USE: "Own use (drawing)",
+  OWN_USE: "Owner's own use (a drawing)",
   GIFT: "Gift",
 };
 
@@ -47,7 +47,7 @@ export default async function TakeOffPage() {
         columns={[
           { key: "number", header: ph("Number"), cell: (row) => <Link href={`/inventory/take-off/${row.id}`}>{row.number}</Link> },
           { key: "date", header: ph("Date"), cell: (row) => row.businessDate },
-          { key: "purpose", header: ph("Why"), cell: (row) => PURPOSE_LABEL[row.purpose ?? ""] ?? row.purpose },
+          { key: "purpose", header: ph("Why"), cell: (row) => ph(PURPOSE_LABEL[row.purpose ?? ""] ?? row.purpose ?? "") },
           { key: "items", header: ph("Goods"), cell: (row) => row.items.map((item) => `${item.name} × ${item.quantity}`).join(", ") },
           { key: "recipient", header: ph("Given to"), cell: (row) => row.recipient },
           { key: "approvedBy", header: ph("Approved by"), cell: (row) => row.approvedBy },

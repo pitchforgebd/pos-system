@@ -212,14 +212,14 @@ export function PurchaseForm({
           paymentAccountId: paying ? paymentAccountId : undefined,
         },
       },
-      { successMessage: mode === "draft" ? "খসড়া সংরক্ষিত হয়েছে। (Draft saved.)" : mode === "ordered" ? "অর্ডার পাঠানো হয়েছে। (Order placed.)" : "ক্রয় গ্রহণ করা হয়েছে। (Purchase received.)", goTo: (data) => `/purchases/${data.id}` },
+      { successMessage: mode === "draft" ? ph("Draft saved.") : mode === "ordered" ? ph("Order placed.") : ph("Purchase received."), goTo: (data) => `/purchases/${data.id}` },
     );
   }
 
   function update() {
     void submit<{ id: string }>(
       { url: `/api/v1/purchases/${initial?.id}`, method: "PATCH", body: payload() },
-      { successMessage: "পরিবর্তন সংরক্ষিত হয়েছে। (Changes saved.)", goTo: () => `/purchases/${initial?.id}` },
+      { successMessage: ph("Changes saved."), goTo: () => `/purchases/${initial?.id}` },
     );
   }
 

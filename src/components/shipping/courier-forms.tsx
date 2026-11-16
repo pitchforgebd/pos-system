@@ -25,7 +25,7 @@ export function CourierForm({ initial }: { initial?: CourierValues }) {
         event.preventDefault();
         void submit(
           { url: initial?.id ? `/api/v1/couriers/${initial.id}` : "/api/v1/couriers", method: initial?.id ? "PATCH" : "POST", body: { name: values.name, phone: values.phone || undefined, status: values.status, defaultConditionPercent: values.defaultConditionPercent, defaultDeliveryCharge: values.defaultDeliveryCharge, outsideDeliveryCharge: values.outsideDeliveryCharge } },
-          { successMessage: "কুরিয়ার সংরক্ষিত হয়েছে। (Courier saved.)", onSuccess: () => { if (!initial) { setValues({ name: "", phone: "", status: "ACTIVE", defaultConditionPercent: "1", defaultDeliveryCharge: "60", outsideDeliveryCharge: "110" }); reset(); } } },
+          { successMessage: ph("Courier saved."), onSuccess: () => { if (!initial) { setValues({ name: "", phone: "", status: "ACTIVE", defaultConditionPercent: "1", defaultDeliveryCharge: "60", outsideDeliveryCharge: "110" }); reset(); } } },
         );
       }}
     >

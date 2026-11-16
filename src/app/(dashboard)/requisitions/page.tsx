@@ -38,7 +38,7 @@ export default async function RequisitionsPage({ searchParams }: { searchParams:
         </Link>
         {statuses.map((item) => (
           <Link key={item} href={`/requisitions?status=${item}`} className={status === item ? "font-semibold" : "text-muted"}>
-            {item === "REQUESTED" ? ph("To approve") : item.charAt(0) + item.slice(1).toLowerCase()}
+            {item === "REQUESTED" ? ph("To approve") : ph(item.charAt(0) + item.slice(1).toLowerCase())}
           </Link>
         ))}
       </div>

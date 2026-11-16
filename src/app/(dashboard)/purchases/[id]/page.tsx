@@ -33,7 +33,7 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
     <div className="space-y-6">
       <PageHeader
         title={title}
-        description={`${purchase.supplier.name} · bill of ${purchase.businessDate}${purchase.supplierInvoiceNo ? ` · vendor's invoice ${purchase.supplierInvoiceNo}` : ""}`}
+        description={`${purchase.supplier.name} · ${ph("bill of")} ${purchase.businessDate}${purchase.supplierInvoiceNo ? ` · ${ph("vendor's invoice")} ${purchase.supplierInvoiceNo}` : ""}`}
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Purchases", href: "/purchases" }, { label: title }]}
         actions={<StatusBadge tone={TONE[purchase.status]}>{purchase.status}</StatusBadge>}
       />
@@ -75,14 +75,14 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
       </dl>
       {purchase.chargesTotal !== "0.00" ? (
         <p className="text-sm text-muted">
-          {ph("Haulage")} {purchase.transportPaidWith === "CREDIT" ? `is owed to ${purchase.transporter?.name ?? "the carrier"}` : `was paid ${purchase.transportPaidWith === "BANK" ? "from the bank" : "in cash"}`}
-          {purchase.transporter ? ` · carrier ${purchase.transporter.name}` : ""}
-          {purchase.vehicleNo ? ` · vehicle ${purchase.vehicleNo}` : ""}.
+          {ph("Haulage")} {purchase.transportPaidWith === "CREDIT" ? `${ph("is owed to")} ${purchase.transporter?.name ?? ph("the carrier")}` : purchase.transportPaidWith === "BANK" ? ph("was paid from the bank") : ph("was paid in cash")}
+          {purchase.transporter ? ` · ${ph("carrier")} ${purchase.transporter.name}` : ""}
+          {purchase.vehicleNo ? ` · ${ph("vehicle")} ${purchase.vehicleNo}` : ""}.
         </p>
       ) : null}
       {purchase.status === "RECEIVED" ? (
         <p className="text-sm text-muted">
-          {ph("Received")} {purchase.receivedOn} {ph("into")} {purchase.warehouse?.name ?? ph("the warehouse")}{ph(". Payment status")} {purchase.paymentStatus}{ph(": owed")} {purchase.owed}{ph(", paid since the purchase")} {purchase.paidLater}{ph(". Journal")}{" "}
+          {ph("Received")} {purchase.receivedOn} {ph("into")} {purchase.warehouse?.name ?? ph("the warehouse")}{ph(". Payment status")} {(purchase.paymentStatus ? ph(purchase.paymentStatus) : "")}{ph(": owed")} {purchase.owed}{ph(", paid since the purchase")} {purchase.paidLater}{ph(". Journal")}{" "}
           {purchase.journalBalanced ? ph("is balanced") : ph("is not balanced")}.
         </p>
       ) : (

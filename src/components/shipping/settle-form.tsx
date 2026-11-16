@@ -43,7 +43,7 @@ export function SettleForm({ courierId, parcels, accounts, today, canApproveDiff
         event.preventDefault();
         void submit<{ id: string }>(
           { url: `/api/v1/couriers/${courierId}/settle`, body: { shipmentIds: chosen.map((parcel) => parcel.id), businessDate: date, netReceived: net, accountId: accountId || undefined, differenceReason: difference !== 0 && reason.trim() !== "" ? reason.trim() : undefined } },
-          { successMessage: "সেটেলমেন্ট সংরক্ষিত হয়েছে। (Settlement saved.)", goTo: "/couriers", onSuccess: () => reset() },
+          { successMessage: ph("Settlement saved."), goTo: "/couriers", onSuccess: () => reset() },
         );
       }}
     >

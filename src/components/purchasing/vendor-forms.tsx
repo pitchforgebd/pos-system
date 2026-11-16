@@ -70,7 +70,7 @@ export function VendorPayForm({ supplierId, accounts, bills, today }: { supplier
             url: `/api/v1/suppliers/${supplierId}/payments`,
             body: { businessDate: date, amount, method: account?.kind ?? "CASH", accountId: accountId || undefined, charge: charge.trim() === "" ? undefined : charge, allocations: allocationsOf(shares) },
           },
-          { successMessage: "পেমেন্ট সংরক্ষিত হয়েছে। (Payment saved.)", onSuccess: () => { setAmount(""); setCharge(""); setShares({}); reset(); } },
+          { successMessage: ph("Payment saved."), onSuccess: () => { setAmount(""); setCharge(""); setShares({}); reset(); } },
         );
       }}
     >
@@ -124,7 +124,7 @@ export function VendorAdvanceForm({ supplierId, accounts, today }: { supplierId:
         event.preventDefault();
         void submit<{ id: string }>(
           { url: `/api/v1/suppliers/${supplierId}/advances`, body: { businessDate: date, amount, method: account?.kind ?? "CASH", accountId: accountId || undefined } },
-          { successMessage: "অগ্রিম সংরক্ষিত হয়েছে। (Advance saved.)", onSuccess: () => { setAmount(""); reset(); } },
+          { successMessage: ph("Advance saved."), onSuccess: () => { setAmount(""); reset(); } },
         );
       }}
     >
@@ -173,7 +173,7 @@ export function VendorApplyAdvanceForm({ supplierId, bills, held, today }: { sup
         event.preventDefault();
         void submit<{ id: string }>(
           { url: `/api/v1/suppliers/${supplierId}/advances/apply`, body: { businessDate: date, amount, allocations: allocationsOf(shares) } },
-          { successMessage: "অগ্রিম বিলে সমন্বয় হয়েছে। (Advance used.)", onSuccess: () => { setAmount(""); setShares({}); reset(); } },
+          { successMessage: ph("Advance used."), onSuccess: () => { setAmount(""); setShares({}); reset(); } },
         );
       }}
     >

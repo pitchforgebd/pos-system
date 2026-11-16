@@ -25,10 +25,10 @@ export function ShipmentActions({ id, status, method, today, can }: { id: string
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
-        {status === "CREATED" ? <Button variant="secondary" loading={pending} onClick={() => step("picked", "পার্সেল তোলা হয়েছে। (Picked up.)")}>{ph("Picked up")}</Button> : null}
-        {status === "CREATED" || status === "PICKED" ? <Button variant="secondary" loading={pending} onClick={() => step("in-transit", "পথে আছে। (In transit.)")}>{ph("On the way")}</Button> : null}
-        <Button loading={pending} onClick={() => step("delivered", "পার্সেল ডেলিভারি হয়েছে। (Delivered.)")}>{ph("Delivered")}</Button>
-        <Button variant="secondary" loading={pending} onClick={() => step("lost", "হারিয়ে গেছে। (Marked lost.)")}>{ph("Lost")}</Button>
+        {status === "CREATED" ? <Button variant="secondary" loading={pending} onClick={() => step("picked", ph("Picked up."))}>{ph("Picked up")}</Button> : null}
+        {status === "CREATED" || status === "PICKED" ? <Button variant="secondary" loading={pending} onClick={() => step("in-transit", ph("In transit."))}>{ph("On the way")}</Button> : null}
+        <Button loading={pending} onClick={() => step("delivered", ph("Delivered."))}>{ph("Delivered")}</Button>
+        <Button variant="secondary" loading={pending} onClick={() => step("lost", ph("Marked lost."))}>{ph("Lost")}</Button>
         {method === "COURIER" ? <Button variant="danger" onClick={() => setReturning((open) => !open)}>{ph("Came back")}</Button> : null}
       </div>
       {returning ? (
@@ -50,7 +50,7 @@ export function ShipmentActions({ id, status, method, today, can }: { id: string
             <Button
               variant="danger"
               loading={pending}
-              onClick={() => void submit({ url: `/api/v1/shipments/${id}/return`, body: { businessDate: date, returnCharge: charge.trim() === "" ? undefined : charge, reason: reason.trim() === "" ? undefined : reason } }, { successMessage: "পার্সেল ফেরত, সেল রিটার্ন হয়েছে। (Parcel returned.)" })}
+              onClick={() => void submit({ url: `/api/v1/shipments/${id}/return`, body: { businessDate: date, returnCharge: charge.trim() === "" ? undefined : charge, reason: reason.trim() === "" ? undefined : reason } }, { successMessage: ph("Parcel returned.") })}
             >
               {ph("Return the parcel")}
             </Button>

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useSubmit } from "@/lib/client/use-submit";
 import { useI18n } from "@/lib/i18n/provider";
@@ -40,7 +41,7 @@ export function ProductForm() {
                 trackExpiry: form.get("trackExpiry") === "on",
               },
             },
-            { successMessage: "পণ্য সংরক্ষিত হয়েছে। (Product saved.)", refresh: false },
+            { successMessage: ph("Product saved."), refresh: false },
           );
           if (!created.ok) {
             return;
@@ -50,7 +51,7 @@ export function ProductForm() {
             photo.set("file", file);
             const uploaded = await submit({ url: `/api/v1/products/${created.data.id}/image`, body: photo }, { quiet: true });
             if (!uploaded.ok) {
-              setPhotoMessage(`The product was saved, but the photo was not: ${uploaded.message}`);
+              setPhotoMessage(`${ph("The product was saved, but the photo was not:")} ${uploaded.message}`);
               return;
             }
           }
@@ -58,14 +59,32 @@ export function ProductForm() {
         })();
       }}
     >
-      <Input name="sku" required placeholder={ph("SKU")} aria-label={ph("SKU")} />
-      <Input name="name" required placeholder={ph("Name")} aria-label={ph("Name")} />
-      <Input name="purchasePrice" required placeholder={ph("Purchase price")} aria-label={ph("Purchase price")} />
-      <Input name="sellingPrice" required placeholder={ph("Selling price")} aria-label={ph("Selling price")} />
-      <Input name="wholesalePrice" required placeholder={ph("Wholesale price")} aria-label={ph("Wholesale price")} />
-      <Input name="minimumPrice" required placeholder={ph("Minimum price")} aria-label={ph("Minimum price")} />
-      <Input name="reorderLevel" placeholder={ph("Reorder level")} aria-label={ph("Reorder level")} defaultValue="0" />
-      <Input name="barcode" placeholder={ph("Barcode")} aria-label={ph("Barcode")} />
+      <Field label={ph("SKU")} hint={ph("The shop's own code for the product, different for each product.")}>
+        <Input name="sku" required />
+      </Field>
+      <Field label={ph("Name")}>
+        <Input name="name" required />
+      </Field>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label={ph("Purchase price")} hint={ph("What one unit cost you.")}>
+          <Input name="purchasePrice" required />
+        </Field>
+        <Field label={ph("Selling price")} hint={ph("The retail price of one unit.")}>
+          <Input name="sellingPrice" required />
+        </Field>
+        <Field label={ph("Wholesale price")}>
+          <Input name="wholesalePrice" required />
+        </Field>
+        <Field label={ph("Minimum price")} hint={ph("The lowest price a sale may go to; it cannot be more than the selling or wholesale price.")}>
+          <Input name="minimumPrice" required />
+        </Field>
+        <Field label={ph("Reorder level")} hint={ph("The stock at or below which the product shows as low.")}>
+          <Input name="reorderLevel" defaultValue="0" />
+        </Field>
+        <Field label={ph("Barcode")} hint={ph("Optional: scan or type it; one can be made later.")}>
+          <Input name="barcode" />
+        </Field>
+      </div>
       <label className="flex items-center gap-2 text-sm">
         <input name="trackStock" type="checkbox" defaultChecked />
         {ph("Track stock")}

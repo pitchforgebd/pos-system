@@ -43,7 +43,7 @@ export default async function ShiftsPage({ searchParams }: { searchParams: Promi
   return (
     <div className="space-y-6">
       <PageHeader
-        title={title}
+        title={ph(title)}
         description={ph("Open a shift with the cash in the drawer, work, then count and close. The drawer should hold the opening cash plus what this shift took in cash, less what it paid out. Two cashiers can work at the same time: each has a drawer of their own.")}
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: ph("Shifts") }]}
       />

@@ -48,7 +48,7 @@ async function Lines({ title, lines, total }: { title: string; lines: Array<{ ke
           {lines.map((line) => (
             <tr key={line.key} className="border-b border-border">
               <td className="py-2">
-                <Link href={line.href}>{line.label}</Link>
+                <Link href={line.href}>{ph(line.label)}</Link>
               </td>
               <td className="py-2 text-right tabular-nums">{line.amount}</td>
             </tr>

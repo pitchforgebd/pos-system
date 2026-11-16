@@ -13,7 +13,7 @@ import { getPhrase } from "@/lib/i18n/server";
 
 export const generateMetadata = phraseTitled("Shift");
 
-const statusText = { OPEN: "Open", ACTIVE: "Open", CLOSING: "Counted, not closed", CLOSED: "Closed" } as const;
+const statusText = { OPEN: "Shift is open", ACTIVE: "Shift is open", CLOSING: "Counted, not closed", CLOSED: "Shift is closed" } as const;
 
 export default async function ShiftDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const ph = await getPhrase();
@@ -36,16 +36,16 @@ export default async function ShiftDetailPage({ params }: { params: Promise<{ id
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`${shift.cashierName}'s shift`}
-        description={`${statusText[shift.status]}. Opened ${shift.day}. The drawer should hold the opening cash plus what this shift's own cash lines add up to.`}
-        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Shifts", href: "/shifts" }, { label: statusText[shift.status] }]}
+        title={`${ph("Shift of")} ${shift.cashierName}`}
+        description={`${ph(statusText[shift.status])}. ${ph("Opened")} ${shift.day}. ${ph("The drawer should hold the opening cash plus what this shift's own cash lines add up to.")}`}
+        breadcrumbs={[{ label: ph("Home"), href: "/dashboard" }, { label: ph("Shifts"), href: "/shifts" }, { label: ph(statusText[shift.status]) }]}
         actions={<PrintButton label={ph("Print shift report")} />}
       />
       <section className="grid gap-3 sm:grid-cols-4" aria-label={ph("Figures")}>
         <Figure label={ph("Opening cash")} value={shift.openingCash ?? "0.00"} />
         <Figure label={counted ? ph("Should have held") : ph("Should hold now")} value={counted ? (shift.expectedCash ?? shift.expectedNow) : shift.expectedNow} />
-        <Figure label={ph("Counted")} value={shift.actualCash ?? "not counted"} />
-        <Figure label={ph("Difference")} value={shift.difference ?? "not counted"} />
+        <Figure label={ph("Counted")} value={shift.actualCash ?? ph("not counted")} />
+        <Figure label={ph("Difference")} value={shift.difference ?? ph("not counted")} />
       </section>
 
       {live && mine ? (
@@ -76,7 +76,7 @@ export default async function ShiftDetailPage({ params }: { params: Promise<{ id
       <DataTable
         caption={ph("What went through the drawer")}
         columns={[
-          { key: "what", header: ph("What"), cell: (row) => row.label },
+          { key: "what", header: ph("What"), cell: (row) => ph(row.label) },
           { key: "in", header: ph("In"), cell: (row) => row.in },
           { key: "out", header: ph("Out"), cell: (row) => row.out },
         ]}
@@ -99,7 +99,7 @@ export default async function ShiftDetailPage({ params }: { params: Promise<{ id
       <DataTable
         caption={ph("Cash movements")}
         columns={[
-          { key: "direction", header: ph("Direction"), cell: (row) => (row.direction === "IN" ? "In" : "Out") },
+          { key: "direction", header: ph("Direction"), cell: (row) => (row.direction === "IN" ? ph("In") : ph("Out")) },
           { key: "amount", header: ph("Amount"), cell: (row) => row.amount },
           { key: "reason", header: ph("Reason"), cell: (row) => row.reason ?? "" },
         ]}
