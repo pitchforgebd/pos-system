@@ -8,6 +8,8 @@ export const SYSTEM_ROLES = [
   "AR",
   "COURIER_AR",
   "INVENTORY",
+  // the other side of a stock transfer between two branches: each branch's books balance on their own, and it nets to zero for the company
+  "INTER_BRANCH",
   "INPUT_VAT",
   "FIXED_ASSET",
   "ACCUM_DEPR",

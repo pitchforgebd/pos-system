@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/ui/states";
 import { getSession } from "@/modules/auth/current-session";
 import { listCustomerAdvances } from "@/modules/customers/advances";
 import { listCustomers } from "@/modules/customers/customers";
+import { moneyAccountOptions } from "@/modules/purchasing/lookups";
 import { phraseTitled } from "@/lib/i18n/metadata";
 import { getPhrase } from "@/lib/i18n/server";
 
@@ -18,10 +19,12 @@ export default async function CustomerAdvancesPage() {
   if (!session?.branchId) {
     redirect("/login");
   }
-  const [customers, advances] = await Promise.all([
+  const [customers, advances, money] = await Promise.all([
     listCustomers(session.organizationId),
     listCustomerAdvances(session.organizationId, session.branchId),
+    moneyAccountOptions(session.organizationId),
   ]);
+  const accounts = money.filter((row) => row.kind !== "CASH").map((row) => ({ id: row.id, label: `${row.code} · ${row.name}`, kind: row.kind }));
 
   return (
     <div className="space-y-6">
@@ -35,6 +38,7 @@ export default async function CustomerAdvancesPage() {
           title={ph("Advance Receive")}
           url="/api/v1/customer-advances"
           mode="advance"
+          accounts={accounts}
           parties={customers
             .filter((customer) => customer.status === "ACTIVE")
             .map((customer) => ({ id: customer.id, name: customer.name, phone: customer.phone, outstanding: customer.outstanding }))}

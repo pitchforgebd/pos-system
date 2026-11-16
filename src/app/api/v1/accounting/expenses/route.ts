@@ -4,7 +4,8 @@ import { isoDate } from "@/core/time/iso-date";
 
 import { jsonError, jsonOk } from "@/lib/api/http";
 import { stockActor } from "@/modules/inventory/actor";
-import { listExpenseRows, payExpense } from "@/modules/treasury/expenses";
+import { businessDate } from "@/core/time/business-date";
+import { generateDrafts, listExpenseRows, payExpense } from "@/modules/treasury/expenses";
 
 const month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
 
@@ -30,6 +31,10 @@ export const GET = defineRoute({
     const url = new URL(request.url);
     const period = month.safeParse(url.searchParams.get("periodMonth") ?? undefined);
     const status = z.enum(["DRAFT", "PAID", "ACCRUED"]).safeParse(url.searchParams.get("status") ?? undefined);
+    // the month's recurring drafts, as the expenses page makes them (made once; asking again changes nothing)
+    if (session.permissions.has("accounting.post")) {
+      await generateDrafts({ organizationId: actor.organizationId, branchId: actor.branchId }, businessDate().slice(0, 7));
+    }
     return jsonOk(await listExpenseRows(actor.organizationId, actor.branchId, { periodMonth: period.success ? period.data : undefined, status: status.success ? status.data : undefined }));
   },
 });

@@ -323,7 +323,7 @@ export function returnShipment(actor: Actor, id: string, input: { businessDate: 
         throw new RuleError("That shipment was already settled.", 409);
       }
       const charge = amountOf(input.returnCharge, "the return charge");
-      const sale = await tx.sale.findFirstOrThrow({ where: { id: current.saleId }, select: { id: true, customerId: true, items: { select: { id: true, quantity: true, returnItems: { where: { saleReturn: { status: "POSTED" } }, select: { id: true } } } } } });
+      const sale = await tx.sale.findFirstOrThrow({ where: { id: current.saleId }, select: { id: true, customerId: true, total: true, chargesTotal: true, items: { select: { id: true, quantity: true, returnItems: { where: { saleReturn: { status: "POSTED" } }, select: { id: true } } } } } });
       if (sale.items.some((item) => item.returnItems.length > 0)) {
         throw new RuleError("Part of this sale was already returned: the parcel cannot come back as a whole.", 409);
       }
@@ -365,6 +365,9 @@ export function returnShipment(actor: Actor, id: string, input: { businessDate: 
         saleId: current.saleId,
         businessDate: input.businessDate,
         lines: sale.items.map((item) => ({ saleItemId: item.id, quantity: item.quantity.toFixed(4) })),
+        // the delivery charge the customer was billed and never paid (it was in the COD) goes back with the goods: a refused parcel
+        // leaves nothing owed (found by the 7-day user test). A charge already paid before the parcel left is kept.
+        chargesBack: Prisma.Decimal.min(sale.chargesTotal, Prisma.Decimal.max(0, current.codAmount.minus(sale.total.minus(sale.chargesTotal)))).toFixed(2),
       });
       if (!back.ok) {
         throw new RuleError(back.message, back.status);

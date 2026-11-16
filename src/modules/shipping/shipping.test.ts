@@ -116,6 +116,26 @@ test("a parcel that comes back: the courier gives the cash back, the customer's 
   });
 });
 
+test("a refused parcel with a delivery charge billed in the COD: the charge goes back too, the customer owes nothing (found by the 7-day user test)", async () => {
+  await withTestOrg(async (t) => {
+    const s = await setup(t);
+    const made = await createOrder(actor(t), { customerId: s.customer.id, businessDate: today(), deliveryMethod: "COURIER", shippingAddress: "Mirpur", chargesTotal: "80.00", lines: [{ productId: s.product.id, quantity: "2" }] });
+    assert.equal(made.ok, true, JSON.stringify(made));
+    const id = made.ok ? made.id : "";
+    assert.equal((await confirmOrder(actor(t), id)).ok, true);
+    assert.equal((await dispatchOrder(actor(t), id, { dispatchedOn: today(), shipment: { courierId: s.courier.id } })).ok, true);
+    const row = await prisma.shipment.findFirstOrThrow({ where: { orderId: id } });
+    assert.equal(row.codAmount.toFixed(2), "280.00", "the COD carries the goods and the delivery charge");
+    const back = await returnShipment(actor(t), row.id, { businessDate: today(), reason: "Customer refused" });
+    assert.equal(back.ok, true, JSON.stringify(back));
+    assert.equal(await customerBalance(t, s.customer.id), "0.00", "nothing is owed for a parcel that was refused");
+    assert.deepEqual([await roleTotal(t, "SALES"), await roleTotal(t, "CHARGE_INCOME")], ["0.00", "0.00"]);
+    const invoice = await prisma.saleReturn.findFirstOrThrow({ where: { saleId: row.saleId as string } });
+    assert.equal(invoice.total.toFixed(2), "280.00", "the return carries the goods and the charge");
+    await assertBooksReconcile(t.org.id, prisma, { strictInventory: true });
+  });
+});
+
 test("a parcel is in one settlement only; only delivered parcels and returned ones are settled; two at once make one", async () => {
   await withTestOrg(async (t) => {
     const s = await setup(t);

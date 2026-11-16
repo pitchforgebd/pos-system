@@ -25,6 +25,8 @@ test("a purchase of an expiry-tracked product creates its lots", async () => {
   const user = await prisma.user.create({
     data: { organizationId: org.id, name: "Buyer", email: `pl-${stamp}@example.com`, passwordHash: await hashPassword("correct-password") },
   });
+  // it posts to fixed past dates: the user holds posting.backdate (D18)
+  await (await import("../../tests/helpers/backdate.ts")).grantBackdate(prisma, user);
   const { ensureChart } = await import("../../core/ledger/chart.ts");
   await ensureChart(prisma, org.id);
   async function product(code: string, trackExpiry: boolean) {

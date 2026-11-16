@@ -35,7 +35,7 @@ export async function salesDayReport(ctx: ReportCtx): Promise<ReportResult> {
     },
   });
   const ids = sales.map((sale) => sale.id);
-  const [status, allocations, levels, returns, methods, salesCredit] = await Promise.all([
+  const [status, allocations, levels, returns, methods, salesCredit, receiptless, booksSales] = await Promise.all([
     paymentStatuses(prisma, ctx.organizationId, "CUSTOMER", sales.map((sale) => ({ id: sale.id, total: sale.total }))),
     ids.length > 0 ? prisma.paymentAllocation.findMany({ where: { organizationId: ctx.organizationId, invoiceId: { in: ids } }, select: { invoiceId: true, amount: true, journal: { select: { businessDate: true } } } }) : [],
     prisma.priceLevel.findMany({ where: { organizationId: ctx.organizationId }, select: { id: true, name: true } }),
@@ -45,6 +45,15 @@ export async function salesDayReport(ctx: ReportCtx): Promise<ReportResult> {
       SELECT SUM(l.credit - l.debit) AS net
       FROM journal_lines l
       JOIN journals j ON j.id = l.journalId AND j.status = 'POSTED' AND j.docType = 'SALE' AND j.kind = 'POSTING'
+      JOIN account_roles r ON r.organizationId = l.organizationId AND r.accountId = l.accountId AND r.role = 'SALES'
+      WHERE l.organizationId = ${ctx.organizationId} ${lineBranches(ctx)} AND l.businessDate BETWEEN ${ctx.from} AND ${ctx.to}
+    `,
+    prisma.receiptlessReturn.aggregate({ where: { organizationId: ctx.organizationId, businessDate: window(ctx), ...docBranches(ctx) }, _sum: { total: true } }),
+    // the Sales account (4100) over the days, returns included: the profit and loss report's net sales
+    prisma.$queryRaw<Array<{ net: Prisma.Decimal | null }>>`
+      SELECT SUM(l.credit - l.debit) AS net
+      FROM journal_lines l
+      JOIN journals j ON j.id = l.journalId AND j.status = 'POSTED' AND (j.docType IS NULL OR j.docType <> 'YEAR_CLOSE')
       JOIN account_roles r ON r.organizationId = l.organizationId AND r.accountId = l.accountId AND r.role = 'SALES'
       WHERE l.organizationId = ${ctx.organizationId} ${lineBranches(ctx)} AND l.businessDate BETWEEN ${ctx.from} AND ${ctx.to}
     `,
@@ -82,6 +91,7 @@ export async function salesDayReport(ctx: ReportCtx): Promise<ReportResult> {
   const top = (map: Map<string, Prisma.Decimal>) => [...map].sort((a, b) => b[1].comparedTo(a[1])).slice(0, 10).map(([name, value]) => ({ name, amount: money(value) }));
   const total = sumOf(rows, (row) => row.sale.total);
   const returned = dec(returns._sum.total);
+  const noReceipt = dec(receiptless._sum.total);
   const columns = [
     col("number", "Invoice", "ইনভয়েস"),
     col("time", "Time", "সময়"),
@@ -101,15 +111,21 @@ export async function salesDayReport(ctx: ReportCtx): Promise<ReportResult> {
   ];
   return {
     key: "sales",
-    figures: { invoices: String(rows.length), sales: money(total), returns: money(returned), net: money(total.minus(returned)), paidSameDay: money(sumOf(rows, (row) => row.paidSameDay)), stillOwed: money(sumOf(rows, (row) => row.owed)) },
+    figures: { invoices: String(rows.length), sales: money(total), returns: money(returned.plus(noReceipt)), net: money(total.minus(returned).minus(noReceipt)), paidSameDay: money(sumOf(rows, (row) => row.paidSameDay)), stillOwed: money(sumOf(rows, (row) => row.owed)) },
     title: t("Sales", "বিক্রি (Sales)"),
     from: ctx.from,
     to: ctx.to,
+    // Found by the 7-day user test: this report's "net sales" (invoice totals, VAT and charges in them) and the profit and loss report's
+    // (the Sales account) differed under the same name. Each figure now says what it holds, and the books' net sales is shown too.
     summary: [
       { label: t("Invoices", "ইনভয়েস"), value: String(rows.length) },
-      { label: t("Sales", "মোট বিক্রি"), value: money(total) },
-      { label: t("Returns", "রিটার্ন"), value: money(returned) },
-      { label: t("Net sales", "নিট বিক্রি"), value: money(total.minus(returned)) },
+      { label: t("Invoiced (with VAT and charges)", "ইনভয়েসের মোট (VAT ও চার্জসহ)"), value: money(total) },
+      { label: t("Of it VAT", "এর মধ্যে VAT"), value: money(sumOf(rows, (row) => row.sale.vatTotal)) },
+      { label: t("Of it delivery and other charges", "এর মধ্যে ডেলিভারি ও অন্যান্য চার্জ"), value: money(sumOf(rows, (row) => row.sale.chargesTotal)) },
+      { label: t("Returns on invoices", "ইনভয়েসের ফেরত"), value: money(returned) },
+      { label: t("Returns with no receipt", "রসিদ ছাড়া ফেরত"), value: money(noReceipt) },
+      { label: t("Invoiced less returns", "ইনভয়েস − ফেরত"), value: money(total.minus(returned).minus(noReceipt)) },
+      { label: t("Net sales in the books (4100, no VAT or charges)", "খাতায় নিট বিক্রি (4100, VAT ও চার্জ ছাড়া)"), value: money(dec(booksSales[0]?.net)) },
       ...(ctx.canProfit ? [{ label: t("Gross profit on these invoices", "এই ইনভয়েসগুলোর মোট লাভ"), value: money(sumOf(rows, (row) => row.salesPart.minus(row.cogs))) }] : []),
     ],
     sections: [
@@ -407,7 +423,7 @@ export async function expenseDayReport(ctx: ReportCtx): Promise<ReportResult> {
   `;
   const accounts = await chart(ctx.organizationId);
   const name = new Map(accounts.map((account) => [account.id, `${account.name} (${account.code})`]));
-  const vouchers = await prisma.expense.findMany({ where: { organizationId: ctx.organizationId, journalId: { in: [...new Set(lines.map((line) => line.journalId))] } }, select: { journalId: true, amount: true, periodMonth: true, moneyAccountId: true, category: { select: { name: true, type: true } } } });
+  const vouchers = await prisma.expense.findMany({ where: { organizationId: ctx.organizationId, journalId: { in: [...new Set(lines.map((line) => line.journalId))] } }, select: { journalId: true, amount: true, charge: true, periodMonth: true, moneyAccountId: true, category: { select: { name: true, type: true } } } });
   const voucher = new Map(vouchers.map((row) => [row.journalId as string, row]));
   const rows = lines.map((line) => {
     const own = voucher.get(line.journalId);
@@ -424,7 +440,11 @@ export async function expenseDayReport(ctx: ReportCtx): Promise<ReportResult> {
   const group = netOf(totals, accounts, (account) => account.group === GROUP.EXPENSE);
   const total = sumOf(rows, (row) => row.amount);
   const voucherLines = sumOf(rows.filter((row) => row.line.docType === "EXPENSE" && row.own), (row) => row.amount);
-  const voucherAmounts = sumOf(vouchers.filter((row) => lines.some((line) => line.journalId === row.journalId && line.docType === "EXPENSE")), (row) => row.amount);
+  // a voucher is its own amount and the bank or mobile charge paid with it: both are expense lines of its journal (found by the user test)
+  const voucherAmounts = sumOf(
+    vouchers.filter((row) => lines.some((line) => line.journalId === row.journalId && line.docType === "EXPENSE")),
+    (row) => row.amount.plus(row.charge ?? 0),
+  );
   const typeLabel: Record<string, string> = { MONTHLY_FIXED: "Fixed monthly / মাসিক স্থির", VARIABLE: "Variable / পরিবর্তনশীল", MISC: "Miscellaneous / বিবিধ", OTHER: "Other (charges, transport, depreciation ...) / অন্যান্য" };
   return {
     key: "expenses",

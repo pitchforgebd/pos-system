@@ -24,6 +24,8 @@ test("phase 15 imports each row on its own and posts the opening stock as one jo
   const user = await prisma.user.create({
     data: { organizationId: org.id, name: "Importer", email: `importer-${stamp}@example.com`, passwordHash: "not-used" },
   });
+  // it posts to fixed past dates: the user holds posting.backdate (D18)
+  await (await import("../../tests/helpers/backdate.ts")).grantBackdate(prisma, user);
   const actor = { organizationId: org.id, userId: user.id, ip: "127.0.0.1", userAgent: "test" };
   const sku = `CSV-${stamp}`;
 

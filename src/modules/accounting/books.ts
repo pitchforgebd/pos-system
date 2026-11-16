@@ -6,6 +6,7 @@ import { RuleError } from "@/core/errors/rule-error";
 import { accountFor, accountsFor, MONEY_ACCOUNT_RANGES, MONEY_KINDS, moneyAccountFor } from "@/core/ledger/accounts";
 import { GROUP } from "@/core/ledger/groups";
 import { businessDate, dateOnly, fiscalYear } from "@/core/time/business-date";
+import { openingDate } from "@/core/time/opening";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
@@ -532,20 +533,39 @@ export async function accountStatement(input: { organizationId: string; branchId
       journal: { status: "POSTED", branchId: input.branchId, businessDate: { gte: from, lte: to } },
     },
     orderBy: [{ journal: { businessDate: "asc" } }, { createdAt: "asc" }],
-    select: { id: true, debit: true, credit: true, journal: { select: { number: true, description: true, businessDate: true } } },
+    select: { id: true, debit: true, credit: true, journalId: true, journal: { select: { number: true, description: true, businessDate: true } } },
   });
+  // who each line was with: the customer, vendor or courier on the same journal (found by the 16-day user test: a bank statement showed
+  // only numbers like "Receipt RCV-..." with no name)
+  const partyLines = rows.length > 0 ? await prisma.journalLine.findMany({ where: { organizationId: input.organizationId, journalId: { in: [...new Set(rows.map((row) => row.journalId))] }, partyId: { not: null } }, select: { journalId: true, partyId: true } }) : [];
+  const partyIds = [...new Set(partyLines.map((line) => line.partyId as string))];
+  const [customers, vendors, couriers] = partyIds.length > 0
+    ? await Promise.all([
+        prisma.customer.findMany({ where: { organizationId: input.organizationId, id: { in: partyIds } }, select: { id: true, name: true } }),
+        prisma.supplier.findMany({ where: { organizationId: input.organizationId, id: { in: partyIds } }, select: { id: true, name: true } }),
+        prisma.courier.findMany({ where: { organizationId: input.organizationId, id: { in: partyIds } }, select: { id: true, name: true } }),
+      ])
+    : [[], [], []];
+  const names = new Map([...customers, ...vendors, ...couriers].map((row) => [row.id, row.name]));
+  const partyOf = new Map(partyLines.map((line) => [line.journalId, names.get(line.partyId as string) ?? ""]));
+  let debitTotal = new Prisma.Decimal(0);
+  let creditTotal = new Prisma.Decimal(0);
   const lines = rows.map((row) => {
     running = running.plus(row.debit).minus(row.credit);
+    debitTotal = debitTotal.plus(row.debit);
+    creditTotal = creditTotal.plus(row.credit);
     return {
       id: row.id,
       businessDate: dateOnly(row.journal.businessDate),
       reference: row.journal.number ?? row.journal.description ?? "Journal",
+      description: row.journal.description ?? "",
+      party: partyOf.get(row.journalId) ?? "",
       debit: decimalString(row.debit, 2),
       credit: decimalString(row.credit, 2),
       balance: decimalString(running, 2),
     };
   });
-  return { account, opening: decimalString(opening, 2), lines };
+  return { account, opening: decimalString(opening, 2), lines, debitTotal: decimalString(debitTotal, 2), creditTotal: decimalString(creditTotal, 2), closing: decimalString(running, 2) };
 }
 
 export async function listCashBankLines(organizationId: string, branchId: string, from?: string, to?: string) {
@@ -1062,11 +1082,12 @@ export async function postOpeningCash(input: Actor & { amount: string }) {
       if (!amount || amount.lte(0)) {
         throw new PostingError("Enter an opening cash amount greater than zero.");
       }
-      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: businessDate() });
+      const day = await openingDate(tx, input.organizationId);
+      const number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: day });
       const journalId = await postBalancedJournal(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
-        businessDate: occurredDate(businessDate()),
+        businessDate: occurredDate(day),
         description: `Opening cash ${number}`,
         createdById: input.userId,
         number,
@@ -1157,11 +1178,12 @@ export async function createMoneyAccount(
       });
       let number: string | null = null;
       if (opening.gt(0)) {
-        number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: businessDate() });
+        const day = await openingDate(tx, input.organizationId);
+        number = await allocateNumber(tx, { organizationId: input.organizationId, documentType: "VCH", businessDate: day });
         await postBalancedJournal(tx, {
           organizationId: input.organizationId,
           branchId: input.branchId,
-          businessDate: occurredDate(businessDate()),
+          businessDate: occurredDate(day),
           description: `${kind === "BANK" ? "Bank" : "Mobile account"} opening ${name} ${number}`,
           createdById: input.userId,
           doc: { type: "BANK_OPENING", id: account.id },

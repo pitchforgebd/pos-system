@@ -35,6 +35,19 @@ test("creating a product puts its Retail and Wholesale prices in the price list;
   });
 });
 
+test("the minimum price is the floor of the selling and wholesale prices: a product priced under it is refused (found by the 7-day user test)", async () => {
+  await withTestOrg(async (t) => {
+    const low = await createProduct({ ...base(t), sku: "LOW-1", sellingPrice: "5.00", wholesalePrice: "5.00", minimumPrice: "8.00" });
+    assert.deepEqual(low.ok ? null : [low.status, low.message], [422, "The minimum price cannot be more than the selling price."]);
+    const lowWholesale = await createProduct({ ...base(t), sku: "LOW-2", sellingPrice: "100.00", wholesalePrice: "70.00", minimumPrice: "80.00" });
+    assert.deepEqual(lowWholesale.ok ? null : [lowWholesale.status, lowWholesale.message], [422, "The minimum price cannot be more than the wholesale price."]);
+    const made = await createProduct(base(t));
+    assert.equal(made.ok, true);
+    const changed = await updateProduct({ ...base(t), productId: made.ok ? made.product.id : "", minimumPrice: "120.00" });
+    assert.equal(changed.ok, false, "a change that puts the minimum above the price is refused too");
+  });
+});
+
 test("a service has no stock, expiry or serial whatever the form says", async () => {
   await withTestOrg(async (t) => {
     const made = await createProduct({ ...base(t), sku: "SVC-1", name: "Delivery charge", isService: true, trackStock: true, trackExpiry: true, trackSerial: true });

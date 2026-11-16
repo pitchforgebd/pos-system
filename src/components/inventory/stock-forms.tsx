@@ -95,6 +95,7 @@ export function AdjustmentForm({ products }: { products: ProductOption[] }) {
             quantity: form.get("quantity"),
             direction: form.get("direction"),
             reason: form.get("reason"),
+            ...(form.get("businessDate") ? { businessDate: form.get("businessDate") } : {}),
           },
         });
       }}
@@ -118,6 +119,10 @@ export function AdjustmentForm({ products }: { products: ProductOption[] }) {
         </select>
       </label>
       <Input name="reason" required placeholder={ph("Reason")} aria-label={ph("Reason")} />
+      <label className="grid gap-1 text-sm">
+        {ph("Day of the count")}
+        <Input name="businessDate" type="date" aria-label={ph("Day of the count")} />
+      </label>
       {message ? <p className="text-sm">{message}</p> : null}
       <Button type="submit" loading={pending} disabled={products.length === 0}>
         {ph("Adjust stock")}

@@ -378,6 +378,9 @@ model Organization {
   lockedThrough        DateTime?    @db.Date
   /// A posting dated further back than this many days needs the posting.backdate permission (D18).
   backdateDays         Int          @default(3)
+  /// The day the books start: every opening balance (cash, bank and mobile accounts, a customer's due, a vendor's payable) is dated
+  /// this day. Null: the day the opening is entered.
+  booksStartOn         DateTime?    @db.Date
   /// The most a sale may be discounted, in percent of what it would sell for (a line or the whole invoice).
   maxDiscountPercent   Decimal      @default(100) @db.Decimal(5, 2)
   /// Loyalty points are earned on a sale only when this is on (D14: off in v2).

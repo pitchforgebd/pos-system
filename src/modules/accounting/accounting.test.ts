@@ -23,6 +23,8 @@ test("phase 09 journals balance and reversals do not edit the original", async (
   const user = await prisma.user.create({
     data: { organizationId: org.id, name: "Accountant", email: `books-${stamp}@example.com`, passwordHash: await hashPassword("correct-password") },
   });
+  // it posts to fixed past dates: the user holds posting.backdate (D18)
+  await (await import("../../tests/helpers/backdate.ts")).grantBackdate(prisma, user);
   const { ensureChart } = await import("../../core/ledger/chart.ts");
   await ensureChart(prisma, org.id);
   const actor = { organizationId: org.id, branchId: branch.id, userId: user.id, ip: "127.0.0.1", userAgent: "test" };

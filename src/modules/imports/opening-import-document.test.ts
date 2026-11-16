@@ -22,6 +22,8 @@ test("an opening-stock import posts one document for all valid rows", async () =
   const user = await prisma.user.create({
     data: { organizationId: org.id, name: "Importer", email: `oi-${stamp}@example.com`, passwordHash: "not-used" },
   });
+  // it posts to fixed past dates: the user holds posting.backdate (D18)
+  await (await import("../../tests/helpers/backdate.ts")).grantBackdate(prisma, user);
 
   async function product(code: string, trackExpiry: boolean) {
     return prisma.product.create({

@@ -26,6 +26,11 @@ export type PostingContext = {
    * The route layer knows the session and passes true or false.
    */
   canBackdate?: boolean;
+  /**
+   * The user who posts. When `canBackdate` is left out and the date is older than the window, the user's own roles are asked whether
+   * they hold posting.backdate (the posting engine passes the journal's creator, so every posting keeps the window, D18).
+   */
+  userId?: string;
 };
 
 /**
@@ -50,10 +55,19 @@ export async function assertPostable(db: Db, ctx: PostingContext, date: string, 
   if (org.lockedThrough && date <= dateOnly(org.lockedThrough)) {
     throw new PeriodError("LOCKED", `The period up to ${dateOnly(org.lockedThrough)} is locked. ${date} cannot be posted.`);
   }
-  if (ctx.canBackdate === false && daysBetween(date, today) > org.backdateDays) {
+  if (daysBetween(date, today) > org.backdateDays && ctx.canBackdate !== true && (ctx.canBackdate === false || (ctx.userId && !(await holdsBackdate(db, ctx.organizationId, ctx.userId))))) {
     throw new PeriodError(
       "BACKDATE",
       `${date} is more than ${org.backdateDays} days back. Posting that far back needs the posting.backdate permission.`,
     );
   }
+}
+
+/** Whether one of the user's roles grants posting.backdate. */
+async function holdsBackdate(db: Db, organizationId: string, userId: string) {
+  const hit = await db.userRole.findFirst({
+    where: { organizationId, userId, role: { permissions: { some: { permission: { code: "posting.backdate" } } } } },
+    select: { userId: true },
+  });
+  return Boolean(hit);
 }

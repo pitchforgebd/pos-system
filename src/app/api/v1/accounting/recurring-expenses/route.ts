@@ -3,7 +3,8 @@ import { defineRoute } from "@/core/http/define-route";
 
 import { jsonError, jsonOk } from "@/lib/api/http";
 import { stockActor } from "@/modules/inventory/actor";
-import { listRecurring, saveRecurring } from "@/modules/treasury/expenses";
+import { businessDate } from "@/core/time/business-date";
+import { generateDrafts, listRecurring, saveRecurring } from "@/modules/treasury/expenses";
 
 const bodySchema = z.object({
   id: z.string().uuid().optional(),
@@ -39,6 +40,8 @@ export const POST = defineRoute({
     if (!result.ok) {
       return jsonError(result.code, result.message, result.status);
     }
+    // this month's draft is made at once (found by the user test: it only appeared when the expenses page was opened)
+    await generateDrafts({ organizationId: actor.organizationId, branchId: actor.branchId }, businessDate().slice(0, 7));
     return jsonOk({ id: result.id }, "Operation completed", body.id ? 200 : 201);
   },
 });

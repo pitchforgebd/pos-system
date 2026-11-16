@@ -91,6 +91,9 @@ export async function Today({ board, name, branchName, day, scope, branches, bra
   type Alert = { key: string; text: string; href: string; tone: string; icon: LucideIcon };
   const alerts: Alert[] = [];
   if (board) {
+    // found by the 7-day user test: the books let the cash go below zero without a word
+    if (Number(value("cash")) < 0) alerts.push({ key: "cashNegative", text: t("dashboard.cashNegative", { amount: taka(value("cash")) }), href: card("cash")?.href ?? "/reports", tone: "border-error/40 bg-error-subtle text-error", icon: AlertTriangle });
+    if (Number(value("bank")) < 0) alerts.push({ key: "bankNegative", text: t("dashboard.bankNegative", { amount: taka(value("bank")) }), href: card("bank")?.href ?? "/reports", tone: "border-error/40 bg-error-subtle text-error", icon: AlertTriangle });
     if (board.mismatches > 0) alerts.push({ key: "mismatch", text: t("dashboard.mismatch", { n: count(board.mismatches) }), href: "/reports/reconcile", tone: "border-error/40 bg-error-subtle text-error", icon: AlertTriangle });
     const low = Number(value("lowStock"));
     if (low > 0) alerts.push({ key: "low", text: t("dashboard.lowStock", { n: count(low) }), href: card("lowStock")?.href ?? "/inventory/alerts", tone: "border-warning/40 bg-warning-subtle text-warning", icon: Boxes });

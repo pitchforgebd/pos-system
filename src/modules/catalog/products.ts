@@ -422,10 +422,28 @@ async function uniqueSlug(organizationId: string, name: string) {
   return null;
 }
 
+/**
+ * The register never sells below the minimum price: a retail or wholesale price under it would be raised at the counter, so the price on
+ * the label and the price charged would differ (found by the 7-day user test). The minimum is the floor of both.
+ */
+function priceOrderProblem(money: { sellingPrice: Prisma.Decimal; wholesalePrice: Prisma.Decimal; minimumPrice: Prisma.Decimal }) {
+  if (money.minimumPrice.gt(money.sellingPrice)) {
+    return "The minimum price cannot be more than the selling price.";
+  }
+  if (money.minimumPrice.gt(money.wholesalePrice)) {
+    return "The minimum price cannot be more than the wholesale price.";
+  }
+  return null;
+}
+
 export async function createProduct(input: ProductInput) {
   const money = prices(input);
   if (!money) {
     return { ok: false as const, status: 422 as const, message: "Enter prices with up to two decimals and a reorder level with up to four." };
+  }
+  const order = priceOrderProblem(money);
+  if (order) {
+    return { ok: false as const, status: 422 as const, message: order };
   }
   if (!(await referenceExists(input.organizationId, input.brandId, input.categoryId, input.unitId))) {
     return { ok: false as const, status: 404 as const, message: "That record was not found." };
@@ -495,6 +513,10 @@ export async function updateProduct(input: ProductInput & { productId: string })
   const money = prices(input);
   if (!money) {
     return { ok: false as const, status: 422 as const, message: "Enter prices with up to two decimals and a reorder level with up to four." };
+  }
+  const order = priceOrderProblem(money);
+  if (order) {
+    return { ok: false as const, status: 422 as const, message: order };
   }
   if (!(await referenceExists(input.organizationId, input.brandId, input.categoryId, input.unitId))) {
     return { ok: false as const, status: 404 as const, message: "That record was not found." };

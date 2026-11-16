@@ -10,7 +10,9 @@ const bodySchema = z.object({
   customerId: z.string().uuid(),
   businessDate: isoDate,
   amount: z.string().trim().max(32),
-  method: z.enum(["CASH", "BANK"]),
+  method: z.enum(["CASH", "BANK", "MOBILE"]),
+  /** The bank or mobile account it came into; the default bank when left out. */
+  accountId: z.string().uuid().optional(),
 });
 
 export const GET = defineRoute({

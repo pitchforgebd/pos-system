@@ -1,11 +1,21 @@
 "use client";
 
-import { type FormEvent } from "react";
+import { type FormEvent, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSubmit } from "@/lib/client/use-submit";
 import { useI18n } from "@/lib/i18n/provider";
+
+function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+  return (
+    <label className="grid gap-1 text-sm">
+      <span className="font-medium">{label}</span>
+      {children}
+      {hint ? <span className="text-xs text-muted">{hint}</span> : null}
+    </label>
+  );
+}
 
 export function ProfileForm({
   name,
@@ -16,6 +26,7 @@ export function ProfileForm({
   logoUrl,
   pointsPerHundred,
   takaPerPoint,
+  booksStartOn,
 }: {
   name: string;
   phone: string;
@@ -25,6 +36,7 @@ export function ProfileForm({
   logoUrl: string;
   pointsPerHundred: string;
   takaPerPoint: string;
+  booksStartOn: string;
 }) {
   const { ph } = useI18n();
   const { submit, pending, message } = useSubmit();
@@ -43,26 +55,44 @@ export function ProfileForm({
         logoUrl: String(data.get("logoUrl") || "") || null,
         pointsPerHundred: String(data.get("pointsPerHundred") || "") || null,
         takaPerPoint: String(data.get("takaPerPoint") || "") || null,
+        booksStartOn: String(data.get("booksStartOn") || "") || null,
       },
     });
   }
 
   return (
     <form className="grid max-w-xl gap-3" onSubmit={onSubmit}>
-      <Input name="name" required defaultValue={name} placeholder={ph("Shop name")} aria-label={ph("Shop name")} />
-      <Input name="phone" defaultValue={phone} placeholder={ph("Phone")} aria-label={ph("Phone")} />
-      <textarea
-        name="address"
-        defaultValue={address}
-        aria-label={ph("Address")}
-        placeholder={ph("Address")}
-        className="min-h-24 rounded-md border border-border bg-surface px-3 py-2 text-sm"
-      />
-      <Input name="bin" defaultValue={bin} placeholder={ph("BIN")} aria-label={ph("BIN")} />
-      <Input name="tin" defaultValue={tin} placeholder={ph("TIN")} aria-label={ph("TIN")} />
-      <Input name="logoUrl" defaultValue={logoUrl} placeholder={ph("Logo URL")} aria-label={ph("Logo URL")} />
-      <Input name="pointsPerHundred" defaultValue={pointsPerHundred} placeholder={ph("Points per 100 taka")} aria-label={ph("Points per hundred")} />
-      <Input name="takaPerPoint" defaultValue={takaPerPoint} placeholder={ph("Taka per point")} aria-label={ph("Taka per point")} />
+      <Field label={ph("Shop name")}>
+        <Input name="name" required defaultValue={name} />
+      </Field>
+      <Field label={ph("Phone")}>
+        <Input name="phone" defaultValue={phone} />
+      </Field>
+      <Field label={ph("Address")}>
+        <textarea name="address" defaultValue={address} className="min-h-24 rounded-md border border-border bg-surface px-3 py-2 text-sm" />
+      </Field>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label={ph("BIN")}>
+          <Input name="bin" defaultValue={bin} />
+        </Field>
+        <Field label={ph("TIN")}>
+          <Input name="tin" defaultValue={tin} />
+        </Field>
+      </div>
+      <Field label={ph("Logo URL")} hint={ph("Printed on invoices and quotations.")}>
+        <Input name="logoUrl" defaultValue={logoUrl} />
+      </Field>
+      <Field label={ph("The day the books start")} hint={ph("Opening cash, bank and mobile balances, customers' old dues and vendors' old payables are dated this day. Leave it blank to date them the day they are entered.")}>
+        <Input name="booksStartOn" type="date" defaultValue={booksStartOn} />
+      </Field>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label={ph("Points per 100 taka")}>
+          <Input name="pointsPerHundred" defaultValue={pointsPerHundred} />
+        </Field>
+        <Field label={ph("Taka per point")}>
+          <Input name="takaPerPoint" defaultValue={takaPerPoint} />
+        </Field>
+      </div>
       {message ? <p className="text-sm text-error">{message}</p> : null}
       <Button type="submit" loading={pending}>
         {ph("Save shop profile")}

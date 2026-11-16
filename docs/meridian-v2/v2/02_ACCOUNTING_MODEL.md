@@ -21,6 +21,7 @@
 | 2100 | Accounts Payable (Vendor বাকি) | AP | Liability | partyId বাধ্যতামূলক |
 | 2150 | Customer Advance | CUSTOMER_ADVANCE | Liability | partyId (N16) |
 | 1450 | Advance to Vendor | VENDOR_ADVANCE | Asset | partyId |
+| 1480 | Inter-branch Clearing | INTER_BRANCH | Asset (ক্লিয়ারিং) | এক ব্রাঞ্চ থেকে আরেক ব্রাঞ্চে স্টক গেলে দুই দিকের বিপরীত লাইন; প্রতিটি ব্রাঞ্চের বই নিজে মেলে, কোম্পানি মিলিয়ে নিট শূন্য। পুরনো চার্টে প্রথম ট্রান্সফারেই যোগ হয় |
 | 2200 | Loans Payable | LOAN | Liability | |
 | 2300 | VAT Payable (Output) | OUTPUT_VAT | Liability | |
 | 2400 | Accrued Expenses | ACCRUED | Liability | মাস শেষের বকেয়া খরচ |
@@ -67,12 +68,12 @@
 
 **ব্যাংক/মোবাইল অ্যাকাউন্ট যোগ (P02 টাস্ক ১১):** `POST /api/v1/accounting/banks` — `kind` (BANK/MOBILE), নাম (একই নাম দুবার নয়, ধরন যাই হোক → 409), ব্যাংক, শাখা, নম্বর (≤ ৬৪ অক্ষর: অক্ষর/অঙ্ক/স্পেস/`-`/`/`), opening। কোড ব্যাপ্তি `prisma/chart-of-accounts.ts`-এর `MONEY_ACCOUNT_RANGES` থেকে (ব্যাংক ১২০১–১২৪৯, মোবাইল ১২৫১–১২৭৯; কোডে সংখ্যা লেখা হয় না), পরের খালি নম্বর। প্রতিটির লেজার `/accounting/statements?accountCode=…` — তারিখ না দিলে চলতি অর্থবছরের শুরু থেকে আজ। ক্যাশ opening ফর্ম ব্যাংক-ও-ক্যাশ পেজে, ব্রাঞ্চে একবার হলে ফর্ম আর দেখায় না।
 
-**opening-এর নিয়ম:** #3–#5 সবই একই দিনে (ঢাকার আজ) পোস্ট হয় এবং **ব্রাঞ্চ ছাড়া নেওয়া হয় না** (ব্রাঞ্চ না থাকলে জার্নাল বাদ পড়ে ব্যালান্স মিলত না; তাই কাস্টমার/Vendor তৈরিতে opening থাকলে ব্রাঞ্চ বাধ্যতামূলক)। ক্যাশ opening প্রতি ব্রাঞ্চে একবার (ব্রাঞ্চই ডকুমেন্ট, দ্বিতীয়বার 409), `POST /api/v1/accounting/opening-cash`। মালিকের মূলধন (3100) শুধু মালিক টাকা দিলে/তুললে নড়ে।
+**opening-এর নিয়ম:** #3–#5 সবই একই দিনে পোস্ট হয় — কোম্পানি প্রোফাইলের "হিসাব শুরুর তারিখ" (`organizations.booksStartOn`), না থাকলে ঢাকার আজ; এই তারিখ ব্যাক-ডেট সীমার বাইরে হলেও opening নেওয়া যায় (opening ব্যাক-ডেট এন্ট্রি নয়) এবং **ব্রাঞ্চ ছাড়া নেওয়া হয় না** (ব্রাঞ্চ না থাকলে জার্নাল বাদ পড়ে ব্যালান্স মিলত না; তাই কাস্টমার/Vendor তৈরিতে opening থাকলে ব্রাঞ্চ বাধ্যতামূলক)। ক্যাশ opening প্রতি ব্রাঞ্চে একবার (ব্রাঞ্চই ডকুমেন্ট, দ্বিতীয়বার 409), `POST /api/v1/accounting/opening-cash`। মালিকের মূলধন (3100) শুধু মালিক টাকা দিলে/তুললে নড়ে।
 | 6 | Adjustment + | Dr INVENTORY / Cr INVENTORY_GAIN (avg) | IN `ADJUSTMENT` |
 | 7 | Adjustment − | Dr INVENTORY_LOSS / Cr INVENTORY (avg) | OUT `ADJUSTMENT` |
 | 8 | Damage / Expiry | Dr INVENTORY_LOSS / Cr INVENTORY (avg) | OUT `DAMAGE`/`EXPIRY` |
 | 9 | Take-off (D1) | Dr DRAWINGS বা বাছাই করা খরচ খাত / Cr INVENTORY (avg) | OUT `TAKE_OFF` |
-| 10 | Branch transfer | Dr INVENTORY [dest branch] / Cr INVENTORY [src branch] (avg) | OUT+IN |
+| 10 | Branch transfer | প্রাপক ব্রাঞ্চে Dr INVENTORY / Cr INTER_BRANCH; প্রেরক ব্রাঞ্চে Dr INTER_BRANCH / Cr INVENTORY (avg) — প্রতিটি ব্রাঞ্চের ট্রায়াল ব্যালান্স নিজে মেলে (১৬ দিনের ইউজার টেস্টে ধরা পড়েছিল) | OUT+IN |
 
 ### ক্রয়
 

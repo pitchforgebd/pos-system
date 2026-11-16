@@ -2,7 +2,7 @@ import { RuleError } from "@/core/errors/rule-error";
 import { nextPartyCode, paymentDaysOf, phoneOf, placeOf, samePhone } from "@/modules/parties/profile";
 import { Prisma } from "@prisma/client";
 import { runTx } from "@/core/tx/run";
-import { businessDate } from "@/core/time/business-date";
+import { openingDate } from "@/core/time/opening";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
@@ -147,7 +147,7 @@ export async function createSupplier(input: {
       await postBalancedJournal(tx, {
         organizationId: input.organizationId,
         branchId: input.branchId,
-        businessDate: occurredDate(businessDate()),
+        businessDate: occurredDate(await openingDate(tx, input.organizationId)),
         description: `Supplier opening ${created.name}`,
         createdById: input.actorId,
         lines: [

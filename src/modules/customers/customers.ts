@@ -2,7 +2,8 @@ import { nextPartyCode, paymentDaysOf, phoneOf, placeOf, samePhone, tagsOf } fro
 import { Prisma } from "@prisma/client";
 import { runTx } from "@/core/tx/run";
 import { RuleError } from "@/core/errors/rule-error";
-import { businessDate, dateOnly } from "@/core/time/business-date";
+import { dateOnly } from "@/core/time/business-date";
+import { openingDate } from "@/core/time/opening";
 
 import { prisma } from "@/lib/db/client";
 import { writeAudit } from "@/modules/auth/audit";
@@ -37,10 +38,6 @@ const customerSelect = {
 
 function dateString(value: Date) {
   return dateOnly(value);
-}
-
-function today() {
-  return new Date(`${businessDate()}T00:00:00.000Z`);
 }
 
 /** What the customer owes the shop: the balance of their receivable lines in the journal (I8). An advance is not netted against it. */
@@ -323,7 +320,7 @@ export async function createCustomer(input: {
         await postBalancedJournal(tx, {
           organizationId: input.organizationId,
           branchId: input.branchId,
-          businessDate: today(),
+          businessDate: new Date(`${await openingDate(tx, input.organizationId)}T00:00:00.000Z`),
           description: `Customer opening ${created.name}`,
           createdById: input.actorId,
           lines: [

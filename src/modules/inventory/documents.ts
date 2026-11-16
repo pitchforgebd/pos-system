@@ -1,5 +1,6 @@
 import { Prisma, type StockDocumentType, type TakeOffPurpose } from "@prisma/client";
 import { RuleError } from "@/core/errors/rule-error";
+import { ensureChart } from "@/core/ledger/chart";
 import { businessDate, dateOnly } from "@/core/time/business-date";
 
 import { prisma } from "@/lib/db/client";
@@ -694,6 +695,10 @@ export async function postTransfer(input: {
         const out = moves.push({ productId: product.id, variantId: line.variantId, warehouseId: fromWarehouse.id, quantity, direction: "OUT", movementType: "TRANSFER_OUT", lotsOut: lots }) - 1;
         moves.push({ productId: product.id, variantId: line.variantId, warehouseId: toWarehouse.id, branchId: input.toBranchId, quantity, direction: "IN", movementType: "TRANSFER_IN", unitCostFrom: out });
       }
+      // a company whose chart is older than the inter-branch clearing account gets it now
+      if (input.fromBranchId !== input.toBranchId && (await tx.accountRole.count({ where: { organizationId: input.organizationId, role: "INTER_BRANCH" } })) === 0) {
+        await ensureChart(tx, input.organizationId);
+      }
       await postWithStock(tx, {
         organizationId: input.organizationId,
         branchId: input.fromBranchId,
@@ -703,10 +708,16 @@ export async function postTransfer(input: {
         doc: { type: "TRANSFER", id: transfer.id },
         reference: { type: "stock_transfer", id: transfer.id },
         moves,
-        // between two branches the inventory moves from one to the other; inside one branch no account changes
+        // Between two branches the inventory moves from one to the other, each side through the inter-branch clearing account, so that
+        // each branch's trial balance and balance sheet agree on their own (found by the 7-day user test); inside one branch no account changes.
         lines: (result) =>
           input.fromBranchId !== input.toBranchId && result.in.gt(0)
-            ? bothSides({ role: "INVENTORY", branchId: input.toBranchId, debit: result.in, credit: ZERO }, { role: "INVENTORY", debit: ZERO, credit: result.out })
+            ? [
+                { role: "INVENTORY", branchId: input.toBranchId, debit: result.in, credit: ZERO },
+                { role: "INTER_BRANCH", branchId: input.toBranchId, debit: ZERO, credit: result.in },
+                { role: "INTER_BRANCH", debit: result.out, credit: ZERO },
+                { role: "INVENTORY", debit: ZERO, credit: result.out },
+              ]
             : [],
       });
       for (const entry of consumed) {

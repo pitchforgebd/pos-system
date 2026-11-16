@@ -25,6 +25,8 @@ test("a variant sells at its own price and falls back to the product price", asy
   const user = await prisma.user.create({
     data: { organizationId: org.id, name: "Cashier", email: `variant-${stamp}@example.com`, passwordHash: await hashPassword("correct-password") },
   });
+  // it posts to fixed past dates: the user holds posting.backdate (D18)
+  await (await import("../../tests/helpers/backdate.ts")).grantBackdate(prisma, user);
   const { ensureChart } = await import("../../core/ledger/chart.ts");
   await ensureChart(prisma, org.id);
   const product = await prisma.product.create({

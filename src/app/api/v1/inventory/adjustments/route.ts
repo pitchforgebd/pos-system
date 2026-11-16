@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { defineRoute } from "@/core/http/define-route";
+import { isoDate } from "@/core/time/iso-date";
 
 import { jsonError, jsonOk } from "@/lib/api/http";
 import { idempotencyKey, stockActor } from "@/modules/inventory/actor";
@@ -12,6 +13,8 @@ const bodySchema = z.object({
   direction: z.enum(["IN", "OUT"]),
   reason: z.string().trim().min(1).max(255),
   warehouseId: z.string().uuid().optional(),
+  /** The day the count was made; today when left out. */
+  businessDate: isoDate.optional(),
 });
 
 export const POST = defineRoute({

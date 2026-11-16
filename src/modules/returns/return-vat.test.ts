@@ -25,6 +25,8 @@ test("a customer return reverses the discount, the sales credit, and the VAT pay
   const user = await prisma.user.create({
     data: { organizationId: org.id, name: "Cashier", email: `return-vat-${stamp}@example.com`, passwordHash: await hashPassword("correct-password") },
   });
+  // it posts to fixed past dates: the user holds posting.backdate (D18)
+  await (await import("../../tests/helpers/backdate.ts")).grantBackdate(prisma, user);
   const { ensureChart } = await import("../../core/ledger/chart.ts");
   await ensureChart(prisma, org.id);
   async function makeProduct(name: string, sellingPrice: string) {

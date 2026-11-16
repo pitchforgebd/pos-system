@@ -50,9 +50,11 @@ export async function createInstallment(input: {
   }
   try {
     const installment = await runTx(async (tx) => {
+      // the open-invoice list names an invoice by its sale's id: either id is accepted (found by the 7-day user test)
       const locked = await tx.$queryRaw<Array<{ id: string }>>`
-        SELECT id FROM invoices WHERE id = ${input.invoiceId} AND organizationId = ${input.organizationId} AND branchId = ${input.branchId} FOR UPDATE
+        SELECT id FROM invoices WHERE (id = ${input.invoiceId} OR saleId = ${input.invoiceId}) AND organizationId = ${input.organizationId} AND branchId = ${input.branchId} FOR UPDATE
       `;
+      input = { ...input, invoiceId: locked[0]?.id ?? input.invoiceId };
       if (!locked[0]) {
         throw new StockRuleError("That record was not found.", 404);
       }

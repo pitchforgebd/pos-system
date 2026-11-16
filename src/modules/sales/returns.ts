@@ -10,7 +10,7 @@ import { postWithStock } from "@/core/posting/stock";
 import type { JournalLineInput } from "@/modules/accounting/post";
 import { allocateNumber } from "@/modules/documents/numbers";
 import { hashPayload, idempotentTransaction, isKeyRace, readIdempotency, saveIdempotency } from "@/core/idempotency";
-import { decimalString, money, parseQuantity, zero } from "@/core/money";
+import { decimalString, money, parseMoney, parseQuantity, zero } from "@/core/money";
 import { addExpiryLots, StockRuleError } from "@/modules/inventory/stock";
 import { markOrderReturned } from "@/modules/orders/orders";
 import { returnLineAmount } from "@/modules/returns/amount";
@@ -55,9 +55,17 @@ export type RefundMethod = "CASH" | "BANK" | "MOBILE" | "ADVANCE" | "AR_ONLY";
  * advance, or left as credit on their account (AR_ONLY).
  */
 export async function postSaleReturn(
-  input: Actor & { saleId: string; businessDate: string; refundMethod?: RefundMethod; refundAccountId?: string; lines: Array<{ saleItemId: string; quantity: string }> },
+  input: Actor & {
+    saleId: string;
+    businessDate: string;
+    refundMethod?: RefundMethod;
+    refundAccountId?: string;
+    lines: Array<{ saleItemId: string; quantity: string }>;
+    /** Part of the sale's delivery and other charges given back with the goods (a whole parcel that came back unopened). */
+    chargesBack?: string;
+  },
 ) {
-  const requestHash = hashPayload({ saleId: input.saleId, businessDate: input.businessDate, refundMethod: input.refundMethod ?? null, refundAccountId: input.refundAccountId ?? null, lines: input.lines });
+  const requestHash = hashPayload({ saleId: input.saleId, businessDate: input.businessDate, refundMethod: input.refundMethod ?? null, refundAccountId: input.refundAccountId ?? null, lines: input.lines, ...(input.chargesBack ? { chargesBack: input.chargesBack } : {}) });
   try {
     const data = await idempotentTransaction(async (tx) => {
       const existing = await readIdempotency(tx, { organizationId: input.organizationId, key: input.idempotencyKey, requestHash });
@@ -69,7 +77,7 @@ export async function postSaleReturn(
       }
       const sale = await tx.sale.findFirst({
         where: { id: input.saleId, organizationId: input.organizationId },
-        select: { id: true, branchId: true, warehouseId: true, customerId: true, status: true, businessDate: true, payments: { select: { method: true, amount: true, accountId: true } }, customer: { select: { isSystem: true } } },
+        select: { id: true, branchId: true, warehouseId: true, customerId: true, status: true, businessDate: true, chargesTotal: true, payments: { select: { method: true, amount: true, accountId: true } }, customer: { select: { isSystem: true } } },
       });
       if (!sale || sale.branchId !== input.branchId) {
         throw new StockRuleError("That record was not found.", 404);
@@ -117,9 +125,14 @@ export async function postSaleReturn(
         const unitCost = item.unitCost !== null ? new Prisma.Decimal(item.unitCost) : await saleUnitCost(tx, input.organizationId, sale.id, item.productId, item.variantId);
         priced.push({ saleItemId: item.id, productId: item.productId, variantId: item.variantId, quantity, amount, vat, unitCost, priorReturned: priorQuantities.reduce((sum, value) => sum.plus(value), zero()), lots: Array.isArray(item.lots) ? (item.lots as SoldLot[]) : [] });
       }
-      const total = money(priced.reduce((sum, line) => sum.plus(line.amount), zero()));
+      const chargesBack = input.chargesBack ? parseMoney(input.chargesBack) : zero();
+      if (!chargesBack || chargesBack.isNeg() || chargesBack.gt(sale.chargesTotal)) {
+        throw new StockRuleError("The charges given back cannot be more than the sale's charges.");
+      }
+      const goodsTotal = money(priced.reduce((sum, line) => sum.plus(line.amount), zero()));
+      const total = money(goodsTotal.plus(chargesBack));
       const vatTotal = money(priced.reduce((sum, line) => sum.plus(line.vat), zero()));
-      const salesTotal = money(total.minus(vatTotal));
+      const salesTotal = money(goodsTotal.minus(vatTotal));
 
       // what the customer still owes on this invoice is cancelled first; the rest was paid, and is given back
       const bill = await invoicePayment(tx, input.organizationId, sale.id);
@@ -170,6 +183,7 @@ export async function postSaleReturn(
           const journalLines: JournalLineInput[] = [
             ...(salesTotal.gt(0) ? [{ role: "SALES" as const, debit: salesTotal, credit: zero() }] : []),
             ...(vatTotal.gt(0) ? [{ role: "OUTPUT_VAT" as const, debit: vatTotal, credit: zero() }] : []),
+            ...(chargesBack.gt(0) ? [{ role: "CHARGE_INCOME" as const, debit: chargesBack, credit: zero() }] : []),
             ...(applied.gt(0) ? [{ role: "AR" as const, debit: zero(), credit: applied, party }] : []),
             ...(refund.gt(0) && refundAccount ? [{ accountId: refundAccount, debit: zero(), credit: refund }] : []),
             ...(refund.gt(0) && method === "ADVANCE" && party ? [{ role: "CUSTOMER_ADVANCE" as const, debit: zero(), credit: refund, party }] : []),

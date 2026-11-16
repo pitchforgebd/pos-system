@@ -17,6 +17,8 @@ test("a transfer is received at once, keeps cost and lots, and is idempotent", a
   const { hashPassword } = await import("../auth/password.ts");
   const { postOpeningStock, postTransfer } = await import("./documents.ts");
   const { ledgerMatchesBalance } = await import("./stock.ts");
+  // today: the user here holds no role, so a date further back than the window would be refused (D18)
+  const today = (await import("../../core/time/business-date.ts")).businessDate();
 
   const stamp = `${Date.now()}-trf`;
   const org = await prisma.organization.create({ data: { name: "Transfer", slug: `transfer-${stamp}` } });
@@ -76,7 +78,7 @@ test("a transfer is received at once, keeps cost and lots, and is idempotent", a
     const variant = await prisma.productVariant.create({ data: { organizationId: org.id, productId: sized.id, sku: `SIZED-L-${stamp}` } });
 
     const open = (where: ReturnType<typeof at>, lines: Parameters<typeof postOpeningStock>[0]["lines"]) =>
-      postOpeningStock({ ...where, idempotencyKey: randomUUID(), businessDate: "2026-10-01", lines });
+      postOpeningStock({ ...where, idempotencyKey: randomUUID(), businessDate: today, lines });
     assert.equal((await open(at(north, northStore), [{ productId: plain.id, quantity: "10", unitCost: "10.00" }])).ok, true);
     assert.equal((await open(at(south, southStore), [{ productId: plain.id, quantity: "10", unitCost: "20.00" }])).ok, true);
     assert.equal(

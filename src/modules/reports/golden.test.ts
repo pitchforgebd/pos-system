@@ -58,7 +58,7 @@ test("the golden day: every daily report gives the figures worked out by hand, a
     // 1. sales
     const sales = await run("sales");
     const s = EXPECTED.sales;
-    assert.deepEqual([summary(sales, "Invoices"), summary(sales, "Sales"), summary(sales, "Returns"), summary(sales, "Net sales"), summary(sales, "Gross profit on these invoices")], [s.invoices, s.sales, s.returns, s.net, s.gross], "sales summary");
+    assert.deepEqual([summary(sales, "Invoices"), summary(sales, "Invoiced (with VAT and charges)"), summary(sales, "Returns on invoices"), summary(sales, "Invoiced less returns"), summary(sales, "Gross profit on these invoices")], [s.invoices, s.sales, s.returns, s.net, s.gross], "sales summary");
     const methods = Object.fromEntries((section(sales, "methods")?.rows ?? []).map((row) => [row.method, row.amount]));
     assert.deepEqual([methods.CASH, methods.MOBILE], [s.cash, s.mobile], "by method");
     const creditRow = section(sales, "invoices")?.rows.find((row) => row.total === "3600.00");

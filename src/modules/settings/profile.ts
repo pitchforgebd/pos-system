@@ -1,12 +1,13 @@
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/client";
+import { businessDate, dateOnly, isIsoDate } from "@/core/time/business-date";
 import { writeAudit } from "@/modules/auth/audit";
 
 export async function getOrganizationProfile(organizationId: string) {
   const row = await prisma.organization.findUnique({
     where: { id: organizationId },
-    select: { name: true, slug: true, phone: true, address: true, status: true, bin: true, tin: true, logoUrl: true, pointsPerHundred: true, takaPerPoint: true },
+    select: { name: true, slug: true, phone: true, address: true, status: true, bin: true, tin: true, logoUrl: true, pointsPerHundred: true, takaPerPoint: true, booksStartOn: true },
   });
   if (!row) {
     return null;
@@ -22,6 +23,7 @@ export async function getOrganizationProfile(organizationId: string) {
     logoUrl: row.logoUrl ?? "",
     pointsPerHundred: row.pointsPerHundred === null ? "" : new Prisma.Decimal(row.pointsPerHundred).toFixed(4),
     takaPerPoint: row.takaPerPoint === null ? "" : new Prisma.Decimal(row.takaPerPoint).toFixed(4),
+    booksStartOn: row.booksStartOn ? dateOnly(row.booksStartOn) : "",
   };
 }
 
@@ -36,6 +38,8 @@ export async function saveOrganizationProfile(input: {
   logoUrl?: string | null;
   pointsPerHundred?: string | null;
   takaPerPoint?: string | null;
+  /** The day the books start (YYYY-MM-DD): opening balances are dated this day. Null clears it; left out keeps it. */
+  booksStartOn?: string | null;
   ip: string;
   userAgent: string | null;
 }) {
@@ -65,16 +69,20 @@ export async function saveOrganizationProfile(input: {
   if (pointsPerHundred === "invalid" || takaPerPoint === "invalid") {
     return { ok: false as const, status: 422 as const, code: "BUSINESS_RULE" as const, message: "Enter point rates as amounts, or leave them blank." };
   }
+  const booksStartOn = input.booksStartOn === undefined ? undefined : input.booksStartOn?.trim() || null;
+  if (booksStartOn && (!isIsoDate(booksStartOn) || booksStartOn > businessDate())) {
+    return { ok: false as const, status: 422 as const, code: "BUSINESS_RULE" as const, message: "The day the books start is a date up to today." };
+  }
   const current = await prisma.organization.findUnique({
     where: { id: input.organizationId },
-    select: { name: true, phone: true, address: true },
+    select: { name: true, phone: true, address: true, booksStartOn: true },
   });
   if (!current) {
     return { ok: false as const, status: 404 as const, code: "NOT_FOUND" as const, message: "That shop was not found." };
   }
   await prisma.organization.update({
     where: { id: input.organizationId },
-    data: { name, phone, address, bin, tin, logoUrl, pointsPerHundred, takaPerPoint },
+    data: { name, phone, address, bin, tin, logoUrl, pointsPerHundred, takaPerPoint, ...(booksStartOn === undefined ? {} : { booksStartOn: booksStartOn ? new Date(`${booksStartOn}T00:00:00.000Z`) : null }) },
   });
   await writeAudit({
     organizationId: input.organizationId,
@@ -83,8 +91,8 @@ export async function saveOrganizationProfile(input: {
     module: "settings",
     entityType: "organization",
     entityId: input.organizationId,
-    before: current,
-    after: { name, phone, address, bin, tin, logoUrl, pointsPerHundred: pointsPerHundred?.toFixed(4) ?? null, takaPerPoint: takaPerPoint?.toFixed(4) ?? null },
+    before: { ...current, booksStartOn: current.booksStartOn ? dateOnly(current.booksStartOn) : null },
+    after: { name, phone, address, bin, tin, logoUrl, pointsPerHundred: pointsPerHundred?.toFixed(4) ?? null, takaPerPoint: takaPerPoint?.toFixed(4) ?? null, booksStartOn: booksStartOn ?? null },
     ip: input.ip,
     userAgent: input.userAgent,
   });

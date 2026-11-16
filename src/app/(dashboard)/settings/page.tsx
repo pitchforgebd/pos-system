@@ -49,6 +49,7 @@ export default async function SettingsPage() {
             logoUrl={profile.logoUrl}
             pointsPerHundred={profile.pointsPerHundred}
             takaPerPoint={profile.takaPerPoint}
+            booksStartOn={profile.booksStartOn}
           />
         ) : null}
       </section>

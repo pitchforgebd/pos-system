@@ -51,6 +51,10 @@ async function pricing(tx: Tx, actor: Actor, input: OrderInput, flags: OrderFlag
   if (!isIsoDate(input.businessDate) || (input.expectedDate && !isIsoDate(input.expectedDate)) || (input.validUntil && !isIsoDate(input.validUntil))) {
     throw new RuleError("Dates use YYYY-MM-DD.");
   }
+  // a quotation that has already expired could never become an order (found by the 7-day user test)
+  if (input.validUntil && (input.validUntil < businessDate() || input.validUntil < input.businessDate)) {
+    throw new RuleError("A quotation must be valid until today or later, and not before its own date.");
+  }
   if (input.lines.length === 0) {
     throw new RuleError("Add a line to the order.");
   }

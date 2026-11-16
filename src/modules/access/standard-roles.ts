@@ -18,12 +18,13 @@ export const STANDARD_ROLES: readonly StandardRole[] = [
   },
   {
     name: "Cashier",
-    note: "The register: sells, takes money from customers, opens and closes a shift. Sees no cost price, no profit and no reports, gives no discount and changes no price.",
-    permissions: ["dashboard.view", "products.view", "sales.view", "sales.create", "customers.view", "customers.create", "customers.payment", "orders.view", "orders.create", "shifts.manage"],
+    note: "The register: sells, takes money from customers, takes goods back on their invoice (a return with no receipt is for the owner or the manager), opens and closes a shift. Sees no cost price, no profit and no reports, gives no discount and changes no price.",
+    // returns found missing by the 7-day user test: every return at the counter needed the owner
+    permissions: ["dashboard.view", "products.view", "sales.view", "sales.create", "sales.return", "customers.view", "customers.create", "customers.payment", "orders.view", "orders.create", "shifts.manage"],
   },
   {
     name: "Store keeper",
-    note: "The store: receives purchases, counts and adjusts stock, moves stock between places, records damage and expiry, dispatches orders. Sees no profit and takes no money.",
+    note: "The store: receives purchases, counts and adjusts stock, moves stock between places, records damage, expiry and goods taken out without a sale, dispatches orders. Sees no profit and takes no money.",
     permissions: [
       "dashboard.view",
       "products.view",
@@ -34,6 +35,7 @@ export const STANDARD_ROLES: readonly StandardRole[] = [
       "inventory.transfer",
       "inventory.damage",
       "inventory.expiry",
+      "inventory.takeoff",
       "inventory.opening",
       "purchase.view",
       "purchase.create",

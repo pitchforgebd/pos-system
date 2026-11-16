@@ -83,21 +83,29 @@ export async function login(input: {
   }
   await clearLimit(rules.pair);
 
+  // The branch the user worked in last time, else the company's first branch they may use (found by the 16-day user test: by name, a new
+  // "Bogura Depot" came before "Main" and the owner signed in to an empty branch where the shop's invoices were "not found").
   const access = await prisma.userBranchAccess.findMany({
     where: { userId: user.id, organizationId: user.organizationId },
     select: { branchId: true },
-    orderBy: { branch: { name: "asc" } },
+    orderBy: { branch: { createdAt: "asc" } },
   });
+  const last = await prisma.session.findFirst({
+    where: { userId: user.id, branchId: { in: access.map((row) => row.branchId) } },
+    orderBy: { createdAt: "desc" },
+    select: { branchId: true },
+  });
+  const branchId = last?.branchId ?? access[0]?.branchId ?? null;
   const opened = await openSession({
     organizationId: user.organizationId,
     userId: user.id,
-    branchId: access[0]?.branchId ?? null,
+    branchId,
     ip: input.ip,
     userAgent: input.userAgent,
   });
   await writeAudit({
     organizationId: user.organizationId,
-    branchId: access[0]?.branchId ?? null,
+    branchId,
     userId: user.id,
     action: "login",
     module: "auth",

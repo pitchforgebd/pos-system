@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import test from "node:test";
 
 import { prisma } from "../../lib/db/client.ts";
+import { TEST_PASSWORD, withTestOrg } from "../../tests/helpers/index.ts";
 import { clientIp, rejectCrossSite } from "../../lib/api/http.ts";
 import { FAILED_LOGIN_AUDIT_PER_HOUR, LOGIN_IP_LIMIT, RESET_DONE_IP_LIMIT, RESET_IP_LIMIT } from "./constants.ts";
 import { login, loginRules } from "./login.ts";
@@ -185,4 +186,21 @@ test("the reset link carries the token after the #, never in the query", () => {
   const link = resetLink("https://shop.example/", "abc DEF/+=");
   assert.equal(link, "https://shop.example/reset-password#token=abc%20DEF%2F%2B%3D");
   assert.equal(link.includes("?"), false, "nothing in the query string, which is what a server log and a Referer header carry");
+});
+
+test("sign-in opens the branch the user worked in last, else the first branch: not the first by name (found by the 16-day user test)", async () => {
+  await withTestOrg(async (t) => {
+    // a newer branch whose name sorts before the shop's own
+    const depot = await prisma.branch.create({ data: { organizationId: t.org.id, name: "AAA Depot" } });
+    await prisma.userBranchAccess.create({ data: { organizationId: t.org.id, userId: t.owner.id, branchId: depot.id } });
+    const ip = `10.9.${Math.floor(Math.random() * 200)}.${Math.floor(Math.random() * 200)}`;
+    const first = await login({ email: t.owner.email, password: TEST_PASSWORD, ip, userAgent: "test" });
+    assert.equal(first.ok, true);
+    const session = await prisma.session.findFirstOrThrow({ where: { userId: t.owner.id }, orderBy: { createdAt: "desc" } });
+    assert.equal(session.branchId, t.branch.id, "the first branch of the company, not the first by name");
+    await prisma.session.update({ where: { id: session.id }, data: { branchId: depot.id } });
+    assert.equal((await login({ email: t.owner.email, password: TEST_PASSWORD, ip, userAgent: "test" })).ok, true);
+    const next = await prisma.session.findFirstOrThrow({ where: { userId: t.owner.id }, orderBy: { createdAt: "desc" } });
+    assert.equal(next.branchId, depot.id, "the branch used last time");
+  });
 });

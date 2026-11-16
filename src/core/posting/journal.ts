@@ -217,6 +217,9 @@ async function checkInventory(tx: Db, plan: JournalPlan, accountIds: string[]) {
 }
 
 /** Postings that put cash in the books by themselves, with nobody at a till: they belong to no shift. */
+/** The openings: dated the day the books start, so not held to the back-date window. */
+const OPENING_DOCS: ReadonlySet<string> = new Set(["CASH_OPENING", "BANK_OPENING", "CUSTOMER_OPENING", "SUPPLIER_OPENING"]);
+
 const NO_SHIFT: ReadonlySet<string> = new Set(["CASH_OPENING", "BANK_OPENING", "OPENING_RECLASS", "OPENING_STOCK", "STOCK_BOOKS_ADJUSTMENT", "LEGACY_ADVANCE", "JOURNAL", "ASSET_OPENING"]);
 
 /**
@@ -259,8 +262,10 @@ async function attachShifts(tx: Db, plan: JournalPlan, accountIds: string[]): Pr
  */
 export async function post(tx: Db, plan: JournalPlan): Promise<string> {
   checkSides(plan.lines);
-  // The period rules apply to every posting: not in the future, not in a locked period (invariant I11).
-  await assertPostable(tx, { organizationId: plan.organizationId }, dateOnly(plan.businessDate));
+  // The period rules apply to every posting: not in the future, not in a locked period (invariant I11), and not further back than the
+  // window unless the user who posts holds posting.backdate (D18).
+  // An opening balance is dated the day the books start (organizations.booksStartOn), which may be further back than the window.
+  await assertPostable(tx, { organizationId: plan.organizationId, userId: plan.createdById, ...(OPENING_DOCS.has(plan.doc.type) ? { canBackdate: true } : {}) }, dateOnly(plan.businessDate));
   // A posting dated into a day that is over changes that day and every later one: their daily snapshots are marked and made again (P11 task 5).
   if (dateOnly(plan.businessDate) < today()) {
     await tx.dailySnapshot.updateMany({ where: { organizationId: plan.organizationId, businessDate: { gte: plan.businessDate }, stale: false }, data: { stale: true } });

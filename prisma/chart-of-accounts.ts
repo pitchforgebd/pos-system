@@ -40,6 +40,7 @@ export const accounts: readonly ChartAccount[] = [
   { code: "1350", name: "Courier Receivable", groupCode: "1000", role: "COURIER_AR" },
   { code: "1400", name: "Inventory", groupCode: "1000", role: "INVENTORY" },
   { code: "1450", name: "Advance to Vendor", groupCode: "1000", role: "VENDOR_ADVANCE" },
+  { code: "1480", name: "Inter-branch Clearing", groupCode: "1000", role: "INTER_BRANCH" },
   { code: "1500", name: "Input VAT", groupCode: "1000", role: "INPUT_VAT" },
   { code: "1600", name: "Fixed Assets", groupCode: "1000", role: "FIXED_ASSET" },
   { code: "1690", name: "Accumulated Depreciation", groupCode: "1000", role: "ACCUM_DEPR" },

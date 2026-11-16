@@ -36,13 +36,21 @@ function failure(error: unknown): Failure | null {
 }
 
 export async function postCustomerAdvance(
-  input: Actor & { customerId: string; businessDate: string; amount: string; method: "CASH" | "BANK" },
+  input: Actor & {
+    customerId: string;
+    businessDate: string;
+    amount: string;
+    method: "CASH" | "BANK" | "MOBILE";
+    /** The bank or mobile account the advance came into (found by the user test: it always went to the default bank). */
+    accountId?: string;
+  },
 ) {
   const requestHash = hashPayload({
     customerId: input.customerId,
     businessDate: input.businessDate,
     amount: input.amount,
     method: input.method,
+    ...(input.accountId ? { accountId: input.accountId } : {}),
   });
   try {
     const data = await idempotentTransaction(async (tx) => {
@@ -80,7 +88,7 @@ export async function postCustomerAdvance(
         createdById: input.userId,
         doc: { type: "CUSTOMER_ADVANCE", id: advanceId },
         lines: [
-          { accountId: await moneyAccountFor(tx, input.organizationId, { method: input.method }), debit: amount, credit: new Prisma.Decimal(0) },
+          { accountId: await moneyAccountFor(tx, input.organizationId, { method: input.method, accountId: input.method === "CASH" ? null : input.accountId }), debit: amount, credit: new Prisma.Decimal(0) },
           { role: "CUSTOMER_ADVANCE", debit: new Prisma.Decimal(0), credit: amount, party: { type: "CUSTOMER" as const, id: input.customerId } },
         ],
       });

@@ -24,6 +24,7 @@ export function PartyAmountForm({
   parties,
   mode,
   balanceLabel = "Due",
+  accounts = [],
 }: {
   title: string;
   /** The API path; `:id` in it is replaced by the chosen party's id (a function cannot be passed from a server page to this client form). */
@@ -31,6 +32,8 @@ export function PartyAmountForm({
   parties: Party[];
   mode: "due" | "advance";
   balanceLabel?: string;
+  /** The bank and mobile accounts the money can come into (cash is always offered). */
+  accounts?: Array<{ id: string; label: string; kind: string }>;
 }) {
   const { ph } = useI18n();
   const [query, setQuery] = useState("");
@@ -134,12 +137,15 @@ export function PartyAmountForm({
           }
           setLocalMessage("");
           const target = url.replace(":id", selected.id);
-          const body = typeof url === "function" ? { businessDate: postDate, amount, method } : { customerId: selected.id, businessDate: postDate, amount, method };
+          // the choice is "CASH", "BANK" (the default bank) or one bank or mobile account by its id
+          const account = accounts.find((row) => row.id === method);
+          const paid = account ? { method: account.kind === "MOBILE" ? "MOBILE" : "BANK", accountId: account.id } : { method };
+          const body = { customerId: selected.id, businessDate: postDate, amount, ...paid };
           // The balance shown for the chosen party is a snapshot, so clear the form once the payment is saved.
           void submit(
             { url: target, body },
             {
-              successMessage: "পেমেন্ট সংরক্ষিত হয়েছে। (Payment saved.)",
+              successMessage: ph("Payment saved."),
               onSuccess: () => {
                 setSelected(null);
                 setQuery("");
@@ -165,7 +171,12 @@ export function PartyAmountForm({
           <Input required aria-label={ph("Amount")} placeholder={ph("Amount")} value={amount} onChange={(event) => setAmount(event.target.value)} />
           <select aria-label={ph("Method")} value={method} onChange={(event) => setMethod(event.target.value)} className="h-10 rounded-md border border-border bg-surface px-3 text-sm">
             <option value="CASH">{ph("Cash")}</option>
-            <option value="BANK">{ph("Bank")}</option>
+            {accounts.length === 0 ? <option value="BANK">{ph("Bank")}</option> : null}
+            {accounts.map((row) => (
+              <option key={row.id} value={row.id}>
+                {row.label}
+              </option>
+            ))}
           </select>
         </div>
         {message ? <p className="mt-3 text-sm text-error">{message}</p> : null}

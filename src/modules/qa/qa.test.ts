@@ -49,6 +49,8 @@ test("phase 18 checks money, numbers, permissions, and the sale path", async () 
       passwordHash: await hashPassword("correct-password"),
     },
   });
+  // it posts to fixed past dates: the user holds posting.backdate (D18)
+  await (await import("../../tests/helpers/backdate.ts")).grantBackdate(prisma, user);
   await prisma.userBranchAccess.create({ data: { organizationId: org.id, userId: user.id, branchId: branch.id } });
   const { ensureChart } = await import("../../core/ledger/chart.ts");
   await ensureChart(prisma, org.id);

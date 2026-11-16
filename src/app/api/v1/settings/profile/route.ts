@@ -13,6 +13,7 @@ const bodySchema = z.object({
   logoUrl: z.string().trim().max(255).nullable().optional(),
   pointsPerHundred: z.string().trim().max(32).nullable().optional(),
   takaPerPoint: z.string().trim().max(32).nullable().optional(),
+  booksStartOn: z.string().trim().max(10).nullable().optional(),
 });
 
 export const GET = defineRoute({
@@ -44,6 +45,7 @@ export const POST = defineRoute({
       logoUrl: parsed.data.logoUrl,
       pointsPerHundred: parsed.data.pointsPerHundred,
       takaPerPoint: parsed.data.takaPerPoint,
+      booksStartOn: parsed.data.booksStartOn,
       ip: clientIp(request),
       userAgent: request.headers.get("user-agent"),
     });

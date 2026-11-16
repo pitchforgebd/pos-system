@@ -32,6 +32,8 @@ test("phase 10 posts customer due and advance without inventing points", async (
       passwordHash: await hashPassword("correct-password"),
     },
   });
+  // it posts to fixed past dates: the user holds posting.backdate (D18)
+  await (await import("../../tests/helpers/backdate.ts")).grantBackdate(prisma, user);
   const { ensureChart } = await import("../../core/ledger/chart.ts");
   await ensureChart(prisma, org.id);
   const actor = {

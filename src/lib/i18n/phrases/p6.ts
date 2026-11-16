@@ -1,0 +1,35 @@
+// Bangla for the texts added while fixing what the 16-day user test found (barcode labels, opening dates, cash warnings and others).
+export const PHRASES_6: Readonly<Record<string, string>> = {
+  "A label shows the product, the barcode and the price at the level chosen: on an A4 sheet (3 or 5 across) or on a thermal label printer (38 × 25, 50 × 25, 40 × 30, 50 × 30 mm, or two across on a roll). Copies do not change stock, and every print is recorded.":
+    "লেবেলে পণ্যের নাম, বারকোড আর বাছাই করা স্তরের দাম থাকে: A4 শিটে (এক সারিতে ৩টি বা ৫টি) অথবা থার্মাল লেবেল প্রিন্টারে (৩৮ × ২৫, ৫০ × ২৫, ৪০ × ৩০, ৫০ × ৩০ মিমি, বা রোলে পাশাপাশি ২টি)। কপি করলে স্টক বদলায় না, প্রতিটি প্রিন্টের রেকর্ড থাকে।",
+  "A4 sheet, 3 across (63 × 38 mm)": "A4 শিট, সারিতে ৩টি (৬৩ × ৩৮ মিমি)",
+  "A4 sheet, 5 across (38 × 21 mm)": "A4 শিট, সারিতে ৫টি (৩৮ × ২১ মিমি)",
+  "Thermal label 38 × 25 mm": "থার্মাল লেবেল ৩৮ × ২৫ মিমি",
+  "Thermal label 50 × 25 mm": "থার্মাল লেবেল ৫০ × ২৫ মিমি",
+  "Thermal label 40 × 30 mm": "থার্মাল লেবেল ৪০ × ৩০ মিমি",
+  "Thermal label 50 × 30 mm": "থার্মাল লেবেল ৫০ × ৩০ মিমি",
+  "Thermal roll, 2 across (38 × 25 mm)": "থার্মাল রোল, পাশাপাশি ২টি (৩৮ × ২৫ মিমি)",
+  "In the print window choose the label printer and set the margins to none.": "প্রিন্ট উইন্ডোতে লেবেল প্রিন্টার বাছুন আর মার্জিন শূন্য (নেই) করুন।",
+  "Search by name or phone, then pay from cash or from one of your bank or mobile accounts. The payment cannot exceed what is owed; for a charge, for named bills, or to pay ahead, use the vendor's page.":
+    "নাম বা ফোন দিয়ে খুঁজুন, তারপর নগদ বা আপনার কোনো ব্যাংক/মোবাইল অ্যাকাউন্ট থেকে পরিশোধ করুন। পাওনার চেয়ে বেশি দেওয়া যায় না; চার্জসহ, নির্দিষ্ট বিলের জন্য বা অগ্রিম দিতে সাপ্লায়ারের পাতা ব্যবহার করুন।",
+  "Pay the vendor": "সাপ্লায়ারকে পরিশোধ",
+  "Opening due": "শুরুর বাকি",
+  Particulars: "বিবরণ",
+  "Payment voucher": "পেমেন্ট ভাউচার",
+  "Paid to": "যাঁকে পরিশোধ",
+  "Received by (vendor)": "গ্রহণকারী (সাপ্লায়ার)",
+  "Authorised signature": "অনুমোদিত স্বাক্ষর",
+  "Customer statement": "কাস্টমারের স্টেটমেন্ট",
+  "Vendor statement": "সাপ্লায়ারের স্টেটমেন্ট",
+  Vendor: "সাপ্লায়ার",
+  "At the end: the customer owes the shop": "শেষে: কাস্টমারের কাছে দোকানের পাওনা",
+  "At the end: the shop owes the vendor": "শেষে: সাপ্লায়ারের কাছে দোকানের দেনা",
+  "Closing balance": "শেষ ব্যালান্স",
+  "Money receipt": "মানি রিসিট",
+  "Payment saved.": "পেমেন্ট সংরক্ষিত হয়েছে।",
+  "Day of the count": "গণনার তারিখ",
+  "Printed on invoices and quotations.": "ইনভয়েস ও কোটেশনে ছাপা হয়।",
+  "The day the books start": "হিসাব শুরুর তারিখ",
+  "Opening cash, bank and mobile balances, customers' old dues and vendors' old payables are dated this day. Leave it blank to date them the day they are entered.":
+    "শুরুর নগদ, ব্যাংক ও মোবাইলের ব্যালান্স, কাস্টমারের পুরনো বাকি আর সাপ্লায়ারের পুরনো পাওনা এই তারিখে বসবে। খালি রাখলে যেদিন লেখা হবে সেদিনের তারিখে বসবে।",
+};

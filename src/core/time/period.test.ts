@@ -71,6 +71,34 @@ test("the back-date window needs posting.backdate, and only when the caller says
   });
 });
 
+test("the posting engine keeps the back-date window for the user who posts (D18): a user without posting.backdate is refused", async () => {
+  // Found by the 7-day user test: no route passed canBackdate, so a cashier could post a sale six days back.
+  const journal = (t: { org: { id: string }; branch: { id: string } }, userId: string, date: string) =>
+    prisma.$transaction((tx) =>
+      postBalancedJournal(tx, {
+        organizationId: t.org.id,
+        branchId: t.branch.id,
+        businessDate: new Date(`${date}T00:00:00.000Z`),
+        description: "back-date test",
+        createdById: userId,
+        doc: { type: "JOURNAL", id: crypto.randomUUID() },
+        lines: [
+          { role: "CASH", debit: new Prisma.Decimal("10.00"), credit: new Prisma.Decimal(0) },
+          { role: "SALES", debit: new Prisma.Decimal(0), credit: new Prisma.Decimal("10.00") },
+        ],
+      }),
+    );
+  await withTestOrg(async (t) => {
+    const today = businessDate();
+    const clerk = await prisma.user.create({ data: { organizationId: t.org.id, name: "Clerk", email: `clerk-${randomUUID()}@example.test`, passwordHash: "x" } });
+    await journal(t, clerk.id, addDays(today, -3));
+    await rejectsWith(journal(t, clerk.id, addDays(today, -6)), "BACKDATE");
+    // the owner holds every permission, posting.backdate among them
+    await journal(t, t.owner.id, addDays(today, -6));
+    assert.equal(await prisma.journal.count({ where: { organizationId: t.org.id } }), 2);
+  });
+});
+
 test("a locked period stays closed for everybody, on the lock date and before it", async () => {
   await withTestOrg(async (t) => {
     const today = businessDate();

@@ -25,6 +25,8 @@ test("stock going out uses up the expiry lots, earliest expiry first", async () 
   const user = await prisma.user.create({
     data: { organizationId: org.id, name: "Keeper", email: `lots-${stamp}@example.com`, passwordHash: await hashPassword("correct-password") },
   });
+  // it posts to fixed past dates: the user holds posting.backdate (D18)
+  await (await import("../../tests/helpers/backdate.ts")).grantBackdate(prisma, user);
   const { ensureChart } = await import("../../core/ledger/chart.ts");
   await ensureChart(prisma, org.id);
   const product = await prisma.product.create({

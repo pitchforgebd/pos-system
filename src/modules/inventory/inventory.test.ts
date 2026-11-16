@@ -33,6 +33,8 @@ test("phase 05 stock and products", async () => {
       passwordHash: await hashPassword("correct-password"),
     },
   });
+  // it posts to fixed past dates: the user holds posting.backdate (D18)
+  await (await import("../../tests/helpers/backdate.ts")).grantBackdate(prisma, user);
   const actor = {
     organizationId: org.id,
     branchId: branch.id,

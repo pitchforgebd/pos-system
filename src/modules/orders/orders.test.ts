@@ -129,7 +129,12 @@ test("a quotation is a draft order with its own QUO number and a valid-until dat
     const confirmed = await confirmOrder(actor(t), id);
     assert.equal(confirmed.ok, true, JSON.stringify(confirmed));
     assert.equal(await reserved(t, product.id), "3.0000");
-    const old = await draft(t, product.id, customer.id, "1", { isQuotation: true, validUntil: addDays(today(), -1) });
+    // a quotation that is expired when it is written is refused (found by the 7-day user test)
+    const late = await createOrder(actor(t), { customerId: customer.id, businessDate: today(), isQuotation: true, validUntil: addDays(today(), -1), lines: [{ productId: product.id, quantity: "1" }] });
+    assert.equal(late.ok, false);
+    // one that expires later cannot be confirmed after it
+    const old = await draft(t, product.id, customer.id, "1", { isQuotation: true, validUntil: today() });
+    await prisma.salesOrder.update({ where: { id: old }, data: { validUntil: new Date(`${addDays(today(), -1)}T00:00:00.000Z`) } });
     const expired = await confirmOrder(actor(t), old);
     assert.equal(expired.ok, false);
     assert.match(!expired.ok ? expired.message : "", /expired/i);
