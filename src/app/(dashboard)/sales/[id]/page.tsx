@@ -1,9 +1,11 @@
 import { notFound, redirect } from "next/navigation";
 
-import { PrintButton, PrintSheet } from "@/components/print/sheet";
+import { PrintSheet } from "@/components/print/document";
+import { PrintButton } from "@/components/print/sheet";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
+import { takaInWords } from "@/lib/format/words";
 import { buildI18n } from "@/lib/i18n/build";
 import { getI18n } from "@/lib/i18n/server";
 import { getSession } from "@/modules/auth/current-session";
@@ -16,8 +18,20 @@ export async function generateMetadata() {
 // What the invoice says, in the language the cashier chose (the language of the screen, or ?lang=bn or en for this one) and on the paper the shop prints on
 // (?print=thermal for 80 mm). Amounts are in taka with the lakh grouping and dates are written out, in the digits the person chose (P13).
 const WORDS = {
-  en: { invoice: "Invoice", receipt: "Receipt", date: "Date", customer: "Customer", level: "Price level", item: "Item", qty: "Qty", price: "Price", total: "Total", goods: "Goods", discount: "Discount", vat: "VAT", charges: "Charges", paid: "Paid", change: "Still owed on this invoice", owes: "Total due from the customer now", status: "Status", thanks: "Thank you" },
-  bn: { invoice: "ইনভয়েস", receipt: "রসিদ", date: "তারিখ", customer: "কাস্টমার", level: "দামের লেভেল", item: "পণ্য", qty: "পরিমাণ", price: "দাম", total: "মোট", goods: "পণ্যের মূল্য", discount: "ছাড়", vat: "ভ্যাট", charges: "চার্জ", paid: "পরিশোধ", change: "এই ইনভয়েসে বাকি", owes: "কাস্টমারের মোট বাকি এখন", status: "অবস্থা", thanks: "ধন্যবাদ" },
+  en: {
+    invoice: "Invoice", receipt: "Cash memo", number: "Invoice no.", date: "Date", customer: "Customer", billTo: "Bill to", code: "Customer code", soldBy: "Served by", level: "Price level",
+    sl: "#", item: "Item", qty: "Qty", price: "Unit price", total: "Total", goods: "Subtotal", discount: "Discount", vat: "VAT", charges: "Delivery / charges", paid: "Paid", change: "Due on this invoice", later: "Paid later or returned",
+    owes: "Customer's total due now", status: "Status", inWords: "In words", customerSign: "Customer's signature", authorisedSign: "Authorised signature",
+    thanks: "Thank you for shopping with us. Goods once sold are taken back only with this invoice.",
+    methods: { CASH: "Cash", BANK: "Bank", MOBILE: "Mobile banking", CARD: "Card", WALLET: "Advance", OTHER: "Other" },
+  },
+  bn: {
+    invoice: "ইনভয়েস", receipt: "ক্যাশ মেমো", number: "ইনভয়েস নং", date: "তারিখ", customer: "কাস্টমার", billTo: "ক্রেতা", code: "কাস্টমার কোড", soldBy: "বিক্রেতা", level: "দামের লেভেল",
+    sl: "ক্র.", item: "পণ্য", qty: "পরিমাণ", price: "একক দাম", total: "মোট", goods: "উপমোট", discount: "ছাড়", vat: "ভ্যাট", charges: "ডেলিভারি / চার্জ", paid: "পরিশোধ", change: "এই ইনভয়েসে বাকি", later: "পরে পরিশোধ বা ফেরত",
+    owes: "কাস্টমারের মোট বাকি এখন", status: "অবস্থা", inWords: "কথায়", customerSign: "ক্রেতার স্বাক্ষর", authorisedSign: "অনুমোদিত স্বাক্ষর",
+    thanks: "আমাদের সাথে কেনাকাটার জন্য ধন্যবাদ। বিক্রিত পণ্য এই ইনভয়েস ছাড়া ফেরত নেওয়া হয় না।",
+    methods: { CASH: "নগদ", BANK: "ব্যাংক", MOBILE: "মোবাইল ব্যাংকিং", CARD: "কার্ড", WALLET: "অগ্রিম", OTHER: "অন্যান্য" },
+  },
 } as const;
 
 export default async function SaleDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ print?: string; lang?: string }> }) {
@@ -39,6 +53,9 @@ export default async function SaleDetailPage({ params, searchParams }: { params:
   const f = buildI18n({ lang, digits: page.digits }, {});
   const s = page.t;
   const fallback = s("sales.fallback");
+  // what was paid after the sale (receipts) or taken off by returns: the invoice is total - paid at the sale - this - still owed
+  const paidAtSale = sale.payments.reduce((sum, row) => sum + Number(row.amount), 0);
+  const settledLater = Math.round((Number(sale.total) - paidAtSale - Number(sale.owed)) * 100) / 100;
   const link = (print: boolean, next: "bn" | "en") => `/sales/${sale.id}?${print ? "print=thermal&" : ""}lang=${next}`;
 
   return (
@@ -62,63 +79,124 @@ export default async function SaleDetailPage({ params, searchParams }: { params:
           </div>
         }
       />
-      <PrintSheet title={thermal ? t.receipt : t.invoice} note={thermal ? "80mm" : "A4"} thermal={thermal}>
-        <p>
-          {t.invoice} {sale.number ?? fallback} · {t.date} {f.date(sale.businessDate)}
-        </p>
-        <p>
-          {t.customer}: {sale.customerName}
-          {sale.priceLevel ? ` · ${t.level}: ${sale.priceLevel}` : ""}
-        </p>
-        <table className="w-full text-sm">
+      <PrintSheet
+        title={thermal ? t.receipt : t.invoice}
+        thermal={thermal}
+        meta={[
+          { label: t.number, value: sale.number ?? fallback },
+          { label: t.date, value: `${f.date(sale.businessDate)} ${new Date(sale.createdAt).toLocaleTimeString("en-GB", { timeZone: "Asia/Dhaka", hour: "2-digit", minute: "2-digit" })}` },
+          ...(sale.soldBy ? [{ label: t.soldBy, value: sale.soldBy }] : []),
+          ...(sale.priceLevel ? [{ label: t.level, value: sale.priceLevel }] : []),
+        ]}
+        party={{
+          label: t.billTo,
+          name: sale.customer?.businessName && sale.customer.businessName !== sale.customerName ? `${sale.customerName} (${sale.customer.businessName})` : sale.customerName,
+          lines: sale.customer ? [sale.customer.phone, sale.customer.address, sale.customer.code ? `${t.code}: ${sale.customer.code}` : null] : [],
+        }}
+        signatures={thermal ? undefined : [t.customerSign, t.authorisedSign]}
+        footer={<p className="text-center">{t.thanks}</p>}
+      >
+        {thermal ? (
+          // on the 80 mm roll each item takes two lines: its name, then quantity x price = total (a name in a narrow column wrapped badly)
+          <ul className="space-y-1">
+            {sale.items.map((item) => (
+              <li key={item.id}>
+                <p>{item.name}</p>
+                <p className="flex justify-between tabular-nums">
+                  <span>
+                    {f.qty(item.quantity)} × {f.taka(item.unitPrice)}
+                    {item.discount !== "0.00" ? ` − ${f.taka(item.discount)}` : ""}
+                  </span>
+                  <span>{f.taka(item.lineTotal)}</span>
+                </p>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <table className={thermal ? "hidden" : "w-full border-collapse text-sm"}>
           <thead>
-            <tr className="text-left">
-              <th className="py-0.5">{t.item}</th>
-              <th className="py-0.5 text-right">{t.qty}</th>
-              <th className="py-0.5 text-right">{t.price}</th>
-              <th className="py-0.5 text-right">{t.total}</th>
+            <tr className={thermal ? "border-b border-dashed border-black text-left" : "border-y border-black bg-gray-100 text-left"}>
+              {thermal ? null : <th className="px-1 py-1 w-8">{t.sl}</th>}
+              <th className="px-1 py-1">{t.item}</th>
+              <th className="px-1 py-1 text-right">{t.qty}</th>
+              <th className="px-1 py-1 text-right">{t.price}</th>
+              {thermal ? null : <th className="px-1 py-1 text-right">{t.discount}</th>}
+              {thermal ? null : <th className="px-1 py-1 text-right">{t.vat}</th>}
+              <th className="px-1 py-1 text-right">{t.total}</th>
             </tr>
           </thead>
           <tbody>
-            {sale.items.map((item) => (
-              <tr key={item.id}>
-                <td className="py-0.5">{item.name}</td>
-                <td className="py-0.5 text-right tabular-nums">{f.qty(item.quantity)}</td>
-                <td className="py-0.5 text-right tabular-nums">{f.taka(item.unitPrice)}</td>
-                <td className="py-0.5 text-right tabular-nums">{f.taka(item.lineTotal)}</td>
+            {sale.items.map((item, index) => (
+              <tr key={item.id} className={thermal ? "" : "border-b border-gray-200"}>
+                {thermal ? null : <td className="px-1 py-1 tabular-nums">{index + 1}</td>}
+                <td className="px-1 py-1">{item.name}</td>
+                <td className="px-1 py-1 text-right tabular-nums">
+                  {f.qty(item.quantity)}
+                  {item.unit && !thermal ? ` ${item.unit}` : ""}
+                </td>
+                <td className="px-1 py-1 text-right tabular-nums">{f.taka(item.unitPrice)}</td>
+                {thermal ? null : <td className="px-1 py-1 text-right tabular-nums">{item.discount !== "0.00" ? f.taka(item.discount) : "–"}</td>}
+                {thermal ? null : <td className="px-1 py-1 text-right tabular-nums">{item.vat !== "0.00" ? f.taka(item.vat) : "–"}</td>}
+                <td className="px-1 py-1 text-right tabular-nums">{f.taka(item.lineTotal)}</td>
               </tr>
             ))}
           </tbody>
         </table>
-        <dl className="ml-auto grid max-w-xs grid-cols-2 gap-x-4 text-sm">
-          <dt>{t.goods}</dt>
-          <dd className="text-right tabular-nums">{f.taka(sale.subtotal)}</dd>
-          <dt>{t.discount}</dt>
-          <dd className="text-right tabular-nums">{f.taka(sale.discountTotal)}</dd>
-          <dt>{t.vat}</dt>
-          <dd className="text-right tabular-nums">{f.taka(sale.vatTotal)}</dd>
-          <dt>{t.charges}</dt>
-          <dd className="text-right tabular-nums">{f.taka(sale.chargesTotal)}</dd>
-          <dt className="font-semibold">{t.total}</dt>
-          <dd className="text-right font-semibold tabular-nums">{f.taka(sale.total)}</dd>
-          {sale.payments.map((payment) => (
-            <div key={payment.id} className="contents">
-              <dt>
-                {t.paid} ({payment.method})
-              </dt>
-              <dd className="text-right tabular-nums">{f.taka(payment.amount)}</dd>
-            </div>
-          ))}
-          <dt>{t.change}</dt>
-          <dd className="text-right tabular-nums">{f.taka(sale.owed)}</dd>
-          {sale.customerDue !== "0.00" ? (
-            <>
-              <dt>{t.owes}</dt>
-              <dd className="text-right tabular-nums">{f.taka(sale.customerDue)}</dd>
-            </>
-          ) : null}
-        </dl>
-        <p className="text-center">{t.thanks}</p>
+        <div className={thermal ? "" : "flex flex-wrap items-start justify-between gap-4"}>
+          {thermal ? null : (
+            <p className="max-w-sm text-sm">
+              <span className="block text-xs uppercase tracking-wide text-gray-600">{t.inWords}</span>
+              {takaInWords(sale.total, lang)}
+            </p>
+          )}
+          <dl className={thermal ? "grid grid-cols-2 gap-x-2" : "ml-auto grid min-w-64 grid-cols-2 gap-x-4 text-sm"}>
+            <dt>{t.goods}</dt>
+            <dd className="text-right tabular-nums">{f.taka(sale.subtotal)}</dd>
+            {sale.discountTotal !== "0.00" ? (
+              <>
+                <dt>{t.discount}</dt>
+                <dd className="text-right tabular-nums">− {f.taka(sale.discountTotal)}</dd>
+              </>
+            ) : null}
+            {sale.vatTotal !== "0.00" ? (
+              <>
+                <dt>{t.vat}</dt>
+                <dd className="text-right tabular-nums">{f.taka(sale.vatTotal)}</dd>
+              </>
+            ) : null}
+            {sale.chargesTotal !== "0.00" ? (
+              <>
+                <dt>{t.charges}</dt>
+                <dd className="text-right tabular-nums">{f.taka(sale.chargesTotal)}</dd>
+              </>
+            ) : null}
+            <dt className="border-t border-black pt-0.5 font-bold">{t.total}</dt>
+            <dd className="border-t border-black pt-0.5 text-right font-bold tabular-nums">{f.taka(sale.total)}</dd>
+            {sale.payments.map((payment) => (
+              <div key={payment.id} className="contents">
+                <dt>
+                  {t.paid} · {payment.account ?? t.methods[payment.method as keyof typeof t.methods] ?? payment.method}
+                </dt>
+                <dd className="text-right tabular-nums">{f.taka(payment.amount)}</dd>
+              </div>
+            ))}
+            {settledLater > 0 ? (
+              <>
+                <dt>{t.later}</dt>
+                <dd className="text-right tabular-nums">{f.taka(settledLater.toFixed(2))}</dd>
+              </>
+            ) : null}
+            <dt className="font-semibold">{t.change}</dt>
+            <dd className="text-right font-semibold tabular-nums">{f.taka(sale.owed)}</dd>
+            {sale.customerDue !== "0.00" ? (
+              <>
+                <dt>{t.owes}</dt>
+                <dd className="text-right tabular-nums">{f.taka(sale.customerDue)}</dd>
+              </>
+            ) : null}
+          </dl>
+        </div>
+        {thermal ? <p className="text-[11px]">{takaInWords(sale.total, lang)}</p> : null}
       </PrintSheet>
       <div className="space-y-3 print:hidden">
         <DataTable

@@ -81,9 +81,10 @@ export async function getSale(organizationId: string, branchId: string, id: stri
   const row = await prisma.sale.findFirst({
     where: { id, organizationId, branchId },
     include: {
-      customer: { select: { id: true, name: true, isSystem: true } },
+      customer: { select: { id: true, name: true, isSystem: true, code: true, phone: true, address: true, businessName: true } },
       invoice: { select: { number: true } },
-      items: { include: { product: { select: { sku: true, name: true } } } },
+      createdBy: { select: { name: true } },
+      items: { include: { product: { select: { sku: true, name: true, unit: { select: { name: true } } } } } },
       payments: true,
       journal: { include: { lines: { select: { debit: true, credit: true } } } },
     },
@@ -96,6 +97,8 @@ export async function getSale(organizationId: string, branchId: string, id: stri
   const payment = await invoicePayment(prisma, organizationId, row.id);
   const level = row.priceLevelId ? await prisma.priceLevel.findFirst({ where: { id: row.priceLevelId, organizationId }, select: { name: true } }) : null;
   const customerDue = row.customer && !row.customer.isSystem ? await outstandingReceivable(organizationId, row.customer.id) : zero();
+  const accountIds = row.payments.map((payment) => payment.accountId).filter((value): value is string => Boolean(value));
+  const accountNames = new Map((accountIds.length > 0 ? await prisma.account.findMany({ where: { organizationId, id: { in: accountIds } }, select: { id: true, name: true } }) : []).map((a) => [a.id, a.name]));
   return {
     priceLevel: level?.name ?? null,
     /** What this customer owes the shop altogether now (the invoice's own part is in `owed`). */
@@ -109,6 +112,10 @@ export async function getSale(organizationId: string, branchId: string, id: stri
     status: row.status,
     businessDate: dateOnly(row.businessDate),
     customerName: row.customer?.name ?? "Walk-in",
+    /** For the printed invoice (found by the user test: it named the customer only). */
+    customer: row.customer && !row.customer.isSystem ? { code: row.customer.code, phone: row.customer.phone, address: row.customer.address, businessName: row.customer.businessName } : null,
+    soldBy: row.createdBy?.name ?? null,
+    createdAt: row.createdAt.toISOString(),
     subtotal: decimalString(row.subtotal, 2),
     discountTotal: decimalString(row.discountTotal, 2),
     vatTotal: decimalString(row.vatTotal, 2),
@@ -120,12 +127,16 @@ export async function getSale(organizationId: string, branchId: string, id: stri
       sku: item.product.sku,
       name: item.product.name,
       quantity: decimalString(item.quantity, 4),
+      unit: item.product.unit?.name ?? null,
       unitPrice: decimalString(item.unitPrice, 2),
+      discount: decimalString(item.discountAmount ?? 0, 2),
+      vat: decimalString(item.vatAmount ?? 0, 2),
       lineTotal: decimalString(item.lineTotal, 2),
     })),
     payments: row.payments.map((payment) => ({
       id: payment.id,
       method: payment.method,
+      account: payment.accountId ? (accountNames.get(payment.accountId) ?? null) : null,
       amount: decimalString(payment.amount, 2),
     })),
   };

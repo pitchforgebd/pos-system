@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 
-import { PrintButton, PrintSheet } from "@/components/print/sheet";
+import { PrintSheet } from "@/components/print/document";
+import { PrintButton } from "@/components/print/sheet";
 import { PageHeader } from "@/components/ui/page-header";
 import { getSession } from "@/modules/auth/current-session";
 import { getTakeOff } from "@/modules/inventory/documents";

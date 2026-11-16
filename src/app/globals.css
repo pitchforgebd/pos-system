@@ -66,6 +66,12 @@ body {
 }
 
 @media print {
+  /* the paper is white whatever the screen's background */
+  html,
+  body {
+    background: #fff !important;
+  }
+
   body * {
     visibility: hidden;
   }
@@ -85,6 +91,26 @@ body {
 
   .print-sheet.thermal {
     width: 80mm;
+  }
+
+  /* barcode labels: only the labels go to the printer, with no blank pages from the hidden page behind them */
+  body:has(.label-print) > *:not(.label-print) {
+    display: none !important;
+  }
+
+  body:has(.label-print) {
+    background: #fff !important;
+  }
+
+  .label-print,
+  .label-print * {
+    visibility: visible;
+  }
+}
+
+@media screen {
+  .label-print {
+    display: none;
   }
 }
 

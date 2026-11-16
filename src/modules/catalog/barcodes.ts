@@ -5,7 +5,11 @@ import { writeAudit } from "@/modules/auth/audit";
 import { decimalString } from "@/core/money";
 import { pricesFor } from "@/modules/pricing";
 
-export const LABEL_FORMATS = ["A4", "LABEL_38X25"] as const;
+/**
+ * Label layouts. A4: an office printer, 3 (A4) or 5 (A4_SMALL) labels across. LABEL_*: a thermal label printer, one label a page at that
+ * size in millimetres. LABEL_2UP_38X25: a thermal roll with two 38 x 25 mm labels side by side.
+ */
+export const LABEL_FORMATS = ["A4", "A4_SMALL", "LABEL_38X25", "LABEL_50X25", "LABEL_40X30", "LABEL_50X30", "LABEL_2UP_38X25"] as const;
 export type LabelFormat = (typeof LABEL_FORMATS)[number];
 
 /** What each product sells for at one level, one unit (the price on its label). Missing: the product has no price. */
@@ -59,17 +63,18 @@ export async function recordBarcodePrint(input: {
   ip: string;
   userAgent: string | null;
 }) {
-  if (!Number.isInteger(input.copies) || input.copies < 1 || input.copies > 50) {
-    return { ok: false as const, status: 422 as const, message: "Enter 1 to 50 copies." };
+  if (!Number.isInteger(input.copies) || input.copies < 1 || input.copies > 300) {
+    return { ok: false as const, status: 422 as const, message: "Enter 1 to 300 copies." };
   }
   const format = input.format ?? "A4";
   if (!LABEL_FORMATS.includes(format)) {
-    return { ok: false as const, status: 422 as const, message: "Choose A4 or a 38 x 25 mm label." };
+    return { ok: false as const, status: 422 as const, message: "Choose a label layout from the list." };
   }
   const barcode = await prisma.productBarcode.findFirst({
     where: { id: input.barcodeId, organizationId: input.organizationId, product: { deletedAt: null } },
-    select: { id: true, barcode: true, productId: true, product: { select: { name: true, sellingPrice: true } } },
+    select: { id: true, barcode: true, productId: true, product: { select: { name: true, sku: true, sellingPrice: true } } },
   });
+  const shop = await prisma.organization.findUnique({ where: { id: input.organizationId }, select: { name: true } });
   if (!barcode) {
     return { ok: false as const, status: 404 as const, message: "That record was not found." };
   }
@@ -94,6 +99,8 @@ export async function recordBarcodePrint(input: {
     barcode: barcode.barcode,
     product: barcode.product.name,
     sellingPrice: price,
+    sku: barcode.product.sku,
+    shop: shop?.name ?? "",
     level: priced.level,
     format,
     copies: input.copies,

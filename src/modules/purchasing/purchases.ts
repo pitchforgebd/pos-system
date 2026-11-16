@@ -66,7 +66,7 @@ export async function getPurchase(organizationId: string, branchId: string, id: 
   const row = await prisma.purchase.findFirst({
     where: { id, organizationId, branchId },
     include: {
-      supplier: { select: { id: true, name: true } },
+      supplier: { select: { id: true, name: true, phone: true, address: true, code: true } },
       warehouse:{ select: { id: true, name: true } },
       items: { orderBy: [{ position: "asc" }, { id: "asc" }], include: { product: { select: { sku: true, name: true } } } },
       payments: true,

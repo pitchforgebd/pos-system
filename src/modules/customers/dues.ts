@@ -195,3 +195,47 @@ export async function listOpenInvoices(organizationId: string, customerId: strin
     return [{ id: sale.id, number: sale.invoice?.number ?? null, businessDate: dateOnly(sale.businessDate), total: decimalString(sale.total, 2), owed: decimalString(figures.owed, 2), status: figures.status }];
   });
 }
+
+/**
+ * One customer payment as its money receipt prints it: who paid, how, the invoices it settled, and what the customer owed just before and
+ * just after it (their receivable lines up to this payment's journal). Added after the 16-day user test: a due collected had no receipt.
+ */
+export async function getCustomerPayment(organizationId: string, id: string) {
+  const row = await prisma.customerPayment.findFirst({
+    where: { id, organizationId },
+    include: { customer: { select: { id: true, name: true, code: true, phone: true, address: true } } },
+  });
+  if (!row || !row.journalId) {
+    return null;
+  }
+  const [account, allocations, journal] = await Promise.all([
+    row.accountId ? prisma.account.findUnique({ where: { id: row.accountId }, select: { name: true } }) : null,
+    prisma.paymentAllocation.findMany({ where: { organizationId, journalId: row.journalId }, select: { amount: true, invoiceId: true } }),
+    prisma.journal.findUniqueOrThrow({ where: { id: row.journalId }, select: { createdAt: true, createdBy: { select: { name: true } } } }),
+  ]);
+  const invoices = allocations.some((a) => a.invoiceId)
+    ? await prisma.invoice.findMany({ where: { organizationId, saleId: { in: allocations.flatMap((a) => (a.invoiceId ? [a.invoiceId] : [])) } }, select: { saleId: true, number: true } })
+    : [];
+  const number = new Map(invoices.map((invoice) => [invoice.saleId, invoice.number]));
+  const owedAfter = await prisma.$queryRaw<Array<{ net: Prisma.Decimal | null }>>`
+    SELECT SUM(l.debit - l.credit) AS net FROM journal_lines l
+    JOIN journals j ON j.id = l.journalId AND j.status = 'POSTED'
+    JOIN account_roles r ON r.organizationId = l.organizationId AND r.accountId = l.accountId AND r.role = 'AR'
+    WHERE l.organizationId = ${organizationId} AND l.partyId = ${row.customerId} AND j.createdAt <= ${journal.createdAt}
+  `;
+  const after = new Prisma.Decimal(owedAfter[0]?.net ?? 0);
+  return {
+    id: row.id,
+    number: row.number,
+    businessDate: dateOnly(row.businessDate),
+    method: row.method,
+    account: account?.name ?? null,
+    amount: decimalString(row.amount, 2),
+    charge: decimalString(row.charge, 2),
+    customer: row.customer,
+    receivedBy: journal.createdBy?.name ?? null,
+    owedBefore: decimalString(after.plus(row.amount), 2),
+    owedAfter: decimalString(after, 2),
+    settled: allocations.map((a) => ({ invoice: a.invoiceId ? (number.get(a.invoiceId) ?? "") : "Opening due", amount: decimalString(a.amount, 2) })),
+  };
+}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ const select = "h-10 rounded-md border border-border bg-surface px-2";
 
 export function CollectForm({ accounts, today }: { accounts: Account[]; today: string }) {
   const { ph } = useI18n();
+  const router = useRouter();
   const { submit, pending, message, reset } = useSubmit();
   const [query, setQuery] = useState("");
   const [found, setFound] = useState<Customer[]>([]);
@@ -68,7 +70,19 @@ export function CollectForm({ accounts, today }: { accounts: Account[]; today: s
         if (!customer) return;
         void submit<{ id: string }>(
           { url: "/api/v1/customer-payments", body: { customerId: customer.id, businessDate: date, amount, method: account?.kind ?? "CASH", accountId: accountId || undefined, charge: charge.trim() === "" ? undefined : charge, allocations: named.length > 0 ? named : undefined } },
-          { successMessage: "পেমেন্ট সংরক্ষিত হয়েছে। (Payment saved.)", onSuccess: () => { setAmount(""); setCharge(""); setShares({}); setCustomer(null); setInvoices([]); reset(); } },
+          {
+            successMessage: ph("Payment saved."),
+            // straight to the money receipt, to print it for the customer (added after the 16-day user test)
+            onSuccess: (data) => {
+              setAmount("");
+              setCharge("");
+              setShares({});
+              setCustomer(null);
+              setInvoices([]);
+              reset();
+              if (data?.id) router.push(`/customers/payments/${data.id}`);
+            },
+          },
         );
       }}
     >

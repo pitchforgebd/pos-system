@@ -23,7 +23,7 @@ export function BarcodeSvg({ code, height = 28, className }: { code: string; hei
     }
   }
   return (
-    <svg viewBox={`0 0 ${width} ${height + 12}`} role="img" aria-label={`Barcode ${code}`} className={className ?? "h-auto w-full"} preserveAspectRatio="xMidYMid meet">
+    <svg viewBox={`0 0 ${width} ${height + 12}`} role="img" aria-label={`Barcode ${code}`} className={className ?? "h-auto w-full"} preserveAspectRatio="xMidYMid meet" shapeRendering="crispEdges">
       {runs.map((run) => (
         <rect key={run.x} x={run.x} y={0} width={run.w} height={height} fill="#000" />
       ))}

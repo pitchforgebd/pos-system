@@ -34,7 +34,7 @@ export default async function CustomerPaymentsPage() {
       <DataTable
         caption={ph("Payment vouchers")}
         columns={[
-          { key: "number", header: ph("Receipt"), cell: (row) => row.number },
+          { key: "number", header: ph("Receipt"), cell: (row) => <a className="underline" href={`/customers/payments/${row.id}`}>{row.number}</a> },
           { key: "date", header: ph("Date"), cell: (row) => row.businessDate },
           { key: "customer", header: ph("Customer"), cell: (row) => row.customerName },
           { key: "method", header: ph("Method"), cell: (row) => row.method },

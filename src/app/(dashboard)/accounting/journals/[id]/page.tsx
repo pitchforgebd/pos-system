@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { ReverseForm } from "@/components/accounting/forms";
-import { PrintButton, PrintSheet } from "@/components/print/sheet";
+import { PrintSheet } from "@/components/print/document";
+import { PrintButton } from "@/components/print/sheet";
 import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { getSession } from "@/modules/auth/current-session";

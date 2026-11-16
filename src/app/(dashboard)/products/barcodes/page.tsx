@@ -30,7 +30,7 @@ export default async function BarcodesPage({ searchParams }: { searchParams: Pro
     <div className="space-y-6">
       <PageHeader
         title={ph("Barcode labels")}
-        description={ph("A label shows the barcode and the price at the level chosen, on an A4 sheet or a 38 × 25 mm label. Copies do not change stock, and every print is recorded.")}
+        description={ph("A label shows the product, the barcode and the price at the level chosen: on an A4 sheet (3 or 5 across) or on a thermal label printer (38 × 25, 50 × 25, 40 × 30, 50 × 30 mm, or two across on a roll). Copies do not change stock, and every print is recorded.")}
         breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Products", href: "/products" }, { label: ph("Barcodes") }]}
         actions={<Button href="/products/barcodes/report" variant="secondary">{ph("Print report")}</Button>}
       />

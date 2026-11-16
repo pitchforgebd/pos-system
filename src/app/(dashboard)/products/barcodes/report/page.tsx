@@ -34,7 +34,7 @@ export default async function BarcodeReportPage() {
           { key: "barcode", header: ph("Barcode"), cell: (row) => row.barcode },
           { key: "product", header: ph("Product"), cell: (row) => row.product },
           { key: "level", header: ph("Price level"), cell: (row) => row.level },
-          { key: "format", header: ph("Layout"), cell: (row) => (row.format === "LABEL_38X25" ? "38 × 25 mm" : row.format === "A4" ? "A4 sheet" : row.format) },
+          { key: "format", header: ph("Layout"), cell: (row) => ({ A4: "A4 (3)", A4_SMALL: "A4 (5)", LABEL_38X25: "38 × 25 mm", LABEL_50X25: "50 × 25 mm", LABEL_40X30: "40 × 30 mm", LABEL_50X30: "50 × 30 mm", LABEL_2UP_38X25: "2 × 38 × 25 mm" })[row.format] ?? row.format },
           { key: "copies", header: ph("Copies"), cell: (row) => row.copies },
           { key: "user", header: ph("Printed by"), cell: (row) => row.user },
         ]}

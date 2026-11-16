@@ -2,13 +2,13 @@ import { z } from "zod";
 import { defineRoute } from "@/core/http/define-route";
 
 import { clientIp, jsonError, jsonOk } from "@/lib/api/http";
-import { recordBarcodePrint } from "@/modules/catalog/barcodes";
+import { LABEL_FORMATS, recordBarcodePrint } from "@/modules/catalog/barcodes";
 
 const bodySchema = z.object({
   barcodeId: z.string().uuid(),
   copies: z.number().int(),
   level: z.string().trim().min(1).max(64).optional(),
-  format: z.enum(["A4", "LABEL_38X25"]).optional(),
+  format: z.enum(LABEL_FORMATS).optional(),
 });
 
 export const POST = defineRoute({
