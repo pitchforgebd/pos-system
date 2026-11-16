@@ -22,15 +22,16 @@ fi
 set +u
 source "$NODE_VENV"
 set -u
-log "node $(node -v), npm $(npm -v)"
+log "node $(node -v)"
 
 if [ ! -d .git ]; then
   log "turning $APP_ROOT into a checkout of $REPO"
   git init -q
   git remote add origin "$REPO"
 fi
-git fetch -q origin "$BRANCH"
-git reset -q --hard "origin/$BRANCH"
+# The host limits how many threads a user may run ("unable to create thread"): one thread, and only the newest commit.
+git -c pack.threads=1 -c index.threads=1 fetch -q --depth 1 origin "$BRANCH"
+git reset -q --hard FETCH_HEAD
 log "at $(git log -1 --format='%h %s')"
 
 npm install --include=dev --no-audit --no-fund

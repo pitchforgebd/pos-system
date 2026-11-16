@@ -43,5 +43,5 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p "${PORT:-22}" -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
           ssh -i ~/.ssh/deploy_key -p "${PORT:-22}" -o BatchMode=yes -o ServerAliveInterval=30 "$USER_NAME@$HOST" \
-            'cd ~/pos-system 2>/dev/null && git fetch -q origin main 2>/dev/null && git show origin/main:scripts/deploy.sh > /tmp/meridian-deploy.sh || curl -fsSL https://raw.githubusercontent.com/pitchforgebd/pos-system/main/scripts/deploy.sh -o /tmp/meridian-deploy.sh; bash /tmp/meridian-deploy.sh'
+            'curl -fsSL https://raw.githubusercontent.com/pitchforgebd/pos-system/main/scripts/deploy.sh -o /tmp/meridian-deploy.sh && bash /tmp/meridian-deploy.sh'
           rm -f ~/.ssh/deploy_key
