@@ -34,10 +34,24 @@ git -c pack.threads=1 -c index.threads=1 fetch -q --depth 1 origin "$BRANCH"
 git reset -q --hard FETCH_HEAD
 log "at $(git log -1 --format='%h %s')"
 
-npm install --include=dev --no-audit --no-fund
+# The host caps how many threads a user may run, and node aborts (core dumped) when it cannot start its own: fewer threads for node,
+# no core files (they would eat the disk quota), and npm told to open few connections.
+ulimit -c 0 || true
+export UV_THREADPOOL_SIZE=2
+export NODE_OPTIONS="--v8-pool-size=1 --max-old-space-size=${NODE_HEAP_MB:-1536}"
+log "threads allowed: $(ulimit -u), running now: $(ps -u "$(id -un)" -L 2>/dev/null | wc -l)"
+# the packages are installed only when the lock file changed since the last good install
+LOCK_HASH="$(sha256sum package-lock.json | cut -d' ' -f1)"
+if [ -d node_modules ] && [ "$(cat node_modules/.deploy-lock-hash 2>/dev/null)" = "$LOCK_HASH" ]; then
+  log "packages unchanged"
+else
+  npm install --include=dev --no-audit --no-fund --maxsockets=2 --prefer-offline
+  echo "$LOCK_HASH" > node_modules/.deploy-lock-hash
+fi
+find . -maxdepth 1 -name 'core.*' -delete 2>/dev/null || true
 set -a; . ./.env; set +a
 npx prisma migrate deploy
-NEXT_BUILD_CPUS="${NEXT_BUILD_CPUS:-1}" NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=2048}" npm run build:cpanel
+NEXT_BUILD_CPUS="${NEXT_BUILD_CPUS:-1}" npm run build:cpanel
 
 # restart the Node.js application (Passenger watches tmp/restart.txt; CloudLinux has its own command)
 mkdir -p tmp && touch tmp/restart.txt
