@@ -92,3 +92,20 @@ Schedule it daily in cPanel Cron Jobs. The script reads `DATABASE_URL` from the 
 ## 8. What stays unwired
 
 SMS provider credentials, the blueprint SMS key names, and object storage have no code path. In-memory rate limits reset when the process restarts. There is no second application cron.
+
+## 9. Deploy from GitHub (P14)
+
+`scripts/deploy.sh` does the release steps of section 3 on the server: it brings `~/pos-system` to `origin/main` (a folder that is not a
+checkout yet becomes one; untracked files such as `.env` and `storage/` stay), runs `npm install --include=dev`, `prisma migrate deploy`
+and `build:cpanel`, restarts the app and checks `/api/health`. It never seeds and never deletes data. It reads `.env` in the application
+root, so the values of section 2 must be in that file too (an SSH session does not see the cPanel app panel's variables; the build needs
+`APP_URL`).
+
+`.github/workflows/deploy.yml` runs it over SSH after CI passes on `main`, or by hand (Actions > Deploy > Run workflow). Once:
+
+1. Make an SSH key pair on your own computer (`ssh-keygen -t ed25519 -f meridian_deploy`). In cPanel > SSH Access > Manage SSH Keys,
+   import the public half and authorise it.
+2. In GitHub > Settings > Secrets and variables > Actions, add `DEPLOY_HOST` (the server name), `DEPLOY_PORT` (the SSH port), `DEPLOY_USER`
+   (the cPanel user) and `DEPLOY_KEY` (the whole private key).
+
+Without these secrets the workflow does nothing. The private key never goes into the repository.
