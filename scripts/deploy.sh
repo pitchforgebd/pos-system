@@ -53,6 +53,8 @@ fi
 find . -maxdepth 1 -name 'core.*' -delete 2>/dev/null || true
 set -a; . ./.env; set +a
 npx prisma migrate deploy
+# the database types the build checks against come from the schema: made every time, not only when the packages are installed
+npx prisma generate
 NEXT_BUILD_CPUS="${NEXT_BUILD_CPUS:-1}" npm run build:cpanel
 
 # restart the Node.js application (Passenger watches tmp/restart.txt; CloudLinux has its own command)
