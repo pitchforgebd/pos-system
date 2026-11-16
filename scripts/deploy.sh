@@ -17,8 +17,11 @@ cd "$APP_ROOT"
 if [ ! -f .env ]; then
   log "no .env in $APP_ROOT: create it first (see docs/CPANEL.md section 2)"; exit 2
 fi
+# the host's activate script reads variables it never sets, so strict mode is off while it runs
 # shellcheck disable=SC1090
+set +u
 source "$NODE_VENV"
+set -u
 log "node $(node -v), npm $(npm -v)"
 
 if [ ! -d .git ]; then
