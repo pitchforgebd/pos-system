@@ -144,8 +144,8 @@ export async function addExpiryLots(
     await tx.$executeRaw`
       INSERT INTO expiry_batches (id, organizationId, branchId, warehouseId, productId, variantId, variantScope, lot, manufacturedOn, expiresOn, quantity, createdAt, updatedAt)
       VALUES (${randomUUID()}, ${input.organizationId}, ${input.branchId}, ${input.warehouseId}, ${input.productId}, ${input.variantId ?? null}, ${input.variantId ?? ""},
-              ${lot.lot}, ${lot.manufacturedOn}, ${lot.expiresOn}, ${lot.quantity}, NOW(3), NOW(3)) AS incoming
-      ON DUPLICATE KEY UPDATE quantity = expiry_batches.quantity + incoming.quantity, updatedAt = NOW(3)
+              ${lot.lot}, ${lot.manufacturedOn}, ${lot.expiresOn}, ${lot.quantity}, NOW(3), NOW(3))
+      ON DUPLICATE KEY UPDATE quantity = quantity + VALUES(quantity), updatedAt = NOW(3)
     `;
   }
 }
